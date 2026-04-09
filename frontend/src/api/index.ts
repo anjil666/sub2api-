@@ -15,6 +15,7 @@ export { usageAPI } from './usage'
 export { userAPI } from './user'
 export { redeemAPI, type RedeemHistoryItem } from './redeem'
 export { userGroupsAPI } from './groups'
+export { modelsAPI, type ModelInfo, type GroupModels } from './models'
 export { totpAPI } from './totp'
 export { default as announcementsAPI } from './announcements'
 

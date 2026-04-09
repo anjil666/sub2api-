@@ -90,5 +90,11 @@ func RegisterUserRoutes(
 			subscriptions.GET("/progress", h.Subscription.GetProgress)
 			subscriptions.GET("/summary", h.Subscription.GetSummary)
 		}
+
+		// 模型广场
+		models := authenticated.Group("/models")
+		{
+			models.GET("", h.ModelSquare.List)
+		}
 	}
 }

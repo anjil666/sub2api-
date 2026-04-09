@@ -47,6 +47,7 @@ type Handlers struct {
 	OpenAIGateway *OpenAIGatewayHandler
 	Setting       *SettingHandler
 	Totp          *TotpHandler
+	ModelSquare   *ModelSquareHandler
 }
 
 // BuildInfo contains build-time information

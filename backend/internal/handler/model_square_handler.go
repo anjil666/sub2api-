@@ -1,0 +1,145 @@
+// Package handler provides HTTP request handlers for the application.
+package handler
+
+import (
+	"sort"
+	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
+	"github.com/Wei-Shaw/sub2api/internal/service"
+
+	"github.com/gin-gonic/gin"
+)
+
+// ModelSquareHandler handles model square (模型广场) requests
+type ModelSquareHandler struct {
+	gatewayService *service.GatewayService
+	pricingService *service.PricingService
+	apiKeyService  *service.APIKeyService
+}
+
+// NewModelSquareHandler creates a new ModelSquareHandler
+func NewModelSquareHandler(
+	gatewayService *service.GatewayService,
+	pricingService *service.PricingService,
+	apiKeyService *service.APIKeyService,
+) *ModelSquareHandler {
+	return &ModelSquareHandler{
+		gatewayService: gatewayService,
+		pricingService: pricingService,
+		apiKeyService:  apiKeyService,
+	}
+}
+
+// modelSquareItem represents a single model's information
+type modelSquareItem struct {
+	ModelName                 string  `json:"model_name"`
+	Provider                  string  `json:"provider"`
+	Mode                      string  `json:"mode"`
+	InputPricePerMillion      float64 `json:"input_price_per_million"`
+	OutputPricePerMillion     float64 `json:"output_price_per_million"`
+	CacheWritePricePerMillion float64 `json:"cache_write_price_per_million"`
+	CacheReadPricePerMillion  float64 `json:"cache_read_price_per_million"`
+	SupportsPromptCaching     bool    `json:"supports_prompt_caching"`
+	HasPricing                bool    `json:"has_pricing"`
+}
+
+// modelSquareGroup represents models available in a specific group
+type modelSquareGroup struct {
+	GroupID        int64             `json:"group_id"`
+	GroupName      string            `json:"group_name"`
+	Platform       string            `json:"platform"`
+	RateMultiplier float64           `json:"rate_multiplier"`
+	Models         []modelSquareItem `json:"models"`
+}
+
+// List returns all models available to the current user, grouped by group
+// GET /api/v1/models
+func (h *ModelSquareHandler) List(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	// 1. Get user's available groups
+	groups, err := h.apiKeyService.GetAvailableGroups(ctx, subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	// 2. For each group, get available models and their pricing
+	result := make([]modelSquareGroup, 0, len(groups))
+
+	for _, group := range groups {
+		groupID := group.ID
+		models := h.gatewayService.GetAvailableModels(ctx, &groupID, group.Platform)
+
+		if len(models) == 0 {
+			result = append(result, modelSquareGroup{
+				GroupID:        group.ID,
+				GroupName:      group.Name,
+				Platform:       group.Platform,
+				RateMultiplier: group.RateMultiplier,
+				Models:         []modelSquareItem{},
+			})
+			continue
+		}
+
+		sort.Strings(models)
+
+		modelInfos := make([]modelSquareItem, 0, len(models))
+		for _, modelName := range models {
+			pricing := h.pricingService.GetModelPricing(modelName)
+
+			info := modelSquareItem{
+				ModelName:  modelName,
+				HasPricing: pricing != nil,
+			}
+
+			if pricing != nil {
+				info.Provider = pricing.LiteLLMProvider
+				info.Mode = pricing.Mode
+				info.SupportsPromptCaching = pricing.SupportsPromptCaching
+				info.InputPricePerMillion = pricing.InputCostPerToken * 1_000_000 * group.RateMultiplier
+				info.OutputPricePerMillion = pricing.OutputCostPerToken * 1_000_000 * group.RateMultiplier
+				info.CacheWritePricePerMillion = pricing.CacheCreationInputTokenCost * 1_000_000 * group.RateMultiplier
+				info.CacheReadPricePerMillion = pricing.CacheReadInputTokenCost * 1_000_000 * group.RateMultiplier
+			} else {
+				info.Provider = inferProviderFromModelName(modelName)
+				info.Mode = "chat"
+			}
+
+			modelInfos = append(modelInfos, info)
+		}
+
+		result = append(result, modelSquareGroup{
+			GroupID:        group.ID,
+			GroupName:      group.Name,
+			Platform:       group.Platform,
+			RateMultiplier: group.RateMultiplier,
+			Models:         modelInfos,
+		})
+	}
+
+	response.Success(c, result)
+}
+
+// inferProviderFromModelName attempts to guess the provider from the model name
+func inferProviderFromModelName(modelName string) string {
+	lower := strings.ToLower(modelName)
+	switch {
+	case strings.Contains(lower, "claude"):
+		return "anthropic"
+	case strings.HasPrefix(lower, "gpt") || strings.HasPrefix(lower, "o1") || strings.HasPrefix(lower, "o3") || strings.HasPrefix(lower, "o4"):
+		return "openai"
+	case strings.Contains(lower, "gemini"):
+		return "google"
+	default:
+		return "unknown"
+	}
+}

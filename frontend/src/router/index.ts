@@ -212,6 +212,18 @@ const routes: RouteRecordRaw[] = [
       titleKey: 'customPage.title',
     }
   },
+  {
+    path: '/model-square',
+    name: 'ModelSquare',
+    component: () => import('@/views/user/ModelSquareView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Model Square',
+      titleKey: 'modelSquare.title',
+      descriptionKey: 'modelSquare.description'
+    }
+  },
 
   // ==================== Admin Routes ====================
   {
