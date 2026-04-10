@@ -160,6 +160,8 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		EnableFingerprintUnification:         settings.EnableFingerprintUnification,
 		EnableMetadataPassthrough:            settings.EnableMetadataPassthrough,
 		EnableCCHSigning:                     settings.EnableCCHSigning,
+		CheckinEnabled:                       settings.CheckinEnabled,
+		CheckinRewardAmount:                  settings.CheckinRewardAmount,
 	})
 }
 
@@ -268,6 +270,10 @@ type UpdateSettingsRequest struct {
 	EnableFingerprintUnification *bool `json:"enable_fingerprint_unification"`
 	EnableMetadataPassthrough    *bool `json:"enable_metadata_passthrough"`
 	EnableCCHSigning             *bool `json:"enable_cch_signing"`
+
+	// Checkin settings
+	CheckinEnabled      bool    `json:"checkin_enabled"`
+	CheckinRewardAmount float64 `json:"checkin_reward_amount"`
 }
 
 // UpdateSettings 更新系统设置
@@ -815,6 +821,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.EnableCCHSigning
 		}(),
+		CheckinEnabled:      req.CheckinEnabled,
+		CheckinRewardAmount: req.CheckinRewardAmount,
 	}
 
 	if err := h.settingService.UpdateSettings(c.Request.Context(), settings); err != nil {
@@ -917,6 +925,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		EnableFingerprintUnification:         updatedSettings.EnableFingerprintUnification,
 		EnableMetadataPassthrough:            updatedSettings.EnableMetadataPassthrough,
 		EnableCCHSigning:                     updatedSettings.EnableCCHSigning,
+		CheckinEnabled:                       updatedSettings.CheckinEnabled,
+		CheckinRewardAmount:                  updatedSettings.CheckinRewardAmount,
 	})
 }
 

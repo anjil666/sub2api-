@@ -22687,6 +22687,7 @@ type UserMutation struct {
 	totp_secret_encrypted         *string
 	totp_enabled                  *bool
 	totp_enabled_at               *time.Time
+	last_checkin_at               *time.Time
 	clearedFields                 map[string]struct{}
 	api_keys                      map[int64]struct{}
 	removedapi_keys               map[int64]struct{}
@@ -23401,6 +23402,55 @@ func (m *UserMutation) ResetTotpEnabledAt() {
 	delete(m.clearedFields, user.FieldTotpEnabledAt)
 }
 
+// SetLastCheckinAt sets the "last_checkin_at" field.
+func (m *UserMutation) SetLastCheckinAt(t time.Time) {
+	m.last_checkin_at = &t
+}
+
+// LastCheckinAt returns the value of the "last_checkin_at" field in the mutation.
+func (m *UserMutation) LastCheckinAt() (r time.Time, exists bool) {
+	v := m.last_checkin_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastCheckinAt returns the old "last_checkin_at" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldLastCheckinAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastCheckinAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastCheckinAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastCheckinAt: %w", err)
+	}
+	return oldValue.LastCheckinAt, nil
+}
+
+// ClearLastCheckinAt clears the value of the "last_checkin_at" field.
+func (m *UserMutation) ClearLastCheckinAt() {
+	m.last_checkin_at = nil
+	m.clearedFields[user.FieldLastCheckinAt] = struct{}{}
+}
+
+// LastCheckinAtCleared returns if the "last_checkin_at" field was cleared in this mutation.
+func (m *UserMutation) LastCheckinAtCleared() bool {
+	_, ok := m.clearedFields[user.FieldLastCheckinAt]
+	return ok
+}
+
+// ResetLastCheckinAt resets all changes to the "last_checkin_at" field.
+func (m *UserMutation) ResetLastCheckinAt() {
+	m.last_checkin_at = nil
+	delete(m.clearedFields, user.FieldLastCheckinAt)
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by ids.
 func (m *UserMutation) AddAPIKeyIDs(ids ...int64) {
 	if m.api_keys == nil {
@@ -23964,6 +24014,9 @@ func (m *UserMutation) Fields() []string {
 	if m.totp_enabled_at != nil {
 		fields = append(fields, user.FieldTotpEnabledAt)
 	}
+	if m.last_checkin_at != nil {
+		fields = append(fields, user.FieldLastCheckinAt)
+	}
 	return fields
 }
 
@@ -24000,6 +24053,8 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.TotpEnabled()
 	case user.FieldTotpEnabledAt:
 		return m.TotpEnabledAt()
+	case user.FieldLastCheckinAt:
+		return m.LastCheckinAt()
 	}
 	return nil, false
 }
@@ -24037,6 +24092,8 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldTotpEnabled(ctx)
 	case user.FieldTotpEnabledAt:
 		return m.OldTotpEnabledAt(ctx)
+	case user.FieldLastCheckinAt:
+		return m.OldLastCheckinAt(ctx)
 	}
 	return nil, fmt.Errorf("unknown User field %s", name)
 }
@@ -24144,6 +24201,13 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetTotpEnabledAt(v)
 		return nil
+	case user.FieldLastCheckinAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastCheckinAt(v)
+		return nil
 	}
 	return fmt.Errorf("unknown User field %s", name)
 }
@@ -24210,6 +24274,9 @@ func (m *UserMutation) ClearedFields() []string {
 	if m.FieldCleared(user.FieldTotpEnabledAt) {
 		fields = append(fields, user.FieldTotpEnabledAt)
 	}
+	if m.FieldCleared(user.FieldLastCheckinAt) {
+		fields = append(fields, user.FieldLastCheckinAt)
+	}
 	return fields
 }
 
@@ -24232,6 +24299,9 @@ func (m *UserMutation) ClearField(name string) error {
 		return nil
 	case user.FieldTotpEnabledAt:
 		m.ClearTotpEnabledAt()
+		return nil
+	case user.FieldLastCheckinAt:
+		m.ClearLastCheckinAt()
 		return nil
 	}
 	return fmt.Errorf("unknown User nullable field %s", name)
@@ -24282,6 +24352,9 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldTotpEnabledAt:
 		m.ResetTotpEnabledAt()
+		return nil
+	case user.FieldLastCheckinAt:
+		m.ResetLastCheckinAt()
 		return nil
 	}
 	return fmt.Errorf("unknown User field %s", name)

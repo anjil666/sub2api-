@@ -23,6 +23,7 @@ func UserFromServiceShallow(u *service.User) *User {
 		AllowedGroups: u.AllowedGroups,
 		CreatedAt:     u.CreatedAt,
 		UpdatedAt:     u.UpdatedAt,
+		LastCheckinAt: u.LastCheckinAt,
 	}
 }
 

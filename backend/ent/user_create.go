@@ -210,6 +210,20 @@ func (_c *UserCreate) SetNillableTotpEnabledAt(v *time.Time) *UserCreate {
 	return _c
 }
 
+// SetLastCheckinAt sets the "last_checkin_at" field.
+func (_c *UserCreate) SetLastCheckinAt(v time.Time) *UserCreate {
+	_c.mutation.SetLastCheckinAt(v)
+	return _c
+}
+
+// SetNillableLastCheckinAt sets the "last_checkin_at" field if the given value is not nil.
+func (_c *UserCreate) SetNillableLastCheckinAt(v *time.Time) *UserCreate {
+	if v != nil {
+		_c.SetLastCheckinAt(*v)
+	}
+	return _c
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_c *UserCreate) AddAPIKeyIDs(ids ...int64) *UserCreate {
 	_c.mutation.AddAPIKeyIDs(ids...)
@@ -569,6 +583,10 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.TotpEnabledAt(); ok {
 		_spec.SetField(user.FieldTotpEnabledAt, field.TypeTime, value)
 		_node.TotpEnabledAt = &value
+	}
+	if value, ok := _c.mutation.LastCheckinAt(); ok {
+		_spec.SetField(user.FieldLastCheckinAt, field.TypeTime, value)
+		_node.LastCheckinAt = &value
 	}
 	if nodes := _c.mutation.APIKeysIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -956,6 +974,24 @@ func (u *UserUpsert) ClearTotpEnabledAt() *UserUpsert {
 	return u
 }
 
+// SetLastCheckinAt sets the "last_checkin_at" field.
+func (u *UserUpsert) SetLastCheckinAt(v time.Time) *UserUpsert {
+	u.Set(user.FieldLastCheckinAt, v)
+	return u
+}
+
+// UpdateLastCheckinAt sets the "last_checkin_at" field to the value that was provided on create.
+func (u *UserUpsert) UpdateLastCheckinAt() *UserUpsert {
+	u.SetExcluded(user.FieldLastCheckinAt)
+	return u
+}
+
+// ClearLastCheckinAt clears the value of the "last_checkin_at" field.
+func (u *UserUpsert) ClearLastCheckinAt() *UserUpsert {
+	u.SetNull(user.FieldLastCheckinAt)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -1215,6 +1251,27 @@ func (u *UserUpsertOne) UpdateTotpEnabledAt() *UserUpsertOne {
 func (u *UserUpsertOne) ClearTotpEnabledAt() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.ClearTotpEnabledAt()
+	})
+}
+
+// SetLastCheckinAt sets the "last_checkin_at" field.
+func (u *UserUpsertOne) SetLastCheckinAt(v time.Time) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetLastCheckinAt(v)
+	})
+}
+
+// UpdateLastCheckinAt sets the "last_checkin_at" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateLastCheckinAt() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateLastCheckinAt()
+	})
+}
+
+// ClearLastCheckinAt clears the value of the "last_checkin_at" field.
+func (u *UserUpsertOne) ClearLastCheckinAt() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.ClearLastCheckinAt()
 	})
 }
 
@@ -1643,6 +1700,27 @@ func (u *UserUpsertBulk) UpdateTotpEnabledAt() *UserUpsertBulk {
 func (u *UserUpsertBulk) ClearTotpEnabledAt() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.ClearTotpEnabledAt()
+	})
+}
+
+// SetLastCheckinAt sets the "last_checkin_at" field.
+func (u *UserUpsertBulk) SetLastCheckinAt(v time.Time) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetLastCheckinAt(v)
+	})
+}
+
+// UpdateLastCheckinAt sets the "last_checkin_at" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateLastCheckinAt() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateLastCheckinAt()
+	})
+}
+
+// ClearLastCheckinAt clears the value of the "last_checkin_at" field.
+func (u *UserUpsertBulk) ClearLastCheckinAt() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.ClearLastCheckinAt()
 	})
 }
 

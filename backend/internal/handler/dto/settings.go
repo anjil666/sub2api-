@@ -121,6 +121,10 @@ type SystemSettings struct {
 	EnableFingerprintUnification bool `json:"enable_fingerprint_unification"`
 	EnableMetadataPassthrough    bool `json:"enable_metadata_passthrough"`
 	EnableCCHSigning             bool `json:"enable_cch_signing"`
+
+	// Checkin settings
+	CheckinEnabled      bool    `json:"checkin_enabled"`
+	CheckinRewardAmount float64 `json:"checkin_reward_amount"`
 }
 
 type DefaultSubscriptionSetting struct {

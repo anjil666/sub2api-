@@ -542,3 +542,15 @@ func (r *userRepository) DisableTotp(ctx context.Context, userID int64) error {
 	}
 	return nil
 }
+
+// UpdateLastCheckin 更新用户最后签到时间
+func (r *userRepository) UpdateLastCheckin(ctx context.Context, userID int64, checkinAt time.Time) error {
+	client := clientFromContext(ctx, r.client)
+	_, err := client.User.UpdateOneID(userID).
+		SetLastCheckinAt(checkinAt).
+		Save(ctx)
+	if err != nil {
+		return translatePersistenceError(err, service.ErrUserNotFound, nil)
+	}
+	return nil
+}

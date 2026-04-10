@@ -45,10 +45,28 @@ export async function changePassword(
   return data
 }
 
+/**
+ * Daily check-in to receive balance reward
+ * @returns Check-in result with reward amount and new balance
+ */
+export async function dailyCheckin(): Promise<{
+  reward: number
+  new_balance: number
+  checkin_at: string
+}> {
+  const { data } = await apiClient.post<{
+    reward: number
+    new_balance: number
+    checkin_at: string
+  }>('/user/checkin')
+  return data
+}
+
 export const userAPI = {
   getProfile,
   updateProfile,
-  changePassword
+  changePassword,
+  dailyCheckin
 }
 
 export default userAPI

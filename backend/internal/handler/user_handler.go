@@ -104,3 +104,21 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 
 	response.Success(c, dto.UserFromService(updatedUser))
 }
+
+// DailyCheckin handles daily check-in
+// POST /api/v1/user/checkin
+func (h *UserHandler) DailyCheckin(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	result, err := h.userService.DailyCheckin(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, result)
+}

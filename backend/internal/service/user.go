@@ -30,6 +30,9 @@ type User struct {
 	TotpEnabled         bool       // 是否启用 TOTP
 	TotpEnabledAt       *time.Time // TOTP 启用时间
 
+	// 签到字段
+	LastCheckinAt *time.Time // 最后签到时间
+
 	APIKeys       []APIKey
 	Subscriptions []UserSubscription
 }

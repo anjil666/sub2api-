@@ -43,6 +43,8 @@ const (
 	FieldTotpEnabled = "totp_enabled"
 	// FieldTotpEnabledAt holds the string denoting the totp_enabled_at field in the database.
 	FieldTotpEnabledAt = "totp_enabled_at"
+	// FieldLastCheckinAt holds the string denoting the last_checkin_at field in the database.
+	FieldLastCheckinAt = "last_checkin_at"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
 	EdgeAPIKeys = "api_keys"
 	// EdgeRedeemCodes holds the string denoting the redeem_codes edge name in mutations.
@@ -152,6 +154,7 @@ var Columns = []string{
 	FieldTotpSecretEncrypted,
 	FieldTotpEnabled,
 	FieldTotpEnabledAt,
+	FieldLastCheckinAt,
 }
 
 var (
@@ -286,6 +289,11 @@ func ByTotpEnabled(opts ...sql.OrderTermOption) OrderOption {
 // ByTotpEnabledAt orders the results by the totp_enabled_at field.
 func ByTotpEnabledAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTotpEnabledAt, opts...).ToFunc()
+}
+
+// ByLastCheckinAt orders the results by the last_checkin_at field.
+func ByLastCheckinAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastCheckinAt, opts...).ToFunc()
 }
 
 // ByAPIKeysCount orders the results by api_keys count.

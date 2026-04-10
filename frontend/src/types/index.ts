@@ -34,6 +34,7 @@ export interface User {
   status: 'active' | 'disabled' // Account status
   allowed_groups: number[] | null // Allowed group IDs (null = all non-exclusive groups)
   subscriptions?: UserSubscription[] // User's active subscriptions
+  last_checkin_at?: string
   created_at: string
   updated_at: string
 }
@@ -113,6 +114,7 @@ export interface PublicSettings {
   oidc_oauth_provider_name: string
   sora_client_enabled: boolean
   backend_mode_enabled: boolean
+  checkin_enabled: boolean
   version: string
 }
 

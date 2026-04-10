@@ -14,6 +14,8 @@ var (
 	ErrUserNotFound      = infraerrors.NotFound("USER_NOT_FOUND", "user not found")
 	ErrPasswordIncorrect = infraerrors.BadRequest("PASSWORD_INCORRECT", "current password is incorrect")
 	ErrInsufficientPerms = infraerrors.Forbidden("INSUFFICIENT_PERMISSIONS", "insufficient permissions")
+	ErrCheckinAlreadyDone = infraerrors.BadRequest("CHECKIN_ALREADY_DONE", "already checked in today")
+	ErrCheckinDisabled    = infraerrors.BadRequest("CHECKIN_DISABLED", "daily check-in is not enabled")
 )
 
 // UserListFilters contains all filter options for listing users
@@ -54,6 +56,9 @@ type UserRepository interface {
 	UpdateTotpSecret(ctx context.Context, userID int64, encryptedSecret *string) error
 	EnableTotp(ctx context.Context, userID int64) error
 	DisableTotp(ctx context.Context, userID int64) error
+
+	// 签到
+	UpdateLastCheckin(ctx context.Context, userID int64, checkinAt time.Time) error
 }
 
 // UpdateProfileRequest 更新用户资料请求
@@ -74,14 +79,16 @@ type UserService struct {
 	userRepo             UserRepository
 	authCacheInvalidator APIKeyAuthCacheInvalidator
 	billingCache         BillingCache
+	settingService       *SettingService
 }
 
 // NewUserService 创建用户服务实例
-func NewUserService(userRepo UserRepository, authCacheInvalidator APIKeyAuthCacheInvalidator, billingCache BillingCache) *UserService {
+func NewUserService(userRepo UserRepository, authCacheInvalidator APIKeyAuthCacheInvalidator, billingCache BillingCache, settingService *SettingService) *UserService {
 	return &UserService{
 		userRepo:             userRepo,
 		authCacheInvalidator: authCacheInvalidator,
 		billingCache:         billingCache,
+		settingService:       settingService,
 	}
 }
 
@@ -206,6 +213,72 @@ func (s *UserService) UpdateBalance(ctx context.Context, userID int64, amount fl
 		}()
 	}
 	return nil
+}
+
+// DailyCheckin 每日签到
+func (s *UserService) DailyCheckin(ctx context.Context, userID int64) (map[string]interface{}, error) {
+	// 1. 检查签到功能是否启用
+	settings, err := s.settingService.GetSettings(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get settings: %w", err)
+	}
+	if !settings.CheckinEnabled {
+		return nil, ErrCheckinDisabled
+	}
+
+	rewardAmount := settings.CheckinRewardAmount
+	if rewardAmount <= 0 {
+		rewardAmount = 1.0
+	}
+
+	// 2. 获取用户，检查 last_checkin_at 是否在今天（北京时间）
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	beijing := time.FixedZone("CST", 8*3600)
+	now := time.Now().In(beijing)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, beijing)
+
+	if user.LastCheckinAt != nil {
+		lastCheckinBeijing := user.LastCheckinAt.In(beijing)
+		lastCheckinDay := time.Date(lastCheckinBeijing.Year(), lastCheckinBeijing.Month(), lastCheckinBeijing.Day(), 0, 0, 0, 0, beijing)
+		if !lastCheckinDay.Before(today) {
+			return nil, ErrCheckinAlreadyDone
+		}
+	}
+
+	// 3. 更新 last_checkin_at
+	checkinTime := time.Now()
+	if err := s.userRepo.UpdateLastCheckin(ctx, userID, checkinTime); err != nil {
+		return nil, fmt.Errorf("update last checkin: %w", err)
+	}
+
+	// 4. 增加余额
+	if err := s.userRepo.UpdateBalance(ctx, userID, rewardAmount); err != nil {
+		return nil, fmt.Errorf("update balance: %w", err)
+	}
+
+	// 5. 缓存失效（auth + billing）
+	if s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
+	}
+	if s.billingCache != nil {
+		go func() {
+			cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := s.billingCache.InvalidateUserBalance(cacheCtx, userID); err != nil {
+				log.Printf("invalidate user balance cache after checkin failed: user_id=%d err=%v", userID, err)
+			}
+		}()
+	}
+
+	return map[string]interface{}{
+		"reward":      rewardAmount,
+		"new_balance": user.Balance + rewardAmount,
+		"checkin_at":  checkinTime,
+	}, nil
 }
 
 // UpdateConcurrency 更新用户并发数（管理员功能）

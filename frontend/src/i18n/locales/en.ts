@@ -941,6 +941,16 @@ export default {
     }
   },
 
+  // Checkin
+  checkin: {
+    title: 'Daily Check-in',
+    description: 'Check in once daily to receive a balance reward',
+    button: 'Check In',
+    alreadyDone: 'Checked In',
+    success: 'Check-in successful! Reward: {amount}',
+    disabled: 'Check-in is not enabled'
+  },
+
   // Empty States
   empty: {
     noData: 'No data found'
@@ -4710,6 +4720,14 @@ export default {
         presetOpusOnly: 'Opus only for 1M',
         presetOpusOnlyDesc: 'Pass for Opus, filter others',
         commonPatterns: 'Common patterns'
+      },
+      checkin: {
+        title: 'Check-in Settings',
+        description: 'Configure daily check-in feature',
+        enabled: 'Enable Check-in',
+        enabledHint: 'When enabled, users can check in daily on their profile page to receive a balance reward',
+        rewardAmount: 'Reward Amount',
+        rewardAmountHint: 'Balance reward for each daily check-in'
       },
       saveSettings: 'Save Settings',
       saving: 'Saving...',

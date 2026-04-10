@@ -72,6 +72,11 @@ func (User) Fields() []ent.Field {
 		field.Time("totp_enabled_at").
 			Optional().
 			Nillable(),
+
+		// 签到字段
+		field.Time("last_checkin_at").
+			Optional().
+			Nillable(),
 	}
 }
 

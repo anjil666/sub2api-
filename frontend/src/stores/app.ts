@@ -336,6 +336,7 @@ export const useAppStore = defineStore('app', () => {
         oidc_oauth_provider_name: 'OIDC',
         sora_client_enabled: false,
         backend_mode_enabled: false,
+        checkin_enabled: false,
         version: siteVersion.value
       }
     }

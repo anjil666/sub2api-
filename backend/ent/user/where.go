@@ -860,6 +860,61 @@ func TotpEnabledAtNotNil() predicate.User {
 	return predicate.User(sql.FieldNotNull(FieldTotpEnabledAt))
 }
 
+// LastCheckinAt applies equality check predicate on the "last_checkin_at" field. It's identical to LastCheckinAtEQ.
+func LastCheckinAt(v time.Time) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldLastCheckinAt, v))
+}
+
+// LastCheckinAtEQ applies the EQ predicate on the "last_checkin_at" field.
+func LastCheckinAtEQ(v time.Time) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldLastCheckinAt, v))
+}
+
+// LastCheckinAtNEQ applies the NEQ predicate on the "last_checkin_at" field.
+func LastCheckinAtNEQ(v time.Time) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldLastCheckinAt, v))
+}
+
+// LastCheckinAtIn applies the In predicate on the "last_checkin_at" field.
+func LastCheckinAtIn(vs ...time.Time) predicate.User {
+	return predicate.User(sql.FieldIn(FieldLastCheckinAt, vs...))
+}
+
+// LastCheckinAtNotIn applies the NotIn predicate on the "last_checkin_at" field.
+func LastCheckinAtNotIn(vs ...time.Time) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldLastCheckinAt, vs...))
+}
+
+// LastCheckinAtGT applies the GT predicate on the "last_checkin_at" field.
+func LastCheckinAtGT(v time.Time) predicate.User {
+	return predicate.User(sql.FieldGT(FieldLastCheckinAt, v))
+}
+
+// LastCheckinAtGTE applies the GTE predicate on the "last_checkin_at" field.
+func LastCheckinAtGTE(v time.Time) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldLastCheckinAt, v))
+}
+
+// LastCheckinAtLT applies the LT predicate on the "last_checkin_at" field.
+func LastCheckinAtLT(v time.Time) predicate.User {
+	return predicate.User(sql.FieldLT(FieldLastCheckinAt, v))
+}
+
+// LastCheckinAtLTE applies the LTE predicate on the "last_checkin_at" field.
+func LastCheckinAtLTE(v time.Time) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldLastCheckinAt, v))
+}
+
+// LastCheckinAtIsNil applies the IsNil predicate on the "last_checkin_at" field.
+func LastCheckinAtIsNil() predicate.User {
+	return predicate.User(sql.FieldIsNull(FieldLastCheckinAt))
+}
+
+// LastCheckinAtNotNil applies the NotNil predicate on the "last_checkin_at" field.
+func LastCheckinAtNotNil() predicate.User {
+	return predicate.User(sql.FieldNotNull(FieldLastCheckinAt))
+}
+
 // HasAPIKeys applies the HasEdge predicate on the "api_keys" edge.
 func HasAPIKeys() predicate.User {
 	return predicate.User(func(s *sql.Selector) {

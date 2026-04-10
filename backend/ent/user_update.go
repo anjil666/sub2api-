@@ -242,6 +242,26 @@ func (_u *UserUpdate) ClearTotpEnabledAt() *UserUpdate {
 	return _u
 }
 
+// SetLastCheckinAt sets the "last_checkin_at" field.
+func (_u *UserUpdate) SetLastCheckinAt(v time.Time) *UserUpdate {
+	_u.mutation.SetLastCheckinAt(v)
+	return _u
+}
+
+// SetNillableLastCheckinAt sets the "last_checkin_at" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableLastCheckinAt(v *time.Time) *UserUpdate {
+	if v != nil {
+		_u.SetLastCheckinAt(*v)
+	}
+	return _u
+}
+
+// ClearLastCheckinAt clears the value of the "last_checkin_at" field.
+func (_u *UserUpdate) ClearLastCheckinAt() *UserUpdate {
+	_u.mutation.ClearLastCheckinAt()
+	return _u
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *UserUpdate) AddAPIKeyIDs(ids ...int64) *UserUpdate {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -708,6 +728,12 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.TotpEnabledAtCleared() {
 		_spec.ClearField(user.FieldTotpEnabledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.LastCheckinAt(); ok {
+		_spec.SetField(user.FieldLastCheckinAt, field.TypeTime, value)
+	}
+	if _u.mutation.LastCheckinAtCleared() {
+		_spec.ClearField(user.FieldLastCheckinAt, field.TypeTime)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1352,6 +1378,26 @@ func (_u *UserUpdateOne) ClearTotpEnabledAt() *UserUpdateOne {
 	return _u
 }
 
+// SetLastCheckinAt sets the "last_checkin_at" field.
+func (_u *UserUpdateOne) SetLastCheckinAt(v time.Time) *UserUpdateOne {
+	_u.mutation.SetLastCheckinAt(v)
+	return _u
+}
+
+// SetNillableLastCheckinAt sets the "last_checkin_at" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableLastCheckinAt(v *time.Time) *UserUpdateOne {
+	if v != nil {
+		_u.SetLastCheckinAt(*v)
+	}
+	return _u
+}
+
+// ClearLastCheckinAt clears the value of the "last_checkin_at" field.
+func (_u *UserUpdateOne) ClearLastCheckinAt() *UserUpdateOne {
+	_u.mutation.ClearLastCheckinAt()
+	return _u
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *UserUpdateOne) AddAPIKeyIDs(ids ...int64) *UserUpdateOne {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -1848,6 +1894,12 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if _u.mutation.TotpEnabledAtCleared() {
 		_spec.ClearField(user.FieldTotpEnabledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.LastCheckinAt(); ok {
+		_spec.SetField(user.FieldLastCheckinAt, field.TypeTime, value)
+	}
+	if _u.mutation.LastCheckinAtCleared() {
+		_spec.ClearField(user.FieldLastCheckinAt, field.TypeTime)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -945,6 +945,16 @@ export default {
     }
   },
 
+  // Checkin
+  checkin: {
+    title: '每日签到',
+    description: '每天签到一次，领取余额奖励',
+    button: '立即签到',
+    alreadyDone: '今日已签到',
+    success: '签到成功！奖励 {amount} 余额',
+    disabled: '签到功能未开启'
+  },
+
   // Empty States
   empty: {
     noData: '暂无数据'
@@ -4873,6 +4883,14 @@ export default {
         presetOpusOnly: '仅 Opus 允许 1M',
         presetOpusOnlyDesc: 'Opus 透传，其他模型过滤',
         commonPatterns: '常用模式'
+      },
+      checkin: {
+        title: '签到设置',
+        description: '配置每日签到功能',
+        enabled: '启用签到',
+        enabledHint: '开启后，用户可在个人资料页面进行每日签到领取余额奖励',
+        rewardAmount: '签到奖励金额',
+        rewardAmountHint: '每次签到奖励的余额数量'
       },
       saveSettings: '保存设置',
       saving: '保存中...',
