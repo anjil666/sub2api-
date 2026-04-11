@@ -120,7 +120,7 @@
     </TablePageLayout>
 
     <!-- 新建/编辑弹窗 -->
-    <DialogModal :show="dialogVisible" :title="dialogMode === 'create' ? t('admin.upstream.addSite') : t('admin.upstream.editSite')" @close="dialogVisible = false">
+    <BaseDialog :show="dialogVisible" :title="dialogMode === 'create' ? t('admin.upstream.addSite') : t('admin.upstream.editSite')" @close="dialogVisible = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
         <div>
           <label class="label">{{ t('admin.upstream.form.name') }}</label>
@@ -159,10 +159,10 @@
           <button type="submit" class="btn btn-primary" :disabled="submitting">{{ t('common.save') }}</button>
         </div>
       </form>
-    </DialogModal>
+    </BaseDialog>
 
     <!-- 模型预览弹窗 -->
-    <DialogModal :show="modelsDialogVisible" :title="t('admin.upstream.modelsTitle')" @close="modelsDialogVisible = false">
+    <BaseDialog :show="modelsDialogVisible" :title="t('admin.upstream.modelsTitle')" @close="modelsDialogVisible = false">
       <div v-if="modelsLoading" class="py-8 text-center text-gray-500">{{ t('common.loading') }}...</div>
       <div v-else-if="modelsList.length === 0" class="py-8 text-center text-gray-500">{{ t('admin.upstream.noModels') }}</div>
       <div v-else class="max-h-96 overflow-y-auto">
@@ -174,10 +174,10 @@
         </div>
         <div class="mt-3 text-sm text-gray-500 text-center">{{ t('admin.upstream.totalModels', { count: modelsList.length }) }}</div>
       </div>
-    </DialogModal>
+    </BaseDialog>
 
     <!-- 余额弹窗 -->
-    <DialogModal :show="balanceDialogVisible" :title="t('admin.upstream.balanceTitle')" @close="balanceDialogVisible = false">
+    <BaseDialog :show="balanceDialogVisible" :title="t('admin.upstream.balanceTitle')" @close="balanceDialogVisible = false">
       <div v-if="balanceLoading" class="py-8 text-center text-gray-500">{{ t('common.loading') }}...</div>
       <div v-else-if="balanceInfo" class="space-y-3 py-4">
         <div class="flex justify-between items-center">
@@ -193,7 +193,7 @@
           <span>${{ balanceInfo.used_usd.toFixed(2) }}</span>
         </div>
       </div>
-    </DialogModal>
+    </BaseDialog>
   </AppLayout>
 </template>
 
@@ -208,7 +208,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
-import DialogModal from '@/components/common/DialogModal.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 
 const { t } = useI18n()
 
