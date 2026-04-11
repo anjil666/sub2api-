@@ -396,6 +396,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/upstream-sync',
+    name: 'AdminUpstreamSync',
+    component: () => import('@/views/admin/UpstreamSyncView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Upstream Sync',
+      titleKey: 'admin.upstream.title',
+      descriptionKey: 'admin.upstream.description'
+    }
+  },
+  {
     path: '/admin/settings',
     name: 'AdminSettings',
     component: () => import('@/views/admin/SettingsView.vue'),

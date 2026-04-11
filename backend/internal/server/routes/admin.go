@@ -91,6 +91,9 @@ func RegisterAdminRoutes(
 
 		// 推荐返利
 		registerReferralRoutes(admin, h)
+
+		// 上游同步
+		registerUpstreamSyncRoutes(admin, h)
 	}
 }
 
@@ -567,5 +570,20 @@ func registerReferralRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	{
 		referral.GET("/commissions", h.Admin.Referral.GetCommissions)
 		referral.POST("/credit-commission", h.Admin.Referral.CreditCommission)
+	}
+}
+
+func registerUpstreamSyncRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	upstream := admin.Group("/upstream-sites")
+	{
+		upstream.GET("", h.Admin.UpstreamSync.List)
+		upstream.GET("/:id", h.Admin.UpstreamSync.GetByID)
+		upstream.POST("", h.Admin.UpstreamSync.Create)
+		upstream.PUT("/:id", h.Admin.UpstreamSync.Update)
+		upstream.DELETE("/:id", h.Admin.UpstreamSync.Delete)
+		upstream.POST("/:id/sync", h.Admin.UpstreamSync.Sync)
+		upstream.GET("/:id/balance", h.Admin.UpstreamSync.GetBalance)
+		upstream.GET("/:id/models", h.Admin.UpstreamSync.GetModels)
+		upstream.POST("/:id/toggle", h.Admin.UpstreamSync.Toggle)
 	}
 }

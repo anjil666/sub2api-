@@ -1,0 +1,48 @@
+package service
+
+import "time"
+
+// UpstreamSite 上游站点配置
+type UpstreamSite struct {
+	ID                  int64
+	Name                string
+	Platform            string // "sub2api"
+	BaseURL             string
+	APIKey              string // 内存中明文，存储时 AES 加密
+	PriceMultiplier     float64
+	SyncEnabled         bool
+	SyncIntervalMinutes int
+	LastSyncAt          *time.Time
+	LastSyncStatus      string // "pending", "success", "error"
+	LastSyncError       string
+	LastSyncModelCount  int
+	Status              string // "active", "disabled"
+	ManagedGroupID      *int64
+	ManagedAccountID    *int64
+	ManagedChannelID    *int64
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}
+
+// UpstreamModelInfo 上游模型信息（来自 /v1/models）
+type UpstreamModelInfo struct {
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	DisplayName string `json:"display_name"`
+}
+
+// UpstreamBalanceInfo 上游余额信息（来自 /v1/usage）
+type UpstreamBalanceInfo struct {
+	BalanceUSD   float64 `json:"balance_usd"`
+	UsedUSD      float64 `json:"used_usd"`
+	RemainingUSD float64 `json:"remaining_usd"`
+}
+
+// SyncResult 同步结果
+type SyncResult struct {
+	ModelsDiscovered int    `json:"models_discovered"`
+	GroupID          int64  `json:"group_id,omitempty"`
+	AccountID        int64  `json:"account_id,omitempty"`
+	ChannelID        int64  `json:"channel_id,omitempty"`
+	Error            string `json:"error,omitempty"`
+}

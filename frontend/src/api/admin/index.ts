@@ -27,6 +27,7 @@ import backupAPI from './backup'
 import tlsFingerprintProfileAPI from './tlsFingerprintProfile'
 import channelsAPI from './channels'
 import referralAPI from './referral'
+import upstreamAPI from './upstream'
 
 /**
  * Unified admin API object for convenient access
@@ -55,7 +56,8 @@ export const adminAPI = {
   backup: backupAPI,
   tlsFingerprintProfiles: tlsFingerprintProfileAPI,
   channels: channelsAPI,
-  referral: referralAPI
+  referral: referralAPI,
+  upstream: upstreamAPI
 }
 
 export {
@@ -82,7 +84,8 @@ export {
   backupAPI,
   tlsFingerprintProfileAPI,
   channelsAPI,
-  referralAPI
+  referralAPI,
+  upstreamAPI
 }
 
 export default adminAPI
@@ -92,3 +95,4 @@ export type { BalanceHistoryItem } from './users'
 export type { ErrorPassthroughRule, CreateRuleRequest, UpdateRuleRequest } from './errorPassthrough'
 export type { BackupAgentHealth, DataManagementConfig } from './dataManagement'
 export type { TLSFingerprintProfile, CreateProfileRequest, UpdateProfileRequest } from './tlsFingerprintProfile'
+export type { UpstreamSite, UpstreamBalanceInfo, UpstreamModelInfo, SyncResult } from './upstream'

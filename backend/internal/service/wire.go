@@ -149,6 +149,18 @@ func ProvideSubscriptionExpiryService(userSubRepo UserSubscriptionRepository) *S
 	return svc
 }
 
+// ProvideUpstreamSyncService creates and starts UpstreamSyncService.
+func ProvideUpstreamSyncService(
+	siteRepo UpstreamSiteRepository,
+	groupRepo GroupRepository,
+	adminService AdminService,
+	channelService *ChannelService,
+) *UpstreamSyncService {
+	svc := NewUpstreamSyncService(siteRepo, groupRepo, adminService, channelService)
+	svc.Start()
+	return svc
+}
+
 // ProvideTimingWheelService creates and starts TimingWheelService
 func ProvideTimingWheelService() (*TimingWheelService, error) {
 	svc, err := NewTimingWheelService()

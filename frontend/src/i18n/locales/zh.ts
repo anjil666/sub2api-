@@ -356,7 +356,8 @@ export default {
     buySubscription: '充值/订阅',
     docs: '文档',
     sora: 'Sora 创作',
-    modelSquare: '模型广场'
+    modelSquare: '模型广场',
+    upstreamSync: '上游同步'
   },
 
   // Model Square (模型广场)
@@ -4436,6 +4437,54 @@ export default {
         status: '状态',
         createdAt: '时间'
       }
+    },
+
+    // Upstream Sync
+    upstream: {
+      title: '上游同步',
+      description: '管理上游中转站，自动同步模型和定价',
+      addSite: '添加上游站点',
+      editSite: '编辑上游站点',
+      columns: {
+        name: '站点名称',
+        status: '状态',
+        syncStatus: '同步状态',
+        modelCount: '模型数',
+        multiplier: '倍率',
+        resources: '关联资源'
+      },
+      statusActive: '已启用',
+      statusDisabled: '已禁用',
+      syncSuccess: '同步成功',
+      syncError: '同步失败',
+      syncPending: '待同步',
+      syncNow: '立即同步',
+      syncing: '同步中...',
+      syncComplete: '同步完成，发现 {count} 个模型',
+      form: {
+        name: '站点名称',
+        baseUrl: 'Base URL',
+        apiKey: 'API Key',
+        apiKeyPlaceholder: '留空则不修改',
+        priceMultiplier: '价格倍率',
+        syncInterval: '同步间隔',
+        minutes: '分钟',
+        syncEnabled: '启用自动同步'
+      },
+      models: '模型',
+      modelsTitle: '上游模型列表',
+      noModels: '暂无模型',
+      totalModels: '共 {count} 个模型',
+      balance: '余额',
+      balanceTitle: '上游余额',
+      balanceRemaining: '剩余额度',
+      balanceTotal: '总额度',
+      balanceUsed: '已使用',
+      group: '分组',
+      account: '账号',
+      channel: '渠道',
+      notSynced: '未同步',
+      confirmDelete: '确定要删除上游站点「{name}」吗？已创建的分组、账号和渠道不会被删除。'
     },
 
     // Settings

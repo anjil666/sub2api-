@@ -356,7 +356,8 @@ export default {
     buySubscription: 'Recharge / Subscription',
     docs: 'Docs',
     sora: 'Sora Studio',
-    modelSquare: 'Model Square'
+    modelSquare: 'Model Square',
+    upstreamSync: 'Upstream Sync'
   },
 
   // Model Square
@@ -4271,6 +4272,54 @@ export default {
         status: 'Status',
         createdAt: 'Time'
       }
+    },
+
+    // Upstream Sync
+    upstream: {
+      title: 'Upstream Sync',
+      description: 'Manage upstream relay sites, auto-sync models and pricing',
+      addSite: 'Add Upstream Site',
+      editSite: 'Edit Upstream Site',
+      columns: {
+        name: 'Site Name',
+        status: 'Status',
+        syncStatus: 'Sync Status',
+        modelCount: 'Models',
+        multiplier: 'Multiplier',
+        resources: 'Resources'
+      },
+      statusActive: 'Active',
+      statusDisabled: 'Disabled',
+      syncSuccess: 'Success',
+      syncError: 'Error',
+      syncPending: 'Pending',
+      syncNow: 'Sync Now',
+      syncing: 'Syncing...',
+      syncComplete: 'Sync complete, discovered {count} models',
+      form: {
+        name: 'Site Name',
+        baseUrl: 'Base URL',
+        apiKey: 'API Key',
+        apiKeyPlaceholder: 'Leave empty to keep current',
+        priceMultiplier: 'Price Multiplier',
+        syncInterval: 'Sync Interval',
+        minutes: 'minutes',
+        syncEnabled: 'Enable Auto Sync'
+      },
+      models: 'Models',
+      modelsTitle: 'Upstream Models',
+      noModels: 'No models found',
+      totalModels: '{count} models total',
+      balance: 'Balance',
+      balanceTitle: 'Upstream Balance',
+      balanceRemaining: 'Remaining',
+      balanceTotal: 'Total',
+      balanceUsed: 'Used',
+      group: 'Group',
+      account: 'Account',
+      channel: 'Channel',
+      notSynced: 'Not synced',
+      confirmDelete: 'Delete upstream site "{name}"? Existing groups, accounts, and channels will not be removed.'
     },
 
     // Settings
