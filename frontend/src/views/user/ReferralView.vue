@@ -186,6 +186,10 @@ async function loadData() {
       referralAPI.getCommissions({ page: 1, page_size: 50 })
     ])
     stats.value = infoRes
+    // 如果后端返回的 referral_link 没有域名，用当前站点域名补全
+    if (stats.value && stats.value.referral_link && !stats.value.referral_link.startsWith('http')) {
+      stats.value.referral_link = window.location.origin + stats.value.referral_link
+    }
     referredUsers.value = usersRes.items || []
     commissions.value = commissionsRes.items || []
   } catch {
