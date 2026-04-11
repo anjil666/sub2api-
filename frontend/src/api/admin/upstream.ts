@@ -7,7 +7,10 @@ export interface UpstreamSite {
   name: string
   platform: string
   base_url: string
+  credential_mode: 'api_key' | 'login'
   api_key_masked: string
+  email_masked: string
+  has_password: boolean
   price_multiplier: number
   sync_enabled: boolean
   sync_interval_minutes: number
@@ -16,9 +19,7 @@ export interface UpstreamSite {
   last_sync_error: string
   last_sync_model_count: number
   status: string
-  managed_group_id: number | null
-  managed_account_id: number | null
-  managed_channel_id: number | null
+  managed_resource_count: number
   created_at: string
   updated_at: string
 }
@@ -26,7 +27,10 @@ export interface UpstreamSite {
 export interface CreateUpstreamSiteRequest {
   name: string
   base_url: string
-  api_key: string
+  credential_mode: 'api_key' | 'login'
+  api_key?: string
+  email?: string
+  password?: string
   price_multiplier: number
   sync_enabled: boolean
   sync_interval_minutes: number
@@ -35,7 +39,10 @@ export interface CreateUpstreamSiteRequest {
 export interface UpdateUpstreamSiteRequest {
   name: string
   base_url: string
+  credential_mode: 'api_key' | 'login'
   api_key?: string
+  email?: string
+  password?: string
   price_multiplier: number
   sync_enabled: boolean
   sync_interval_minutes: number
@@ -54,8 +61,25 @@ export interface UpstreamModelInfo {
   display_name: string
 }
 
+export interface UpstreamManagedResource {
+  id: number
+  upstream_key_id: string
+  upstream_key_prefix: string
+  upstream_key_name: string
+  upstream_group_id: number | null
+  managed_group_id: number | null
+  managed_account_id: number | null
+  managed_channel_id: number | null
+  model_count: number
+  status: string
+  last_synced_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface SyncResult {
   models_discovered: number
+  keys_discovered?: number
   group_id?: number
   account_id?: number
   channel_id?: number
@@ -111,6 +135,11 @@ async function getModels(id: number): Promise<UpstreamModelInfo[]> {
   return data
 }
 
+async function listResources(id: number): Promise<UpstreamManagedResource[]> {
+  const { data } = await apiClient.get(`/admin/upstream-sites/${id}/resources`)
+  return data
+}
+
 async function toggle(id: number): Promise<UpstreamSite> {
   const { data } = await apiClient.post(`/admin/upstream-sites/${id}/toggle`)
   return data
@@ -125,6 +154,7 @@ export const upstreamAPI = {
   syncNow,
   getBalance,
   getModels,
+  listResources,
   toggle
 }
 

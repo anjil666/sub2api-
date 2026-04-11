@@ -8,7 +8,13 @@ type UpstreamSite struct {
 	Name                string
 	Platform            string // "sub2api"
 	BaseURL             string
-	APIKey              string // 内存中明文，存储时 AES 加密
+	APIKey              string // 内存中明文，存储时 AES 加密（api_key 模式）
+	CredentialMode      string // "api_key" 或 "login"
+	Email               string // login 模式邮箱（内存明文）
+	Password            string // login 模式密码（内存明文）
+	CachedAccessToken   string // 缓存的 JWT access token
+	CachedRefreshToken  string // 缓存的 refresh token
+	TokenExpiresAt      *time.Time
 	PriceMultiplier     float64
 	SyncEnabled         bool
 	SyncIntervalMinutes int
@@ -17,9 +23,7 @@ type UpstreamSite struct {
 	LastSyncError       string
 	LastSyncModelCount  int
 	Status              string // "active", "disabled"
-	ManagedGroupID      *int64
-	ManagedAccountID    *int64
-	ManagedChannelID    *int64
+	ManagedResourceCount int   // 从子表 COUNT 获取
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }
@@ -41,6 +45,7 @@ type UpstreamBalanceInfo struct {
 // SyncResult 同步结果
 type SyncResult struct {
 	ModelsDiscovered int    `json:"models_discovered"`
+	KeysDiscovered   int    `json:"keys_discovered,omitempty"`
 	GroupID          int64  `json:"group_id,omitempty"`
 	AccountID        int64  `json:"account_id,omitempty"`
 	ChannelID        int64  `json:"channel_id,omitempty"`

@@ -28,7 +28,10 @@ func NewUpstreamHandler(siteRepo service.UpstreamSiteRepository, syncService *se
 type createUpstreamSiteRequest struct {
 	Name                string  `json:"name" binding:"required,max=200"`
 	BaseURL             string  `json:"base_url" binding:"required,max=500"`
-	APIKey              string  `json:"api_key" binding:"required"`
+	CredentialMode      string  `json:"credential_mode" binding:"required,oneof=api_key login"`
+	APIKey              string  `json:"api_key"`
+	Email               string  `json:"email"`
+	Password            string  `json:"password"`
 	PriceMultiplier     float64 `json:"price_multiplier"`
 	SyncEnabled         bool    `json:"sync_enabled"`
 	SyncIntervalMinutes int     `json:"sync_interval_minutes"`
@@ -37,7 +40,10 @@ type createUpstreamSiteRequest struct {
 type updateUpstreamSiteRequest struct {
 	Name                string  `json:"name" binding:"required,max=200"`
 	BaseURL             string  `json:"base_url" binding:"required,max=500"`
+	CredentialMode      string  `json:"credential_mode" binding:"required,oneof=api_key login"`
 	APIKey              string  `json:"api_key"`
+	Email               string  `json:"email"`
+	Password            string  `json:"password"`
 	PriceMultiplier     float64 `json:"price_multiplier"`
 	SyncEnabled         bool    `json:"sync_enabled"`
 	SyncIntervalMinutes int     `json:"sync_interval_minutes"`
@@ -45,45 +51,63 @@ type updateUpstreamSiteRequest struct {
 }
 
 type upstreamSiteResponse struct {
-	ID                  int64   `json:"id"`
-	Name                string  `json:"name"`
-	Platform            string  `json:"platform"`
-	BaseURL             string  `json:"base_url"`
-	APIKeyMasked        string  `json:"api_key_masked"`
-	PriceMultiplier     float64 `json:"price_multiplier"`
-	SyncEnabled         bool    `json:"sync_enabled"`
-	SyncIntervalMinutes int     `json:"sync_interval_minutes"`
-	LastSyncAt          *string `json:"last_sync_at"`
-	LastSyncStatus      string  `json:"last_sync_status"`
-	LastSyncError       string  `json:"last_sync_error"`
-	LastSyncModelCount  int     `json:"last_sync_model_count"`
-	Status              string  `json:"status"`
-	ManagedGroupID      *int64  `json:"managed_group_id"`
-	ManagedAccountID    *int64  `json:"managed_account_id"`
-	ManagedChannelID    *int64  `json:"managed_channel_id"`
-	CreatedAt           string  `json:"created_at"`
-	UpdatedAt           string  `json:"updated_at"`
+	ID                   int64   `json:"id"`
+	Name                 string  `json:"name"`
+	Platform             string  `json:"platform"`
+	BaseURL              string  `json:"base_url"`
+	CredentialMode       string  `json:"credential_mode"`
+	APIKeyMasked         string  `json:"api_key_masked"`
+	EmailMasked          string  `json:"email_masked"`
+	HasPassword          bool    `json:"has_password"`
+	PriceMultiplier      float64 `json:"price_multiplier"`
+	SyncEnabled          bool    `json:"sync_enabled"`
+	SyncIntervalMinutes  int     `json:"sync_interval_minutes"`
+	LastSyncAt           *string `json:"last_sync_at"`
+	LastSyncStatus       string  `json:"last_sync_status"`
+	LastSyncError        string  `json:"last_sync_error"`
+	LastSyncModelCount   int     `json:"last_sync_model_count"`
+	Status               string  `json:"status"`
+	ManagedResourceCount int     `json:"managed_resource_count"`
+	CreatedAt            string  `json:"created_at"`
+	UpdatedAt            string  `json:"updated_at"`
+}
+
+type managedResourceResponse struct {
+	ID               int64   `json:"id"`
+	UpstreamKeyID    string  `json:"upstream_key_id"`
+	UpstreamKeyPrefix string `json:"upstream_key_prefix"`
+	UpstreamKeyName  string  `json:"upstream_key_name"`
+	UpstreamGroupID  *int64  `json:"upstream_group_id"`
+	ManagedGroupID   *int64  `json:"managed_group_id"`
+	ManagedAccountID *int64  `json:"managed_account_id"`
+	ManagedChannelID *int64  `json:"managed_channel_id"`
+	ModelCount       int     `json:"model_count"`
+	Status           string  `json:"status"`
+	LastSyncedAt     *string `json:"last_synced_at"`
+	CreatedAt        string  `json:"created_at"`
+	UpdatedAt        string  `json:"updated_at"`
 }
 
 func siteToResponse(s *service.UpstreamSite) *upstreamSiteResponse {
 	resp := &upstreamSiteResponse{
-		ID:                  s.ID,
-		Name:                s.Name,
-		Platform:            s.Platform,
-		BaseURL:             s.BaseURL,
-		APIKeyMasked:        maskAPIKey(s.APIKey),
-		PriceMultiplier:     s.PriceMultiplier,
-		SyncEnabled:         s.SyncEnabled,
-		SyncIntervalMinutes: s.SyncIntervalMinutes,
-		LastSyncStatus:      s.LastSyncStatus,
-		LastSyncError:       s.LastSyncError,
-		LastSyncModelCount:  s.LastSyncModelCount,
-		Status:              s.Status,
-		ManagedGroupID:      s.ManagedGroupID,
-		ManagedAccountID:    s.ManagedAccountID,
-		ManagedChannelID:    s.ManagedChannelID,
-		CreatedAt:           s.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:           s.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:                   s.ID,
+		Name:                 s.Name,
+		Platform:             s.Platform,
+		BaseURL:              s.BaseURL,
+		CredentialMode:       s.CredentialMode,
+		APIKeyMasked:         maskAPIKey(s.APIKey),
+		EmailMasked:          maskEmail(s.Email),
+		HasPassword:          s.Password != "",
+		PriceMultiplier:      s.PriceMultiplier,
+		SyncEnabled:          s.SyncEnabled,
+		SyncIntervalMinutes:  s.SyncIntervalMinutes,
+		LastSyncStatus:       s.LastSyncStatus,
+		LastSyncError:        s.LastSyncError,
+		LastSyncModelCount:   s.LastSyncModelCount,
+		Status:               s.Status,
+		ManagedResourceCount: s.ManagedResourceCount,
+		CreatedAt:            s.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:            s.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 	if s.LastSyncAt != nil {
 		t := s.LastSyncAt.Format("2006-01-02T15:04:05Z")
@@ -96,6 +120,28 @@ func siteListItemToResponse(s *service.UpstreamSite) *upstreamSiteResponse {
 	return siteToResponse(s)
 }
 
+func resourceToResponse(r *service.UpstreamManagedResource) *managedResourceResponse {
+	resp := &managedResourceResponse{
+		ID:               r.ID,
+		UpstreamKeyID:    r.UpstreamKeyID,
+		UpstreamKeyPrefix: r.UpstreamKeyPrefix,
+		UpstreamKeyName:  r.UpstreamKeyName,
+		UpstreamGroupID:  r.UpstreamGroupID,
+		ManagedGroupID:   r.ManagedGroupID,
+		ManagedAccountID: r.ManagedAccountID,
+		ManagedChannelID: r.ManagedChannelID,
+		ModelCount:       r.ModelCount,
+		Status:           r.Status,
+		CreatedAt:        r.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:        r.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+	if r.LastSyncedAt != nil {
+		t := r.LastSyncedAt.Format("2006-01-02T15:04:05Z")
+		resp.LastSyncedAt = &t
+	}
+	return resp
+}
+
 // maskAPIKey 脱敏 API Key
 func maskAPIKey(key string) string {
 	if key == "" {
@@ -105,6 +151,22 @@ func maskAPIKey(key string) string {
 		return "sk-****"
 	}
 	return key[:4] + "****" + key[len(key)-4:]
+}
+
+// maskEmail 脱敏邮箱
+func maskEmail(email string) string {
+	if email == "" {
+		return ""
+	}
+	parts := strings.SplitN(email, "@", 2)
+	if len(parts) != 2 {
+		return "****"
+	}
+	local := parts[0]
+	if len(local) <= 2 {
+		return local + "****@" + parts[1]
+	}
+	return local[:2] + "****@" + parts[1]
 }
 
 // --- Handler methods ---
@@ -159,6 +221,18 @@ func (h *UpstreamHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// 校验模式对应的必填字段
+	if req.CredentialMode == "api_key" && req.APIKey == "" {
+		response.ErrorFrom(c, infraerrors.BadRequest("VALIDATION_ERROR", "api_key is required for api_key mode"))
+		return
+	}
+	if req.CredentialMode == "login" {
+		if req.Email == "" || req.Password == "" {
+			response.ErrorFrom(c, infraerrors.BadRequest("VALIDATION_ERROR", "email and password are required for login mode"))
+			return
+		}
+	}
+
 	// 规范化 base_url
 	req.BaseURL = strings.TrimRight(req.BaseURL, "/")
 
@@ -185,7 +259,10 @@ func (h *UpstreamHandler) Create(c *gin.Context) {
 		Name:                req.Name,
 		Platform:            "sub2api",
 		BaseURL:             req.BaseURL,
+		CredentialMode:      req.CredentialMode,
 		APIKey:              req.APIKey,
+		Email:               req.Email,
+		Password:            req.Password,
 		PriceMultiplier:     req.PriceMultiplier,
 		SyncEnabled:         req.SyncEnabled,
 		SyncIntervalMinutes: req.SyncIntervalMinutes,
@@ -242,7 +319,10 @@ func (h *UpstreamHandler) Update(c *gin.Context) {
 		ID:                  id,
 		Name:                req.Name,
 		BaseURL:             req.BaseURL,
+		CredentialMode:      req.CredentialMode,
 		APIKey:              req.APIKey, // 空字符串 = 不修改
+		Email:               req.Email,
+		Password:            req.Password,
 		PriceMultiplier:     req.PriceMultiplier,
 		SyncEnabled:         req.SyncEnabled,
 		SyncIntervalMinutes: req.SyncIntervalMinutes,
@@ -336,6 +416,28 @@ func (h *UpstreamHandler) GetModels(c *gin.Context) {
 	}
 
 	response.Success(c, models)
+}
+
+// ListResources 列出站点托管资源
+// GET /api/v1/admin/upstream-sites/:id/resources
+func (h *UpstreamHandler) ListResources(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_ID", "Invalid upstream site ID"))
+		return
+	}
+
+	resources, err := h.syncService.ListManagedResources(c.Request.Context(), id)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	out := make([]*managedResourceResponse, 0, len(resources))
+	for _, r := range resources {
+		out = append(out, resourceToResponse(r))
+	}
+	response.Success(c, out)
 }
 
 // Toggle 切换站点状态 (active ↔ disabled)

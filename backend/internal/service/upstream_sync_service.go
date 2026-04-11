@@ -1,12 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +17,7 @@ import (
 // UpstreamSyncService 上游站点同步服务
 type UpstreamSyncService struct {
 	siteRepo       UpstreamSiteRepository
+	resourceRepo   UpstreamManagedResourceRepository
 	groupRepo      GroupRepository
 	adminService   AdminService
 	channelService *ChannelService
@@ -28,12 +31,14 @@ type UpstreamSyncService struct {
 // NewUpstreamSyncService 创建上游同步服务
 func NewUpstreamSyncService(
 	siteRepo UpstreamSiteRepository,
+	resourceRepo UpstreamManagedResourceRepository,
 	groupRepo GroupRepository,
 	adminService AdminService,
 	channelService *ChannelService,
 ) *UpstreamSyncService {
 	return &UpstreamSyncService{
 		siteRepo:       siteRepo,
+		resourceRepo:   resourceRepo,
 		groupRepo:      groupRepo,
 		adminService:   adminService,
 		channelService: channelService,
@@ -105,7 +110,8 @@ func (s *UpstreamSyncService) checkAndSync() {
 			log.Printf("[UpstreamSync] Site %q (#%d) sync failed: %s", site.Name, site.ID, result.Error)
 			_ = s.siteRepo.UpdateSyncStatus(ctx, site.ID, "error", result.Error, 0)
 		} else {
-			log.Printf("[UpstreamSync] Site %q (#%d) sync success: %d models", site.Name, site.ID, result.ModelsDiscovered)
+			log.Printf("[UpstreamSync] Site %q (#%d) sync success: %d models, %d keys",
+				site.Name, site.ID, result.ModelsDiscovered, result.KeysDiscovered)
 			_ = s.siteRepo.UpdateSyncStatus(ctx, site.ID, "success", "", result.ModelsDiscovered)
 		}
 	}
@@ -134,7 +140,24 @@ func (s *UpstreamSyncService) FetchUpstreamModels(ctx context.Context, siteID in
 	if err != nil {
 		return nil, err
 	}
-	return s.fetchModels(ctx, site)
+
+	if site.CredentialMode == "login" {
+		// login 模式：先发现所有 key，然后用第一个 key 获取模型
+		accessToken, err := s.getAccessToken(ctx, site)
+		if err != nil {
+			return nil, fmt.Errorf("get access token: %w", err)
+		}
+		keys, err := s.discoverKeys(ctx, site, accessToken)
+		if err != nil {
+			return nil, fmt.Errorf("discover keys: %w", err)
+		}
+		if len(keys) == 0 {
+			return nil, fmt.Errorf("no API keys found for this account")
+		}
+		return s.fetchModelsWithKey(ctx, site, keys[0].Key)
+	}
+
+	return s.fetchModelsWithKey(ctx, site, site.APIKey)
 }
 
 // CheckUpstreamBalance 查询上游余额
@@ -144,6 +167,581 @@ func (s *UpstreamSyncService) CheckUpstreamBalance(ctx context.Context, siteID i
 		return nil, err
 	}
 
+	if site.CredentialMode == "login" {
+		// login 模式: 使用 JWT 查 /api/v1/auth/me 获取 balance
+		accessToken, err := s.getAccessToken(ctx, site)
+		if err != nil {
+			return nil, fmt.Errorf("get access token: %w", err)
+		}
+		return s.fetchBalanceViaJWT(ctx, site, accessToken)
+	}
+
+	// api_key 模式: /v1/usage
+	return s.fetchBalanceViaAPIKey(ctx, site)
+}
+
+// ListManagedResources 列出站点的托管资源
+func (s *UpstreamSyncService) ListManagedResources(ctx context.Context, siteID int64) ([]*UpstreamManagedResource, error) {
+	return s.resourceRepo.ListBySiteID(ctx, siteID)
+}
+
+// ── 核心同步逻辑 ──
+
+func (s *UpstreamSyncService) syncSite(ctx context.Context, site *UpstreamSite) SyncResult {
+	if site.CredentialMode == "login" {
+		return s.syncSiteLoginMode(ctx, site)
+	}
+	return s.syncSiteAPIKeyMode(ctx, site)
+}
+
+// syncSiteAPIKeyMode api_key 模式同步（单 Key）
+func (s *UpstreamSyncService) syncSiteAPIKeyMode(ctx context.Context, site *UpstreamSite) SyncResult {
+	// 1. 获取上游模型列表
+	models, err := s.fetchModelsWithKey(ctx, site, site.APIKey)
+	if err != nil {
+		return SyncResult{Error: fmt.Sprintf("fetch models: %v", err)}
+	}
+	if len(models) == 0 {
+		return SyncResult{Error: "upstream returned 0 models"}
+	}
+
+	// 2. Upsert 到 managed resource 表
+	keyID := "apikey-" + strconv.FormatInt(site.ID, 10)
+	res := &UpstreamManagedResource{
+		UpstreamSiteID:  site.ID,
+		UpstreamKeyID:   keyID,
+		UpstreamKeyPrefix: maskAPIKey(site.APIKey),
+		UpstreamKeyName: "Manual API Key",
+		APIKey:          site.APIKey,
+		Status:          "active",
+	}
+	if err := s.resourceRepo.Upsert(ctx, res); err != nil {
+		return SyncResult{Error: fmt.Sprintf("upsert resource: %v", err)}
+	}
+
+	// 3. 确保分组/账号/渠道存在
+	groupID, accountID, channelID, err := s.ensureLocalResources(ctx, site, res, models)
+	if err != nil {
+		return SyncResult{Error: err.Error()}
+	}
+
+	// 4. 更新 managed resource 的关联 ID 和模型数
+	_ = s.resourceRepo.UpdateManagedIDs(ctx, res.ID, &groupID, &accountID, &channelID)
+	_ = s.resourceRepo.UpdateModelCount(ctx, res.ID, len(models))
+
+	return SyncResult{
+		ModelsDiscovered: len(models),
+		KeysDiscovered:   1,
+		GroupID:          groupID,
+		AccountID:        accountID,
+		ChannelID:        channelID,
+	}
+}
+
+// syncSiteLoginMode 邮箱密码登录模式同步（多 Key 自动发现）
+func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *UpstreamSite) SyncResult {
+	// 1. 获取 access token
+	accessToken, err := s.getAccessToken(ctx, site)
+	if err != nil {
+		return SyncResult{Error: fmt.Sprintf("login failed: %v", err)}
+	}
+
+	// 2. 发现所有 API Key
+	keys, err := s.discoverKeys(ctx, site, accessToken)
+	if err != nil {
+		return SyncResult{Error: fmt.Sprintf("discover keys: %v", err)}
+	}
+	if len(keys) == 0 {
+		return SyncResult{Error: "no API keys found for this account"}
+	}
+
+	log.Printf("[UpstreamSync] Site %q: discovered %d API key(s)", site.Name, len(keys))
+
+	// 3. 对每个 key 获取模型并创建本地资源
+	totalModels := 0
+	var activeKeyIDs []string
+	for _, key := range keys {
+		keyID := strconv.FormatInt(key.ID, 10)
+		activeKeyIDs = append(activeKeyIDs, keyID)
+
+		// 获取该 key 下的模型
+		models, err := s.fetchModelsWithKey(ctx, site, key.Key)
+		if err != nil {
+			log.Printf("[UpstreamSync] Site %q key %s: fetch models failed: %v", site.Name, key.Name, err)
+			continue
+		}
+
+		// Upsert managed resource
+		res := &UpstreamManagedResource{
+			UpstreamSiteID:  site.ID,
+			UpstreamKeyID:   keyID,
+			UpstreamKeyPrefix: maskAPIKey(key.Key),
+			UpstreamKeyName: key.Name,
+			APIKey:          key.Key,
+			Status:          "active",
+		}
+		if key.GroupID != nil {
+			res.UpstreamGroupID = key.GroupID
+		}
+		if err := s.resourceRepo.Upsert(ctx, res); err != nil {
+			log.Printf("[UpstreamSync] Site %q key %s: upsert resource failed: %v", site.Name, key.Name, err)
+			continue
+		}
+
+		// 确保本地 group/account/channel
+		groupID, accountID, channelID, err := s.ensureLocalResources(ctx, site, res, models)
+		if err != nil {
+			log.Printf("[UpstreamSync] Site %q key %s: ensure resources failed: %v", site.Name, key.Name, err)
+			continue
+		}
+
+		// 更新关联 ID 和模型数
+		_ = s.resourceRepo.UpdateManagedIDs(ctx, res.ID, &groupID, &accountID, &channelID)
+		_ = s.resourceRepo.UpdateModelCount(ctx, res.ID, len(models))
+
+		totalModels += len(models)
+	}
+
+	// 4. 清理上游已删除的 key
+	staleCount, err := s.resourceRepo.DeleteStale(ctx, site.ID, activeKeyIDs)
+	if err != nil {
+		log.Printf("[UpstreamSync] Site %q: delete stale resources failed: %v", site.Name, err)
+	} else if staleCount > 0 {
+		log.Printf("[UpstreamSync] Site %q: removed %d stale resource(s)", site.Name, staleCount)
+	}
+
+	return SyncResult{
+		ModelsDiscovered: totalModels,
+		KeysDiscovered:   len(keys),
+	}
+}
+
+// ── 登录与 Token 管理 ──
+
+// upstreamKeyInfo 上游 API Key 信息（来自 /api/v1/keys）
+type upstreamKeyInfo struct {
+	ID      int64  `json:"id"`
+	Key     string `json:"key"`
+	Name    string `json:"name"`
+	GroupID *int64 `json:"group_id"`
+	Status  string `json:"status"`
+}
+
+// getAccessToken 获取上游的 JWT access token（优先缓存 → 刷新 → 登录）
+func (s *UpstreamSyncService) getAccessToken(ctx context.Context, site *UpstreamSite) (string, error) {
+	// 1. 检查缓存 token 是否有效（至少还有 5 分钟有效期）
+	if site.CachedAccessToken != "" && site.TokenExpiresAt != nil {
+		if time.Until(*site.TokenExpiresAt) > 5*time.Minute {
+			return site.CachedAccessToken, nil
+		}
+	}
+
+	// 2. 尝试 refresh token
+	if site.CachedRefreshToken != "" {
+		accessToken, refreshToken, expiresIn, err := s.refreshToken(ctx, site)
+		if err == nil {
+			expiresAt := time.Now().Add(time.Duration(expiresIn) * time.Second)
+			_ = s.siteRepo.UpdateTokenCache(ctx, site.ID, accessToken, refreshToken, &expiresAt)
+			site.CachedAccessToken = accessToken
+			site.CachedRefreshToken = refreshToken
+			site.TokenExpiresAt = &expiresAt
+			return accessToken, nil
+		}
+		log.Printf("[UpstreamSync] Site %q: refresh token failed (%v), falling back to login", site.Name, err)
+	}
+
+	// 3. 全量登录
+	accessToken, refreshToken, expiresIn, err := s.loginUpstream(ctx, site)
+	if err != nil {
+		_ = s.siteRepo.ClearTokenCache(ctx, site.ID)
+		return "", err
+	}
+
+	expiresAt := time.Now().Add(time.Duration(expiresIn) * time.Second)
+	_ = s.siteRepo.UpdateTokenCache(ctx, site.ID, accessToken, refreshToken, &expiresAt)
+	site.CachedAccessToken = accessToken
+	site.CachedRefreshToken = refreshToken
+	site.TokenExpiresAt = &expiresAt
+	return accessToken, nil
+}
+
+// loginUpstream 使用邮箱+密码登录上游
+func (s *UpstreamSyncService) loginUpstream(ctx context.Context, site *UpstreamSite) (accessToken, refreshToken string, expiresIn int, err error) {
+	url := strings.TrimRight(site.BaseURL, "/") + "/api/v1/auth/login"
+
+	body, _ := json.Marshal(map[string]string{
+		"email":           site.Email,
+		"password":        site.Password,
+		"turnstile_token": "",
+	})
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return "", "", 0, fmt.Errorf("create login request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("login request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", 0, fmt.Errorf("login returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			AccessToken  string `json:"access_token"`
+			RefreshToken string `json:"refresh_token"`
+			ExpiresIn    int    `json:"expires_in"`
+			Requires2FA  bool   `json:"requires_2fa"`
+			TempToken    string `json:"temp_token"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", "", 0, fmt.Errorf("decode login response: %w", err)
+	}
+
+	if result.Data.Requires2FA {
+		return "", "", 0, fmt.Errorf("upstream requires 2FA authentication, which is not supported for server-to-server login")
+	}
+
+	if result.Data.AccessToken == "" {
+		return "", "", 0, fmt.Errorf("login failed: %s", result.Message)
+	}
+
+	return result.Data.AccessToken, result.Data.RefreshToken, result.Data.ExpiresIn, nil
+}
+
+// refreshToken 使用 refresh token 刷新 access token
+func (s *UpstreamSyncService) refreshToken(ctx context.Context, site *UpstreamSite) (accessToken, refreshToken string, expiresIn int, err error) {
+	url := strings.TrimRight(site.BaseURL, "/") + "/api/v1/auth/refresh"
+
+	body, _ := json.Marshal(map[string]string{
+		"refresh_token": site.CachedRefreshToken,
+	})
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return "", "", 0, fmt.Errorf("create refresh request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("refresh request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return "", "", 0, fmt.Errorf("refresh returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		Code int `json:"code"`
+		Data struct {
+			AccessToken  string `json:"access_token"`
+			RefreshToken string `json:"refresh_token"`
+			ExpiresIn    int    `json:"expires_in"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", 0, fmt.Errorf("decode refresh response: %w", err)
+	}
+
+	if result.Data.AccessToken == "" {
+		return "", "", 0, fmt.Errorf("refresh failed: empty access token")
+	}
+
+	return result.Data.AccessToken, result.Data.RefreshToken, result.Data.ExpiresIn, nil
+}
+
+// discoverKeys 使用 JWT 发现上游所有 API Key
+func (s *UpstreamSyncService) discoverKeys(ctx context.Context, site *UpstreamSite, accessToken string) ([]upstreamKeyInfo, error) {
+	url := strings.TrimRight(site.BaseURL, "/") + "/api/v1/keys?page_size=100"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create keys request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("keys request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return nil, fmt.Errorf("keys endpoint returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Code int `json:"code"`
+		Data struct {
+			Items []upstreamKeyInfo `json:"items"`
+			Total int               `json:"total"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode keys response: %w", err)
+	}
+
+	// 过滤 active 的 key
+	var activeKeys []upstreamKeyInfo
+	for _, k := range result.Data.Items {
+		if k.Status == "active" {
+			activeKeys = append(activeKeys, k)
+		}
+	}
+	return activeKeys, nil
+}
+
+// ── 本地资源管理 ──
+
+// ensureLocalResources 确保本地 group/account/channel 存在（幂等）
+func (s *UpstreamSyncService) ensureLocalResources(
+	ctx context.Context,
+	site *UpstreamSite,
+	res *UpstreamManagedResource,
+	models []UpstreamModelInfo,
+) (groupID, accountID, channelID int64, err error) {
+	// 从已有的 managed resource 获取之前创建的 ID
+	existing, _ := s.resourceRepo.GetBySiteAndKeyID(ctx, site.ID, res.UpstreamKeyID)
+
+	// 1. 确保分组
+	groupID, err = s.ensureGroup(ctx, site, res, existing)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("ensure group: %v", err)
+	}
+
+	// 2. 确保账号
+	accountID, err = s.ensureAccount(ctx, site, res, existing, groupID, models)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("ensure account: %v", err)
+	}
+
+	// 3. 确保渠道
+	channelID, err = s.ensureChannel(ctx, site, res, existing, groupID, models)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("ensure channel: %v", err)
+	}
+
+	return groupID, accountID, channelID, nil
+}
+
+// ensureGroup 确保分组存在（幂等）
+func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSite, res *UpstreamManagedResource, existing *UpstreamManagedResource) (int64, error) {
+	// 如果已有 managed_group_id，先检查是否还存在
+	if existing != nil && existing.ManagedGroupID != nil {
+		g, err := s.groupRepo.GetByIDLite(ctx, *existing.ManagedGroupID)
+		if err == nil && g != nil {
+			if g.RateMultiplier != site.PriceMultiplier {
+				g.RateMultiplier = site.PriceMultiplier
+				if err := s.groupRepo.Update(ctx, g); err != nil {
+					log.Printf("[UpstreamSync] Warning: failed to update group rate_multiplier: %v", err)
+				}
+			}
+			return g.ID, nil
+		}
+		log.Printf("[UpstreamSync] Managed group %d not found, will recreate", *existing.ManagedGroupID)
+	}
+
+	// 创建新分组
+	groupName := fmt.Sprintf("上游: %s", site.Name)
+	if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
+		groupName = fmt.Sprintf("上游: %s - %s", site.Name, res.UpstreamKeyName)
+	}
+
+	group := &Group{
+		Name:             groupName,
+		Description:      fmt.Sprintf("自动同步自上游站点 %s (%s)", site.Name, site.BaseURL),
+		Platform:         PlatformAntigravity,
+		RateMultiplier:   site.PriceMultiplier,
+		Status:           StatusActive,
+		SubscriptionType: SubscriptionTypeStandard,
+	}
+	if err := s.groupRepo.Create(ctx, group); err != nil {
+		return 0, fmt.Errorf("create group: %w", err)
+	}
+	return group.ID, nil
+}
+
+// ensureAccount 确保账号存在（幂等），并更新 model_mapping
+func (s *UpstreamSyncService) ensureAccount(ctx context.Context, site *UpstreamSite, res *UpstreamManagedResource, existing *UpstreamManagedResource, groupID int64, models []UpstreamModelInfo) (int64, error) {
+	// 用该 key 对应的 API Key 作为凭证
+	apiKey := res.APIKey
+	modelMapping := make(map[string]any, len(models))
+	for _, m := range models {
+		modelMapping[m.ID] = m.ID
+	}
+
+	credentials := map[string]any{
+		"api_key":       apiKey,
+		"base_url":      strings.TrimRight(site.BaseURL, "/"),
+		"model_mapping": modelMapping,
+	}
+
+	// 如果已有 managed_account_id，更新凭证
+	if existing != nil && existing.ManagedAccountID != nil {
+		existingAccount, err := s.adminService.GetAccount(ctx, *existing.ManagedAccountID)
+		if err == nil && existingAccount != nil {
+			updateInput := &UpdateAccountInput{
+				Credentials: credentials,
+			}
+			if _, err := s.adminService.UpdateAccount(ctx, existingAccount.ID, updateInput); err != nil {
+				log.Printf("[UpstreamSync] Warning: failed to update account credentials: %v", err)
+			}
+			return existingAccount.ID, nil
+		}
+		log.Printf("[UpstreamSync] Managed account %d not found, will recreate", *existing.ManagedAccountID)
+	}
+
+	// 创建新账号
+	accountName := fmt.Sprintf("上游: %s", site.Name)
+	if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
+		accountName = fmt.Sprintf("上游: %s - %s", site.Name, res.UpstreamKeyName)
+	}
+
+	concurrency := 5
+	createInput := &CreateAccountInput{
+		Name:                  accountName,
+		Platform:              PlatformAntigravity,
+		Type:                  AccountTypeAPIKey,
+		Credentials:           credentials,
+		Concurrency:           concurrency,
+		Priority:              0,
+		GroupIDs:              []int64{groupID},
+		SkipMixedChannelCheck: true,
+	}
+	account, err := s.adminService.CreateAccount(ctx, createInput)
+	if err != nil {
+		return 0, fmt.Errorf("create account: %w", err)
+	}
+	return account.ID, nil
+}
+
+// ensureChannel 确保渠道存在（幂等），并更新模型定价
+func (s *UpstreamSyncService) ensureChannel(ctx context.Context, site *UpstreamSite, res *UpstreamManagedResource, existing *UpstreamManagedResource, groupID int64, models []UpstreamModelInfo) (int64, error) {
+	pricingList := s.buildModelPricing(models, site.PriceMultiplier)
+
+	// 如果已有 managed_channel_id，更新定价
+	if existing != nil && existing.ManagedChannelID != nil {
+		existingChannel, err := s.channelService.GetByID(ctx, *existing.ManagedChannelID)
+		if err == nil && existingChannel != nil {
+			updateInput := &UpdateChannelInput{
+				ModelPricing:       &pricingList,
+				BillingModelSource: BillingModelSourceChannelMapped,
+			}
+			if _, err := s.channelService.Update(ctx, existingChannel.ID, updateInput); err != nil {
+				log.Printf("[UpstreamSync] Warning: failed to update channel pricing: %v", err)
+			}
+			return existingChannel.ID, nil
+		}
+		log.Printf("[UpstreamSync] Managed channel %d not found, will recreate", *existing.ManagedChannelID)
+	}
+
+	// 创建新渠道
+	channelName := fmt.Sprintf("上游: %s", site.Name)
+	if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
+		channelName = fmt.Sprintf("上游: %s - %s", site.Name, res.UpstreamKeyName)
+	}
+
+	createInput := &CreateChannelInput{
+		Name:               channelName,
+		Description:        fmt.Sprintf("自动同步自上游站点 %s", site.Name),
+		GroupIDs:           []int64{groupID},
+		ModelPricing:       pricingList,
+		BillingModelSource: BillingModelSourceChannelMapped,
+		RestrictModels:     false,
+	}
+	channel, err := s.channelService.Create(ctx, createInput)
+	if err != nil {
+		return 0, fmt.Errorf("create channel: %w", err)
+	}
+	return channel.ID, nil
+}
+
+// ── 模型获取 ──
+
+// fetchModelsWithKey 使用指定的 API Key 获取模型列表（GET /v1/models）
+func (s *UpstreamSyncService) fetchModelsWithKey(ctx context.Context, site *UpstreamSite, apiKey string) ([]UpstreamModelInfo, error) {
+	url := strings.TrimRight(site.BaseURL, "/") + "/v1/models"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return nil, fmt.Errorf("upstream returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Data []UpstreamModelInfo `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return result.Data, nil
+}
+
+// ── 余额查询 ──
+
+// fetchBalanceViaJWT login 模式: GET /api/v1/auth/me → balance
+func (s *UpstreamSyncService) fetchBalanceViaJWT(ctx context.Context, site *UpstreamSite, accessToken string) (*UpstreamBalanceInfo, error) {
+	url := strings.TrimRight(site.BaseURL, "/") + "/api/v1/auth/me"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return nil, fmt.Errorf("upstream returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	// /api/v1/auth/me 响应格式: {code: 0, message: "success", data: {id, email, balance, ...}}
+	var result struct {
+		Code int `json:"code"`
+		Data struct {
+			Balance float64 `json:"balance"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	return &UpstreamBalanceInfo{
+		BalanceUSD:   result.Data.Balance,
+		RemainingUSD: result.Data.Balance,
+	}, nil
+}
+
+// fetchBalanceViaAPIKey api_key 模式: GET /v1/usage
+func (s *UpstreamSyncService) fetchBalanceViaAPIKey(ctx context.Context, site *UpstreamSite) (*UpstreamBalanceInfo, error) {
 	url := strings.TrimRight(site.BaseURL, "/") + "/v1/usage"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -171,196 +769,14 @@ func (s *UpstreamSyncService) CheckUpstreamBalance(ctx context.Context, siteID i
 	return &result.Data, nil
 }
 
-// ── 核心同步逻辑 ──
+// ── 辅助函数 ──
 
-func (s *UpstreamSyncService) syncSite(ctx context.Context, site *UpstreamSite) SyncResult {
-	// 1. 获取上游模型列表
-	models, err := s.fetchModels(ctx, site)
-	if err != nil {
-		return SyncResult{Error: fmt.Sprintf("fetch models: %v", err)}
+// maskAPIKey 遮蔽 API Key 仅显示前缀
+func maskAPIKey(key string) string {
+	if len(key) <= 10 {
+		return key
 	}
-	if len(models) == 0 {
-		return SyncResult{Error: "upstream returned 0 models"}
-	}
-
-	// 2. 确保分组存在
-	groupID, err := s.ensureGroup(ctx, site)
-	if err != nil {
-		return SyncResult{Error: fmt.Sprintf("ensure group: %v", err)}
-	}
-
-	// 3. 确保账号存在（含 model_mapping）
-	accountID, err := s.ensureAccount(ctx, site, groupID, models)
-	if err != nil {
-		return SyncResult{Error: fmt.Sprintf("ensure account: %v", err)}
-	}
-
-	// 4. 确保渠道存在（含模型定价）
-	channelID, err := s.ensureChannel(ctx, site, groupID, models)
-	if err != nil {
-		return SyncResult{Error: fmt.Sprintf("ensure channel: %v", err)}
-	}
-
-	// 5. 更新幂等标记
-	if err := s.siteRepo.UpdateManagedResources(ctx, site.ID, &groupID, &accountID, &channelID); err != nil {
-		log.Printf("[UpstreamSync] Warning: failed to update managed resources for site %d: %v", site.ID, err)
-	}
-
-	return SyncResult{
-		ModelsDiscovered: len(models),
-		GroupID:          groupID,
-		AccountID:        accountID,
-		ChannelID:        channelID,
-	}
-}
-
-// fetchModels 从上游 GET /v1/models 获取模型列表
-func (s *UpstreamSyncService) fetchModels(ctx context.Context, site *UpstreamSite) ([]UpstreamModelInfo, error) {
-	url := strings.TrimRight(site.BaseURL, "/") + "/v1/models"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+site.APIKey)
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return nil, fmt.Errorf("upstream returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result struct {
-		Data []UpstreamModelInfo `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return result.Data, nil
-}
-
-// ensureGroup 确保分组存在（幂等）
-func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSite) (int64, error) {
-	// 如果已有 managed_group_id，先检查是否还存在
-	if site.ManagedGroupID != nil {
-		g, err := s.groupRepo.GetByIDLite(ctx, *site.ManagedGroupID)
-		if err == nil && g != nil {
-			// 更新倍率（如果站点倍率改变了）
-			if g.RateMultiplier != site.PriceMultiplier {
-				g.RateMultiplier = site.PriceMultiplier
-				if err := s.groupRepo.Update(ctx, g); err != nil {
-					log.Printf("[UpstreamSync] Warning: failed to update group rate_multiplier: %v", err)
-				}
-			}
-			return g.ID, nil
-		}
-		// 分组已被删除，重新创建
-		log.Printf("[UpstreamSync] Managed group %d not found, will recreate", *site.ManagedGroupID)
-	}
-
-	// 创建新分组（直接用 repo 以支持 antigravity 平台）
-	group := &Group{
-		Name:             fmt.Sprintf("上游: %s", site.Name),
-		Description:      fmt.Sprintf("自动同步自上游站点 %s (%s)", site.Name, site.BaseURL),
-		Platform:         PlatformAntigravity,
-		RateMultiplier:   site.PriceMultiplier,
-		Status:           StatusActive,
-		SubscriptionType: SubscriptionTypeStandard,
-	}
-	if err := s.groupRepo.Create(ctx, group); err != nil {
-		return 0, fmt.Errorf("create group: %w", err)
-	}
-	return group.ID, nil
-}
-
-// ensureAccount 确保账号存在（幂等），并更新 model_mapping
-func (s *UpstreamSyncService) ensureAccount(ctx context.Context, site *UpstreamSite, groupID int64, models []UpstreamModelInfo) (int64, error) {
-	// 构建 model_mapping：每个上游模型映射到自身
-	modelMapping := make(map[string]any, len(models))
-	for _, m := range models {
-		modelMapping[m.ID] = m.ID
-	}
-
-	credentials := map[string]any{
-		"api_key":       site.APIKey,
-		"base_url":      strings.TrimRight(site.BaseURL, "/"),
-		"model_mapping": modelMapping,
-	}
-
-	// 如果已有 managed_account_id，更新凭证和 model_mapping
-	if site.ManagedAccountID != nil {
-		existing, err := s.adminService.GetAccount(ctx, *site.ManagedAccountID)
-		if err == nil && existing != nil {
-			// 更新凭证（含 model_mapping）
-			updateInput := &UpdateAccountInput{
-				Credentials: credentials,
-			}
-			if _, err := s.adminService.UpdateAccount(ctx, existing.ID, updateInput); err != nil {
-				log.Printf("[UpstreamSync] Warning: failed to update account credentials: %v", err)
-			}
-			return existing.ID, nil
-		}
-		log.Printf("[UpstreamSync] Managed account %d not found, will recreate", *site.ManagedAccountID)
-	}
-
-	// 创建新账号
-	concurrency := 5
-	createInput := &CreateAccountInput{
-		Name:                 fmt.Sprintf("上游: %s", site.Name),
-		Platform:             PlatformAntigravity,
-		Type:                 AccountTypeAPIKey,
-		Credentials:          credentials,
-		Concurrency:          concurrency,
-		Priority:             0,
-		GroupIDs:             []int64{groupID},
-		SkipMixedChannelCheck: true,
-	}
-	account, err := s.adminService.CreateAccount(ctx, createInput)
-	if err != nil {
-		return 0, fmt.Errorf("create account: %w", err)
-	}
-	return account.ID, nil
-}
-
-// ensureChannel 确保渠道存在（幂等），并更新模型定价
-func (s *UpstreamSyncService) ensureChannel(ctx context.Context, site *UpstreamSite, groupID int64, models []UpstreamModelInfo) (int64, error) {
-	// 构建模型定价列表
-	pricingList := s.buildModelPricing(models, site.PriceMultiplier)
-
-	// 如果已有 managed_channel_id，更新定价
-	if site.ManagedChannelID != nil {
-		existing, err := s.channelService.GetByID(ctx, *site.ManagedChannelID)
-		if err == nil && existing != nil {
-			updateInput := &UpdateChannelInput{
-				ModelPricing:       &pricingList,
-				BillingModelSource: BillingModelSourceChannelMapped,
-			}
-			if _, err := s.channelService.Update(ctx, existing.ID, updateInput); err != nil {
-				log.Printf("[UpstreamSync] Warning: failed to update channel pricing: %v", err)
-			}
-			return existing.ID, nil
-		}
-		log.Printf("[UpstreamSync] Managed channel %d not found, will recreate", *site.ManagedChannelID)
-	}
-
-	// 创建新渠道
-	createInput := &CreateChannelInput{
-		Name:               fmt.Sprintf("上游: %s", site.Name),
-		Description:        fmt.Sprintf("自动同步自上游站点 %s", site.Name),
-		GroupIDs:           []int64{groupID},
-		ModelPricing:       pricingList,
-		BillingModelSource: BillingModelSourceChannelMapped,
-		RestrictModels:     false,
-	}
-	channel, err := s.channelService.Create(ctx, createInput)
-	if err != nil {
-		return 0, fmt.Errorf("create channel: %w", err)
-	}
-	return channel.ID, nil
+	return key[:10] + "..."
 }
 
 // buildModelPricing 根据上游模型列表和倍率构建定价
@@ -374,7 +790,6 @@ func (s *UpstreamSyncService) buildModelPricing(models []UpstreamModelInfo, mult
 
 	var pricingList []ChannelModelPricing
 	for platform, modelNames := range platformModels {
-		// 按定价分组：相同定价的模型合并到一条 pricing
 		pricingGroups := groupModelsByPricing(modelNames, multiplier)
 		for _, pg := range pricingGroups {
 			pricing := ChannelModelPricing{
@@ -416,7 +831,6 @@ type modelDefaultPrice struct {
 func ptrFloat(v float64) *float64 { return &v }
 
 // defaultModelPrices 内置默认价格（per token, USD）
-// 来源: 各官方定价页面，最后更新 2025-01
 var defaultModelPrices = map[string]modelDefaultPrice{
 	// Claude 系列 (Anthropic)
 	"claude-opus-4-6-thinking":   {InputPerToken: 15e-6, OutputPerToken: 75e-6, CacheWritePerToken: ptrFloat(18.75e-6), CacheReadPerToken: ptrFloat(1.50e-6)},
@@ -427,17 +841,17 @@ var defaultModelPrices = map[string]modelDefaultPrice{
 	"claude-haiku-4-5":           {InputPerToken: 0.80e-6, OutputPerToken: 4e-6, CacheWritePerToken: ptrFloat(1e-6), CacheReadPerToken: ptrFloat(0.08e-6)},
 
 	// GPT 系列 (OpenAI)
-	"gpt-4o":            {InputPerToken: 2.5e-6, OutputPerToken: 10e-6},
-	"gpt-4o-mini":       {InputPerToken: 0.15e-6, OutputPerToken: 0.60e-6},
-	"gpt-4-turbo":       {InputPerToken: 10e-6, OutputPerToken: 30e-6},
-	"gpt-5.4":           {InputPerToken: 2.5e-6, OutputPerToken: 15e-6},
-	"gpt-5.4-mini":      {InputPerToken: 0.75e-6, OutputPerToken: 4.5e-6},
-	"o1":                {InputPerToken: 15e-6, OutputPerToken: 60e-6},
-	"o1-mini":           {InputPerToken: 3e-6, OutputPerToken: 12e-6},
-	"o3":                {InputPerToken: 10e-6, OutputPerToken: 40e-6},
-	"o3-mini":           {InputPerToken: 1.1e-6, OutputPerToken: 4.4e-6},
-	"o4-mini":           {InputPerToken: 1.1e-6, OutputPerToken: 4.4e-6},
-	"gpt-oss-120b-medium": {InputPerToken: 2e-6, OutputPerToken: 8e-6},
+	"gpt-4o":               {InputPerToken: 2.5e-6, OutputPerToken: 10e-6},
+	"gpt-4o-mini":          {InputPerToken: 0.15e-6, OutputPerToken: 0.60e-6},
+	"gpt-4-turbo":          {InputPerToken: 10e-6, OutputPerToken: 30e-6},
+	"gpt-5.4":              {InputPerToken: 2.5e-6, OutputPerToken: 15e-6},
+	"gpt-5.4-mini":         {InputPerToken: 0.75e-6, OutputPerToken: 4.5e-6},
+	"o1":                   {InputPerToken: 15e-6, OutputPerToken: 60e-6},
+	"o1-mini":              {InputPerToken: 3e-6, OutputPerToken: 12e-6},
+	"o3":                   {InputPerToken: 10e-6, OutputPerToken: 40e-6},
+	"o3-mini":              {InputPerToken: 1.1e-6, OutputPerToken: 4.4e-6},
+	"o4-mini":              {InputPerToken: 1.1e-6, OutputPerToken: 4.4e-6},
+	"gpt-oss-120b-medium":  {InputPerToken: 2e-6, OutputPerToken: 8e-6},
 
 	// Gemini 系列 (Google)
 	"gemini-2.5-pro":      {InputPerToken: 1.25e-6, OutputPerToken: 10e-6},
@@ -497,8 +911,8 @@ func groupModelsByPricing(modelNames []string, multiplier float64) []pricingGrou
 			inputP := price.InputPerToken * multiplier
 			outputP := price.OutputPerToken * multiplier
 			pg := &pricingGroup{
-				Models:     []string{name},
-				InputPrice: &inputP,
+				Models:      []string{name},
+				InputPrice:  &inputP,
 				OutputPrice: &outputP,
 			}
 			if price.CacheWritePerToken != nil {
@@ -518,7 +932,7 @@ func groupModelsByPricing(modelNames []string, multiplier float64) []pricingGrou
 		result = append(result, *pg)
 	}
 
-	// 未知模型：不设价格，让管理员手动配置
+	// 未知模型：不设价格
 	if len(unknownModels) > 0 {
 		result = append(result, pricingGroup{
 			Models: unknownModels,
@@ -529,11 +943,9 @@ func groupModelsByPricing(modelNames []string, multiplier float64) []pricingGrou
 
 // lookupModelPrice 查找模型默认价格（精确匹配 → 前缀匹配）
 func lookupModelPrice(model string) (modelDefaultPrice, bool) {
-	// 精确匹配
 	if p, ok := defaultModelPrices[model]; ok {
 		return p, true
 	}
-	// 前缀匹配（处理带版本号的模型名，如 claude-sonnet-4-5-20250929）
 	bestMatch := ""
 	for key := range defaultModelPrices {
 		if strings.HasPrefix(model, key) && len(key) > len(bestMatch) {

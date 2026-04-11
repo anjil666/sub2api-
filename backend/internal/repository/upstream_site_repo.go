@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -21,18 +22,28 @@ func NewUpstreamSiteRepository(db *sql.DB, encryptor service.SecretEncryptor) se
 }
 
 func (r *upstreamSiteRepo) Create(ctx context.Context, site *service.UpstreamSite) error {
-	encrypted, err := r.encryptor.Encrypt(site.APIKey)
+	apiKeyEnc, err := r.encryptor.Encrypt(site.APIKey)
 	if err != nil {
 		return fmt.Errorf("encrypt api key: %w", err)
 	}
+	emailEnc, err := r.encryptor.Encrypt(site.Email)
+	if err != nil {
+		return fmt.Errorf("encrypt email: %w", err)
+	}
+	passwordEnc, err := r.encryptor.Encrypt(site.Password)
+	if err != nil {
+		return fmt.Errorf("encrypt password: %w", err)
+	}
 
 	err = r.db.QueryRowContext(ctx,
-		`INSERT INTO upstream_sites (name, platform, base_url, api_key_encrypted, price_multiplier,
-			sync_enabled, sync_interval_minutes, status)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`INSERT INTO upstream_sites (name, platform, base_url, api_key_encrypted,
+			credential_mode, email_encrypted, password_encrypted,
+			price_multiplier, sync_enabled, sync_interval_minutes, status)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		 RETURNING id, created_at, updated_at`,
-		site.Name, site.Platform, site.BaseURL, encrypted, site.PriceMultiplier,
-		site.SyncEnabled, site.SyncIntervalMinutes, site.Status,
+		site.Name, site.Platform, site.BaseURL, apiKeyEnc,
+		site.CredentialMode, emailEnc, passwordEnc,
+		site.PriceMultiplier, site.SyncEnabled, site.SyncIntervalMinutes, site.Status,
 	).Scan(&site.ID, &site.CreatedAt, &site.UpdatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -45,23 +56,27 @@ func (r *upstreamSiteRepo) Create(ctx context.Context, site *service.UpstreamSit
 
 func (r *upstreamSiteRepo) GetByID(ctx context.Context, id int64) (*service.UpstreamSite, error) {
 	site := &service.UpstreamSite{}
-	var encrypted string
+	var apiKeyEnc, emailEnc, passwordEnc, cachedAccessToken, cachedRefreshToken string
 	var lastSyncAt sql.NullTime
-	var managedGroupID, managedAccountID, managedChannelID sql.NullInt64
+	var tokenExpiresAt sql.NullTime
 
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, name, platform, base_url, api_key_encrypted, price_multiplier,
-			sync_enabled, sync_interval_minutes, last_sync_at, last_sync_status,
-			last_sync_error, last_sync_model_count, status,
-			managed_group_id, managed_account_id, managed_channel_id,
-			created_at, updated_at
-		 FROM upstream_sites WHERE id = $1`, id,
+		`SELECT us.id, us.name, us.platform, us.base_url, us.api_key_encrypted,
+			us.credential_mode, us.email_encrypted, us.password_encrypted,
+			us.cached_access_token, us.cached_refresh_token, us.token_expires_at,
+			us.price_multiplier, us.sync_enabled, us.sync_interval_minutes,
+			us.last_sync_at, us.last_sync_status, us.last_sync_error, us.last_sync_model_count,
+			us.status, us.created_at, us.updated_at,
+			(SELECT COUNT(*) FROM upstream_managed_resources WHERE upstream_site_id = us.id)
+		 FROM upstream_sites us WHERE us.id = $1`, id,
 	).Scan(
-		&site.ID, &site.Name, &site.Platform, &site.BaseURL, &encrypted, &site.PriceMultiplier,
-		&site.SyncEnabled, &site.SyncIntervalMinutes, &lastSyncAt, &site.LastSyncStatus,
-		&site.LastSyncError, &site.LastSyncModelCount, &site.Status,
-		&managedGroupID, &managedAccountID, &managedChannelID,
-		&site.CreatedAt, &site.UpdatedAt,
+		&site.ID, &site.Name, &site.Platform, &site.BaseURL, &apiKeyEnc,
+		&site.CredentialMode, &emailEnc, &passwordEnc,
+		&cachedAccessToken, &cachedRefreshToken, &tokenExpiresAt,
+		&site.PriceMultiplier, &site.SyncEnabled, &site.SyncIntervalMinutes,
+		&lastSyncAt, &site.LastSyncStatus, &site.LastSyncError, &site.LastSyncModelCount,
+		&site.Status, &site.CreatedAt, &site.UpdatedAt,
+		&site.ManagedResourceCount,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -70,56 +85,80 @@ func (r *upstreamSiteRepo) GetByID(ctx context.Context, id int64) (*service.Upst
 		return nil, fmt.Errorf("get upstream site: %w", err)
 	}
 
-	decrypted, err := r.encryptor.Decrypt(encrypted)
-	if err != nil {
+	// 解密敏感字段
+	if site.APIKey, err = r.encryptor.Decrypt(apiKeyEnc); err != nil {
 		return nil, fmt.Errorf("decrypt api key: %w", err)
 	}
-	site.APIKey = decrypted
+	if site.Email, err = r.encryptor.Decrypt(emailEnc); err != nil {
+		return nil, fmt.Errorf("decrypt email: %w", err)
+	}
+	if site.Password, err = r.encryptor.Decrypt(passwordEnc); err != nil {
+		return nil, fmt.Errorf("decrypt password: %w", err)
+	}
+	if cachedAccessToken != "" {
+		if site.CachedAccessToken, err = r.encryptor.Decrypt(cachedAccessToken); err != nil {
+			return nil, fmt.Errorf("decrypt access token: %w", err)
+		}
+	}
+	if cachedRefreshToken != "" {
+		if site.CachedRefreshToken, err = r.encryptor.Decrypt(cachedRefreshToken); err != nil {
+			return nil, fmt.Errorf("decrypt refresh token: %w", err)
+		}
+	}
 
 	if lastSyncAt.Valid {
 		site.LastSyncAt = &lastSyncAt.Time
 	}
-	if managedGroupID.Valid {
-		site.ManagedGroupID = &managedGroupID.Int64
-	}
-	if managedAccountID.Valid {
-		site.ManagedAccountID = &managedAccountID.Int64
-	}
-	if managedChannelID.Valid {
-		site.ManagedChannelID = &managedChannelID.Int64
+	if tokenExpiresAt.Valid {
+		site.TokenExpiresAt = &tokenExpiresAt.Time
 	}
 	return site, nil
 }
 
 func (r *upstreamSiteRepo) Update(ctx context.Context, site *service.UpstreamSite) error {
-	var encrypted string
+	var apiKeyEnc string
 	if site.APIKey != "" {
 		var err error
-		encrypted, err = r.encryptor.Encrypt(site.APIKey)
+		apiKeyEnc, err = r.encryptor.Encrypt(site.APIKey)
 		if err != nil {
 			return fmt.Errorf("encrypt api key: %w", err)
 		}
 	}
 
-	var query string
-	var args []any
-	if encrypted != "" {
-		query = `UPDATE upstream_sites
-			SET name=$1, base_url=$2, api_key_encrypted=$3, price_multiplier=$4,
-				sync_enabled=$5, sync_interval_minutes=$6, status=$7, updated_at=NOW()
-			WHERE id=$8 RETURNING updated_at`
-		args = []any{site.Name, site.BaseURL, encrypted, site.PriceMultiplier,
-			site.SyncEnabled, site.SyncIntervalMinutes, site.Status, site.ID}
-	} else {
-		query = `UPDATE upstream_sites
-			SET name=$1, base_url=$2, price_multiplier=$3,
-				sync_enabled=$4, sync_interval_minutes=$5, status=$6, updated_at=NOW()
-			WHERE id=$7 RETURNING updated_at`
-		args = []any{site.Name, site.BaseURL, site.PriceMultiplier,
-			site.SyncEnabled, site.SyncIntervalMinutes, site.Status, site.ID}
+	emailEnc, err := r.encryptor.Encrypt(site.Email)
+	if err != nil {
+		return fmt.Errorf("encrypt email: %w", err)
+	}
+	passwordEnc, err := r.encryptor.Encrypt(site.Password)
+	if err != nil {
+		return fmt.Errorf("encrypt password: %w", err)
 	}
 
-	err := r.db.QueryRowContext(ctx, query, args...).Scan(&site.UpdatedAt)
+	var query string
+	var args []any
+	if apiKeyEnc != "" {
+		query = `UPDATE upstream_sites
+			SET name=$1, base_url=$2, api_key_encrypted=$3, credential_mode=$4,
+				email_encrypted=$5, password_encrypted=$6,
+				price_multiplier=$7, sync_enabled=$8, sync_interval_minutes=$9, status=$10,
+				updated_at=NOW()
+			WHERE id=$11 RETURNING updated_at`
+		args = []any{site.Name, site.BaseURL, apiKeyEnc, site.CredentialMode,
+			emailEnc, passwordEnc,
+			site.PriceMultiplier, site.SyncEnabled, site.SyncIntervalMinutes, site.Status, site.ID}
+	} else {
+		query = `UPDATE upstream_sites
+			SET name=$1, base_url=$2, credential_mode=$3,
+				email_encrypted=$4, password_encrypted=$5,
+				price_multiplier=$6, sync_enabled=$7, sync_interval_minutes=$8, status=$9,
+				updated_at=NOW()
+			WHERE id=$10 RETURNING updated_at`
+		args = []any{site.Name, site.BaseURL, site.CredentialMode,
+			emailEnc, passwordEnc,
+			site.PriceMultiplier, site.SyncEnabled, site.SyncIntervalMinutes, site.Status, site.ID}
+	}
+
+	err = r.db.QueryRowContext(ctx, query, args...).Scan(&site.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return service.ErrUpstreamSiteNotFound
@@ -150,12 +189,12 @@ func (r *upstreamSiteRepo) List(ctx context.Context, params pagination.Paginatio
 	argIdx := 1
 
 	if status != "" {
-		where = append(where, fmt.Sprintf("status = $%d", argIdx))
+		where = append(where, fmt.Sprintf("us.status = $%d", argIdx))
 		args = append(args, status)
 		argIdx++
 	}
 	if search != "" {
-		where = append(where, fmt.Sprintf("(name ILIKE $%d OR base_url ILIKE $%d)", argIdx, argIdx))
+		where = append(where, fmt.Sprintf("(us.name ILIKE $%d OR us.base_url ILIKE $%d)", argIdx, argIdx))
 		args = append(args, "%"+escapeLike(search)+"%")
 		argIdx++
 	}
@@ -164,7 +203,7 @@ func (r *upstreamSiteRepo) List(ctx context.Context, params pagination.Paginatio
 
 	var total int64
 	err := r.db.QueryRowContext(ctx,
-		fmt.Sprintf("SELECT COUNT(*) FROM upstream_sites WHERE %s", whereClause), args...,
+		fmt.Sprintf("SELECT COUNT(*) FROM upstream_sites us WHERE %s", whereClause), args...,
 	).Scan(&total)
 	if err != nil {
 		return nil, nil, fmt.Errorf("count upstream sites: %w", err)
@@ -178,12 +217,12 @@ func (r *upstreamSiteRepo) List(ctx context.Context, params pagination.Paginatio
 	offset := (page - 1) * pageSize
 
 	dataQuery := fmt.Sprintf(
-		`SELECT id, name, platform, base_url, api_key_encrypted, price_multiplier,
-			sync_enabled, sync_interval_minutes, last_sync_at, last_sync_status,
-			last_sync_error, last_sync_model_count, status,
-			managed_group_id, managed_account_id, managed_channel_id,
-			created_at, updated_at
-		 FROM upstream_sites WHERE %s ORDER BY id DESC LIMIT $%d OFFSET $%d`,
+		`SELECT us.id, us.name, us.platform, us.base_url, us.credential_mode,
+			us.price_multiplier, us.sync_enabled, us.sync_interval_minutes,
+			us.last_sync_at, us.last_sync_status, us.last_sync_error, us.last_sync_model_count,
+			us.status, us.created_at, us.updated_at,
+			(SELECT COUNT(*) FROM upstream_managed_resources WHERE upstream_site_id = us.id)
+		 FROM upstream_sites us WHERE %s ORDER BY us.id DESC LIMIT $%d OFFSET $%d`,
 		whereClause, argIdx, argIdx+1,
 	)
 	args = append(args, pageSize, offset)
@@ -197,33 +236,21 @@ func (r *upstreamSiteRepo) List(ctx context.Context, params pagination.Paginatio
 	var sites []service.UpstreamSite
 	for rows.Next() {
 		var site service.UpstreamSite
-		var encrypted string
 		var lastSyncAt sql.NullTime
-		var managedGroupID, managedAccountID, managedChannelID sql.NullInt64
 
 		if err := rows.Scan(
-			&site.ID, &site.Name, &site.Platform, &site.BaseURL, &encrypted, &site.PriceMultiplier,
-			&site.SyncEnabled, &site.SyncIntervalMinutes, &lastSyncAt, &site.LastSyncStatus,
-			&site.LastSyncError, &site.LastSyncModelCount, &site.Status,
-			&managedGroupID, &managedAccountID, &managedChannelID,
-			&site.CreatedAt, &site.UpdatedAt,
+			&site.ID, &site.Name, &site.Platform, &site.BaseURL, &site.CredentialMode,
+			&site.PriceMultiplier, &site.SyncEnabled, &site.SyncIntervalMinutes,
+			&lastSyncAt, &site.LastSyncStatus, &site.LastSyncError, &site.LastSyncModelCount,
+			&site.Status, &site.CreatedAt, &site.UpdatedAt,
+			&site.ManagedResourceCount,
 		); err != nil {
 			return nil, nil, fmt.Errorf("scan upstream site: %w", err)
 		}
 
-		// 列表不解密 API Key，只用于展示
-		site.APIKey = ""
+		// 列表不解密敏感字段
 		if lastSyncAt.Valid {
 			site.LastSyncAt = &lastSyncAt.Time
-		}
-		if managedGroupID.Valid {
-			site.ManagedGroupID = &managedGroupID.Int64
-		}
-		if managedAccountID.Valid {
-			site.ManagedAccountID = &managedAccountID.Int64
-		}
-		if managedChannelID.Valid {
-			site.ManagedChannelID = &managedChannelID.Int64
 		}
 		sites = append(sites, site)
 	}
@@ -242,15 +269,16 @@ func (r *upstreamSiteRepo) List(ctx context.Context, params pagination.Paginatio
 
 func (r *upstreamSiteRepo) ListDueForSync(ctx context.Context) ([]service.UpstreamSite, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, name, platform, base_url, api_key_encrypted, price_multiplier,
-			sync_enabled, sync_interval_minutes, last_sync_at, last_sync_status,
-			last_sync_error, last_sync_model_count, status,
-			managed_group_id, managed_account_id, managed_channel_id,
-			created_at, updated_at
-		 FROM upstream_sites
-		 WHERE sync_enabled = true AND status = 'active'
-		   AND (last_sync_at IS NULL OR last_sync_at + (sync_interval_minutes || ' minutes')::INTERVAL < NOW())
-		 ORDER BY last_sync_at ASC NULLS FIRST`)
+		`SELECT us.id, us.name, us.platform, us.base_url, us.api_key_encrypted,
+			us.credential_mode, us.email_encrypted, us.password_encrypted,
+			us.cached_access_token, us.cached_refresh_token, us.token_expires_at,
+			us.price_multiplier, us.sync_enabled, us.sync_interval_minutes,
+			us.last_sync_at, us.last_sync_status, us.last_sync_error, us.last_sync_model_count,
+			us.status, us.created_at, us.updated_at
+		 FROM upstream_sites us
+		 WHERE us.sync_enabled = true AND us.status = 'active'
+		   AND (us.last_sync_at IS NULL OR us.last_sync_at + (us.sync_interval_minutes || ' minutes')::INTERVAL < NOW())
+		 ORDER BY us.last_sync_at ASC NULLS FIRST`)
 	if err != nil {
 		return nil, fmt.Errorf("query due upstream sites: %w", err)
 	}
@@ -259,37 +287,48 @@ func (r *upstreamSiteRepo) ListDueForSync(ctx context.Context) ([]service.Upstre
 	var sites []service.UpstreamSite
 	for rows.Next() {
 		var site service.UpstreamSite
-		var encrypted string
+		var apiKeyEnc, emailEnc, passwordEnc, cachedAccessToken, cachedRefreshToken string
 		var lastSyncAt sql.NullTime
-		var managedGroupID, managedAccountID, managedChannelID sql.NullInt64
+		var tokenExpiresAt sql.NullTime
 
 		if err := rows.Scan(
-			&site.ID, &site.Name, &site.Platform, &site.BaseURL, &encrypted, &site.PriceMultiplier,
-			&site.SyncEnabled, &site.SyncIntervalMinutes, &lastSyncAt, &site.LastSyncStatus,
-			&site.LastSyncError, &site.LastSyncModelCount, &site.Status,
-			&managedGroupID, &managedAccountID, &managedChannelID,
-			&site.CreatedAt, &site.UpdatedAt,
+			&site.ID, &site.Name, &site.Platform, &site.BaseURL, &apiKeyEnc,
+			&site.CredentialMode, &emailEnc, &passwordEnc,
+			&cachedAccessToken, &cachedRefreshToken, &tokenExpiresAt,
+			&site.PriceMultiplier, &site.SyncEnabled, &site.SyncIntervalMinutes,
+			&lastSyncAt, &site.LastSyncStatus, &site.LastSyncError, &site.LastSyncModelCount,
+			&site.Status, &site.CreatedAt, &site.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan upstream site: %w", err)
 		}
 
-		decrypted, err := r.encryptor.Decrypt(encrypted)
-		if err != nil {
-			return nil, fmt.Errorf("decrypt api key for site %d: %w", site.ID, err)
+		// 解密
+		var decErr error
+		if site.APIKey, decErr = r.encryptor.Decrypt(apiKeyEnc); decErr != nil {
+			return nil, fmt.Errorf("decrypt api key for site %d: %w", site.ID, decErr)
 		}
-		site.APIKey = decrypted
+		if site.Email, decErr = r.encryptor.Decrypt(emailEnc); decErr != nil {
+			return nil, fmt.Errorf("decrypt email for site %d: %w", site.ID, decErr)
+		}
+		if site.Password, decErr = r.encryptor.Decrypt(passwordEnc); decErr != nil {
+			return nil, fmt.Errorf("decrypt password for site %d: %w", site.ID, decErr)
+		}
+		if cachedAccessToken != "" {
+			if site.CachedAccessToken, decErr = r.encryptor.Decrypt(cachedAccessToken); decErr != nil {
+				return nil, fmt.Errorf("decrypt access token for site %d: %w", site.ID, decErr)
+			}
+		}
+		if cachedRefreshToken != "" {
+			if site.CachedRefreshToken, decErr = r.encryptor.Decrypt(cachedRefreshToken); decErr != nil {
+				return nil, fmt.Errorf("decrypt refresh token for site %d: %w", site.ID, decErr)
+			}
+		}
 
 		if lastSyncAt.Valid {
 			site.LastSyncAt = &lastSyncAt.Time
 		}
-		if managedGroupID.Valid {
-			site.ManagedGroupID = &managedGroupID.Int64
-		}
-		if managedAccountID.Valid {
-			site.ManagedAccountID = &managedAccountID.Int64
-		}
-		if managedChannelID.Valid {
-			site.ManagedChannelID = &managedChannelID.Int64
+		if tokenExpiresAt.Valid {
+			site.TokenExpiresAt = &tokenExpiresAt.Time
 		}
 		sites = append(sites, site)
 	}
@@ -309,15 +348,36 @@ func (r *upstreamSiteRepo) UpdateSyncStatus(ctx context.Context, id int64, statu
 	return nil
 }
 
-func (r *upstreamSiteRepo) UpdateManagedResources(ctx context.Context, id int64, groupID, accountID, channelID *int64) error {
-	_, err := r.db.ExecContext(ctx,
-		`UPDATE upstream_sites SET managed_group_id=$1, managed_account_id=$2, managed_channel_id=$3,
+func (r *upstreamSiteRepo) UpdateTokenCache(ctx context.Context, id int64, accessToken, refreshToken string, expiresAt *time.Time) error {
+	atEnc, err := r.encryptor.Encrypt(accessToken)
+	if err != nil {
+		return fmt.Errorf("encrypt access token: %w", err)
+	}
+	rtEnc, err := r.encryptor.Encrypt(refreshToken)
+	if err != nil {
+		return fmt.Errorf("encrypt refresh token: %w", err)
+	}
+
+	_, err = r.db.ExecContext(ctx,
+		`UPDATE upstream_sites SET cached_access_token=$1, cached_refresh_token=$2, token_expires_at=$3,
 			updated_at=NOW()
 		 WHERE id=$4`,
-		toNullInt64(groupID), toNullInt64(accountID), toNullInt64(channelID), id,
+		atEnc, rtEnc, expiresAt, id,
 	)
 	if err != nil {
-		return fmt.Errorf("update managed resources: %w", err)
+		return fmt.Errorf("update token cache: %w", err)
+	}
+	return nil
+}
+
+func (r *upstreamSiteRepo) ClearTokenCache(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE upstream_sites SET cached_access_token='', cached_refresh_token='', token_expires_at=NULL,
+			updated_at=NOW()
+		 WHERE id=$1`, id,
+	)
+	if err != nil {
+		return fmt.Errorf("clear token cache: %w", err)
 	}
 	return nil
 }

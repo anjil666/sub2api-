@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -21,7 +22,8 @@ type UpstreamSiteRepository interface {
 	List(ctx context.Context, params pagination.PaginationParams, status, search string) ([]UpstreamSite, *pagination.PaginationResult, error)
 	ListDueForSync(ctx context.Context) ([]UpstreamSite, error)
 	UpdateSyncStatus(ctx context.Context, id int64, status, syncError string, modelCount int) error
-	UpdateManagedResources(ctx context.Context, id int64, groupID, accountID, channelID *int64) error
+	UpdateTokenCache(ctx context.Context, id int64, accessToken, refreshToken string, expiresAt *time.Time) error
+	ClearTokenCache(ctx context.Context, id int64) error
 	ExistsByBaseURL(ctx context.Context, baseURL string) (bool, error)
 	ExistsByBaseURLExcluding(ctx context.Context, baseURL string, excludeID int64) (bool, error)
 }

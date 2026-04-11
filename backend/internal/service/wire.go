@@ -152,11 +152,12 @@ func ProvideSubscriptionExpiryService(userSubRepo UserSubscriptionRepository) *S
 // ProvideUpstreamSyncService creates and starts UpstreamSyncService.
 func ProvideUpstreamSyncService(
 	siteRepo UpstreamSiteRepository,
+	resourceRepo UpstreamManagedResourceRepository,
 	groupRepo GroupRepository,
 	adminService AdminService,
 	channelService *ChannelService,
 ) *UpstreamSyncService {
-	svc := NewUpstreamSyncService(siteRepo, groupRepo, adminService, channelService)
+	svc := NewUpstreamSyncService(siteRepo, resourceRepo, groupRepo, adminService, channelService)
 	svc.Start()
 	return svc
 }

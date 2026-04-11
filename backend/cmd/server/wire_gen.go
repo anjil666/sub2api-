@@ -80,6 +80,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		return nil, err
 	}
 	upstreamSiteRepository := repository.NewUpstreamSiteRepository(db, secretEncryptor)
+	upstreamManagedResourceRepository := repository.NewUpstreamManagedResourceRepository(db, secretEncryptor)
 	totpCache := repository.NewTotpCache(redisClient)
 	totpService := service.NewTotpService(userRepository, secretEncryptor, totpCache, settingService, emailService, emailQueueService)
 	authHandler := handler.NewAuthHandler(configConfig, authService, userService, settingService, promoService, redeemService, totpService)
@@ -180,7 +181,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	claudeTokenProvider := service.ProvideClaudeTokenProvider(accountRepository, geminiTokenCache, oAuthService, oauthRefreshAPI)
 	digestSessionStore := service.NewDigestSessionStore()
 	channelService := service.NewChannelService(channelRepository, apiKeyAuthCacheInvalidator)
-	upstreamSyncService := service.ProvideUpstreamSyncService(upstreamSiteRepository, groupRepository, adminService, channelService)
+	upstreamSyncService := service.ProvideUpstreamSyncService(upstreamSiteRepository, upstreamManagedResourceRepository, groupRepository, adminService, channelService)
 	modelPricingResolver := service.NewModelPricingResolver(channelService, billingService)
 	gatewayService := service.NewGatewayService(accountRepository, groupRepository, usageLogRepository, usageBillingRepository, userRepository, userSubscriptionRepository, userGroupRateRepository, gatewayCache, configConfig, schedulerSnapshotService, concurrencyService, billingService, rateLimitService, billingCacheService, identityService, httpUpstream, deferredService, claudeTokenProvider, sessionLimitCache, rpmCache, digestSessionStore, settingService, tlsFingerprintProfileService, channelService, modelPricingResolver)
 	openAITokenProvider := service.ProvideOpenAITokenProvider(accountRepository, geminiTokenCache, openAIOAuthService, oauthRefreshAPI)

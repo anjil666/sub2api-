@@ -32,6 +32,16 @@
               <div class="text-xs text-gray-500 dark:text-gray-400 truncate max-w-xs">{{ row.base_url }}</div>
             </div>
           </template>
+          <template #cell-credential_mode="{ row }">
+            <span
+              class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+              :class="row.credential_mode === 'login'
+                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'"
+            >
+              {{ row.credential_mode === 'login' ? t('admin.upstream.modeLogin') : t('admin.upstream.modeApiKey') }}
+            </span>
+          </template>
           <template #cell-status="{ row }">
             <span
               class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer"
@@ -70,20 +80,16 @@
             <span class="font-medium">{{ Number(value).toFixed(2) }}x</span>
           </template>
           <template #cell-managed="{ row }">
-            <div class="flex flex-wrap gap-1 text-xs">
-              <span v-if="row.managed_group_id" class="text-blue-600 dark:text-blue-400">
-                {{ t('admin.upstream.group') }}#{{ row.managed_group_id }}
-              </span>
-              <span v-if="row.managed_account_id" class="text-purple-600 dark:text-purple-400">
-                {{ t('admin.upstream.account') }}#{{ row.managed_account_id }}
-              </span>
-              <span v-if="row.managed_channel_id" class="text-orange-600 dark:text-orange-400">
-                {{ t('admin.upstream.channel') }}#{{ row.managed_channel_id }}
-              </span>
-              <span v-if="!row.managed_group_id && !row.managed_account_id && !row.managed_channel_id" class="text-gray-400">
-                {{ t('admin.upstream.notSynced') }}
-              </span>
-            </div>
+            <button
+              v-if="row.managed_resource_count > 0"
+              class="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              @click="handleViewResources(row)"
+            >
+              {{ t('admin.upstream.resourceCount', { count: row.managed_resource_count }) }}
+            </button>
+            <span v-else class="text-xs text-gray-400">
+              {{ t('admin.upstream.notSynced') }}
+            </span>
           </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center gap-1">
@@ -130,15 +136,53 @@
           <label class="label">{{ t('admin.upstream.form.baseUrl') }}</label>
           <input v-model="form.base_url" type="url" class="input" required maxlength="500" :placeholder="'https://example.com'" />
         </div>
+
+        <!-- 认证方式选择 -->
         <div>
+          <label class="label">{{ t('admin.upstream.credentialMode') }}</label>
+          <div class="flex items-center gap-4 mt-1">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input v-model="form.credential_mode" type="radio" value="api_key" class="radio" />
+              <span class="text-sm">{{ t('admin.upstream.modeApiKey') }}</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input v-model="form.credential_mode" type="radio" value="login" class="radio" />
+              <span class="text-sm">{{ t('admin.upstream.modeLogin') }}</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- API Key 模式 -->
+        <div v-if="form.credential_mode === 'api_key'">
           <label class="label">{{ t('admin.upstream.form.apiKey') }}</label>
           <div class="relative">
             <input v-model="form.api_key" :type="showApiKey ? 'text' : 'password'" class="input pr-10" :required="dialogMode === 'create'" :placeholder="dialogMode === 'edit' ? t('admin.upstream.form.apiKeyPlaceholder') : ''" />
             <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" @click="showApiKey = !showApiKey">
-              {{ showApiKey ? '🙈' : '👁️' }}
+              {{ showApiKey ? '***' : 'Aa' }}
             </button>
           </div>
         </div>
+
+        <!-- 邮箱密码登录模式 -->
+        <template v-if="form.credential_mode === 'login'">
+          <div>
+            <label class="label">{{ t('admin.upstream.form.email') }}</label>
+            <input v-model="form.email" type="email" class="input" :required="dialogMode === 'create'" :placeholder="dialogMode === 'edit' ? t('admin.upstream.form.emailPlaceholder') : ''" />
+          </div>
+          <div>
+            <label class="label">{{ t('admin.upstream.form.password') }}</label>
+            <div class="relative">
+              <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="input pr-10" :required="dialogMode === 'create'" :placeholder="dialogMode === 'edit' ? t('admin.upstream.form.passwordPlaceholder') : ''" />
+              <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" @click="showPassword = !showPassword">
+                {{ showPassword ? '***' : 'Aa' }}
+              </button>
+            </div>
+          </div>
+          <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 text-xs text-blue-700 dark:text-blue-300">
+            {{ t('admin.upstream.loginModeHint') }}
+          </div>
+        </template>
+
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="label">{{ t('admin.upstream.form.priceMultiplier') }}</label>
@@ -194,6 +238,49 @@
         </div>
       </div>
     </BaseDialog>
+
+    <!-- 托管资源弹窗 -->
+    <BaseDialog :show="resourcesDialogVisible" :title="t('admin.upstream.resourcesTitle')" @close="resourcesDialogVisible = false">
+      <div v-if="resourcesLoading" class="py-8 text-center text-gray-500">{{ t('common.loading') }}...</div>
+      <div v-else-if="resourcesList.length === 0" class="py-8 text-center text-gray-500">{{ t('admin.upstream.noResources') }}</div>
+      <div v-else class="max-h-96 overflow-y-auto">
+        <div class="space-y-2">
+          <div v-for="res in resourcesList" :key="res.id" class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="font-medium text-sm">{{ res.upstream_key_name || 'Unnamed Key' }}</span>
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                  :class="res.status === 'active'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'"
+                >
+                  {{ res.status }}
+                </span>
+              </div>
+              <span class="text-xs text-gray-400">{{ res.model_count }} {{ t('admin.upstream.models') }}</span>
+            </div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 font-mono mb-1">
+              {{ t('admin.upstream.keyPrefix') }}: {{ res.upstream_key_prefix }}
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <span v-if="res.managed_group_id" class="text-blue-600 dark:text-blue-400">
+                {{ t('admin.upstream.group') }}#{{ res.managed_group_id }}
+              </span>
+              <span v-if="res.managed_account_id" class="text-purple-600 dark:text-purple-400">
+                {{ t('admin.upstream.account') }}#{{ res.managed_account_id }}
+              </span>
+              <span v-if="res.managed_channel_id" class="text-orange-600 dark:text-orange-400">
+                {{ t('admin.upstream.channel') }}#{{ res.managed_channel_id }}
+              </span>
+            </div>
+            <div v-if="res.last_synced_at" class="text-xs text-gray-400 mt-1">
+              {{ t('admin.upstream.lastSynced') }}: {{ formatDateTime(res.last_synced_at) }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </BaseDialog>
   </AppLayout>
 </template>
 
@@ -202,7 +289,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { adminAPI } from '@/api/admin'
-import type { UpstreamSite, UpstreamModelInfo, UpstreamBalanceInfo } from '@/api/admin/upstream'
+import type { UpstreamSite, UpstreamModelInfo, UpstreamBalanceInfo, UpstreamManagedResource } from '@/api/admin/upstream'
 import type { Column } from '@/components/common/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -223,12 +310,13 @@ const pagination = reactive({
 })
 
 const columns = computed<Column[]>(() => [
-  { key: 'name', label: t('admin.upstream.columns.name'), width: '200px' },
+  { key: 'name', label: t('admin.upstream.columns.name'), width: '180px' },
+  { key: 'credential_mode', label: t('admin.upstream.columns.credentialMode'), width: '100px' },
   { key: 'status', label: t('admin.upstream.columns.status'), width: '90px' },
   { key: 'sync_status', label: t('admin.upstream.columns.syncStatus'), width: '120px' },
   { key: 'last_sync_model_count', label: t('admin.upstream.columns.modelCount'), width: '80px' },
   { key: 'price_multiplier', label: t('admin.upstream.columns.multiplier'), width: '80px' },
-  { key: 'managed', label: t('admin.upstream.columns.resources'), width: '200px' },
+  { key: 'managed', label: t('admin.upstream.columns.resources'), width: '120px' },
   { key: 'actions', label: t('common.actions'), width: '320px' }
 ])
 
@@ -241,10 +329,14 @@ const dialogMode = ref<'create' | 'edit'>('create')
 const editingId = ref<number | null>(null)
 const submitting = ref(false)
 const showApiKey = ref(false)
+const showPassword = ref(false)
 const form = reactive({
   name: '',
   base_url: '',
+  credential_mode: 'api_key' as 'api_key' | 'login',
   api_key: '',
+  email: '',
+  password: '',
   price_multiplier: 1.0,
   sync_enabled: true,
   sync_interval_minutes: 60
@@ -257,6 +349,10 @@ const modelsList = ref<UpstreamModelInfo[]>([])
 const balanceDialogVisible = ref(false)
 const balanceLoading = ref(false)
 const balanceInfo = ref<UpstreamBalanceInfo | null>(null)
+
+const resourcesDialogVisible = ref(false)
+const resourcesLoading = ref(false)
+const resourcesList = ref<UpstreamManagedResource[]>([])
 
 // ── 数据加载 ──
 const loadItems = async () => {
@@ -292,10 +388,14 @@ function openCreateDialog() {
   dialogMode.value = 'create'
   editingId.value = null
   showApiKey.value = false
+  showPassword.value = false
   Object.assign(form, {
     name: '',
     base_url: '',
+    credential_mode: 'api_key',
     api_key: '',
+    email: '',
+    password: '',
     price_multiplier: 1.0,
     sync_enabled: true,
     sync_interval_minutes: 60
@@ -307,10 +407,14 @@ function openEditDialog(site: UpstreamSite) {
   dialogMode.value = 'edit'
   editingId.value = site.id
   showApiKey.value = false
+  showPassword.value = false
   Object.assign(form, {
     name: site.name,
     base_url: site.base_url,
+    credential_mode: site.credential_mode || 'api_key',
     api_key: '',
+    email: '',
+    password: '',
     price_multiplier: site.price_multiplier,
     sync_enabled: site.sync_enabled,
     sync_interval_minutes: site.sync_interval_minutes
@@ -325,7 +429,10 @@ async function handleSubmit() {
       await adminAPI.upstream.create({
         name: form.name,
         base_url: form.base_url,
-        api_key: form.api_key,
+        credential_mode: form.credential_mode,
+        api_key: form.credential_mode === 'api_key' ? form.api_key : undefined,
+        email: form.credential_mode === 'login' ? form.email : undefined,
+        password: form.credential_mode === 'login' ? form.password : undefined,
         price_multiplier: form.price_multiplier,
         sync_enabled: form.sync_enabled,
         sync_interval_minutes: form.sync_interval_minutes
@@ -334,7 +441,10 @@ async function handleSubmit() {
       await adminAPI.upstream.update(editingId.value, {
         name: form.name,
         base_url: form.base_url,
-        api_key: form.api_key || undefined,
+        credential_mode: form.credential_mode,
+        api_key: form.credential_mode === 'api_key' && form.api_key ? form.api_key : undefined,
+        email: form.credential_mode === 'login' && form.email ? form.email : undefined,
+        password: form.credential_mode === 'login' && form.password ? form.password : undefined,
         price_multiplier: form.price_multiplier,
         sync_enabled: form.sync_enabled,
         sync_interval_minutes: form.sync_interval_minutes
@@ -354,7 +464,8 @@ async function handleSync(site: UpstreamSite) {
   syncing[site.id] = true
   try {
     const result = await adminAPI.upstream.syncNow(site.id)
-    alert(t('admin.upstream.syncComplete', { count: result.models_discovered }))
+    const keysMsg = result.keys_discovered ? `, ${result.keys_discovered} keys` : ''
+    alert(t('admin.upstream.syncComplete', { count: result.models_discovered }) + keysMsg)
     loadItems()
   } catch (err: any) {
     alert(err?.message || 'Sync failed')
@@ -407,6 +518,20 @@ async function handleViewBalance(site: UpstreamSite) {
     balanceDialogVisible.value = false
   } finally {
     balanceLoading.value = false
+  }
+}
+
+async function handleViewResources(site: UpstreamSite) {
+  resourcesDialogVisible.value = true
+  resourcesLoading.value = true
+  resourcesList.value = []
+  try {
+    resourcesList.value = await adminAPI.upstream.listResources(site.id)
+  } catch (err: any) {
+    alert(err?.message || 'Failed to fetch resources')
+    resourcesDialogVisible.value = false
+  } finally {
+    resourcesLoading.value = false
   }
 }
 
