@@ -62,7 +62,7 @@ func (h *ReferralHandler) GetCommissions(c *gin.Context) {
 			"total":      paging.Total,
 			"page":       paging.Page,
 			"page_size":  paging.PageSize,
-			"pages":      paging.TotalPages,
+			"pages":      paging.Pages,
 		},
 	})
 }
