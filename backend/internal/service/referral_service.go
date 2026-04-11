@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"strings"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -58,19 +57,6 @@ func GenerateReferralCode() (string, error) {
 		code[i] = charset[n.Int64()]
 	}
 	return string(code), nil
-}
-
-// MaskEmail 脱敏邮箱：a****@example.com
-func MaskEmail(email string) string {
-	parts := strings.SplitN(email, "@", 2)
-	if len(parts) != 2 {
-		return "****"
-	}
-	local := parts[0]
-	if len(local) <= 1 {
-		return local + "****@" + parts[1]
-	}
-	return string(local[0]) + "****@" + parts[1]
 }
 
 // EnsureReferralCode 确保用户有推荐码，没有则生成
