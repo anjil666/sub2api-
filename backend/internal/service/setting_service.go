@@ -167,6 +167,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyBackendModeEnabled,
 		SettingKeyOIDCConnectEnabled,
 		SettingKeyOIDCConnectProviderName,
+		SettingKeyCheckinEnabled,
 	}
 
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)

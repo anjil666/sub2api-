@@ -218,7 +218,7 @@ func (s *UserService) UpdateBalance(ctx context.Context, userID int64, amount fl
 // DailyCheckin 每日签到
 func (s *UserService) DailyCheckin(ctx context.Context, userID int64) (map[string]interface{}, error) {
 	// 1. 检查签到功能是否启用
-	settings, err := s.settingService.GetSettings(ctx)
+	settings, err := s.settingService.GetAllSettings(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get settings: %w", err)
 	}
