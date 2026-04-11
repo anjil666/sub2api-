@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -82,15 +81,12 @@ func (h *ReferralHandler) GetReferredUsers(c *gin.Context) {
 		users = []service.ReferredUser{}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"items":     users,
-			"total":     paging.Total,
-			"page":      paging.Page,
-			"page_size": paging.PageSize,
-			"pages":     paging.Pages,
-		},
+	response.Success(c, response.PaginatedData{
+		Items:    users,
+		Total:    paging.Total,
+		Page:     paging.Page,
+		PageSize: paging.PageSize,
+		Pages:    paging.Pages,
 	})
 }
 
@@ -132,14 +128,11 @@ func (h *ReferralHandler) GetCommissions(c *gin.Context) {
 		items = []gin.H{}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"items":     items,
-			"total":     paging.Total,
-			"page":      paging.Page,
-			"page_size": paging.PageSize,
-			"pages":     paging.Pages,
-		},
+	response.Success(c, response.PaginatedData{
+		Items:    items,
+		Total:    paging.Total,
+		Page:     paging.Page,
+		PageSize: paging.PageSize,
+		Pages:    paging.Pages,
 	})
 }
