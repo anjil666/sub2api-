@@ -122,49 +122,49 @@ func (r *upstreamSiteRepo) GetByID(ctx context.Context, id int64) (*service.Upst
 }
 
 func (r *upstreamSiteRepo) Update(ctx context.Context, site *service.UpstreamSite) error {
-	var apiKeyEnc string
+	// 动态构建 SET 子句，只更新非空的敏感字段（空 = 不修改）
+	setClauses := []string{
+		"name=$1", "base_url=$2", "credential_mode=$3",
+		"price_multiplier=$4", "sync_enabled=$5", "sync_interval_minutes=$6", "status=$7",
+		"updated_at=NOW()",
+	}
+	args := []any{site.Name, site.BaseURL, site.CredentialMode,
+		site.PriceMultiplier, site.SyncEnabled, site.SyncIntervalMinutes, site.Status}
+	argIdx := 8
+
 	if site.APIKey != "" {
-		var err error
-		apiKeyEnc, err = r.encryptor.Encrypt(site.APIKey)
+		enc, err := r.encryptor.Encrypt(site.APIKey)
 		if err != nil {
 			return fmt.Errorf("encrypt api key: %w", err)
 		}
+		setClauses = append(setClauses, fmt.Sprintf("api_key_encrypted=$%d", argIdx))
+		args = append(args, enc)
+		argIdx++
+	}
+	if site.Email != "" {
+		enc, err := r.encryptor.Encrypt(site.Email)
+		if err != nil {
+			return fmt.Errorf("encrypt email: %w", err)
+		}
+		setClauses = append(setClauses, fmt.Sprintf("email_encrypted=$%d", argIdx))
+		args = append(args, enc)
+		argIdx++
+	}
+	if site.Password != "" {
+		enc, err := r.encryptor.Encrypt(site.Password)
+		if err != nil {
+			return fmt.Errorf("encrypt password: %w", err)
+		}
+		setClauses = append(setClauses, fmt.Sprintf("password_encrypted=$%d", argIdx))
+		args = append(args, enc)
+		argIdx++
 	}
 
-	emailEnc, err := r.encryptor.Encrypt(site.Email)
-	if err != nil {
-		return fmt.Errorf("encrypt email: %w", err)
-	}
-	passwordEnc, err := r.encryptor.Encrypt(site.Password)
-	if err != nil {
-		return fmt.Errorf("encrypt password: %w", err)
-	}
+	query := fmt.Sprintf(`UPDATE upstream_sites SET %s WHERE id=$%d RETURNING updated_at`,
+		strings.Join(setClauses, ", "), argIdx)
+	args = append(args, site.ID)
 
-	var query string
-	var args []any
-	if apiKeyEnc != "" {
-		query = `UPDATE upstream_sites
-			SET name=$1, base_url=$2, api_key_encrypted=$3, credential_mode=$4,
-				email_encrypted=$5, password_encrypted=$6,
-				price_multiplier=$7, sync_enabled=$8, sync_interval_minutes=$9, status=$10,
-				updated_at=NOW()
-			WHERE id=$11 RETURNING updated_at`
-		args = []any{site.Name, site.BaseURL, apiKeyEnc, site.CredentialMode,
-			emailEnc, passwordEnc,
-			site.PriceMultiplier, site.SyncEnabled, site.SyncIntervalMinutes, site.Status, site.ID}
-	} else {
-		query = `UPDATE upstream_sites
-			SET name=$1, base_url=$2, credential_mode=$3,
-				email_encrypted=$4, password_encrypted=$5,
-				price_multiplier=$6, sync_enabled=$7, sync_interval_minutes=$8, status=$9,
-				updated_at=NOW()
-			WHERE id=$10 RETURNING updated_at`
-		args = []any{site.Name, site.BaseURL, site.CredentialMode,
-			emailEnc, passwordEnc,
-			site.PriceMultiplier, site.SyncEnabled, site.SyncIntervalMinutes, site.Status, site.ID}
-	}
-
-	err = r.db.QueryRowContext(ctx, query, args...).Scan(&site.UpdatedAt)
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&site.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return service.ErrUpstreamSiteNotFound
