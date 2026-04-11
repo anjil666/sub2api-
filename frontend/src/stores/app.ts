@@ -337,6 +337,7 @@ export const useAppStore = defineStore('app', () => {
         sora_client_enabled: false,
         backend_mode_enabled: false,
         checkin_enabled: false,
+        referral_enabled: false,
         version: siteVersion.value
       }
     }
