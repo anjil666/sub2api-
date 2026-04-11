@@ -333,6 +333,7 @@ export default {
     usage: '使用记录',
     redeem: '兑换',
     referral: '推荐返利',
+    referralManagement: '推荐管理',
     profile: '个人资料',
     users: '用户管理',
     groups: '分组管理',
@@ -4416,6 +4417,24 @@ export default {
         resetZoomHint: '重置缩放（若启用）',
         downloadChart: '下载',
         downloadChartHint: '下载图表图片'
+      }
+    },
+
+    // Referral Management
+    referral: {
+      title: '推荐返利管理',
+      description: '查看所有推荐返利记录',
+      statusCompleted: '已完成',
+      statusPending: '待处理',
+      columns: {
+        referrerId: '推荐人ID',
+        referredEmail: '被推荐人邮箱',
+        orderCode: '订单号',
+        orderAmount: '订单金额',
+        commissionRate: '返利比例',
+        commissionAmount: '返利金额',
+        status: '状态',
+        createdAt: '时间'
       }
     },
 

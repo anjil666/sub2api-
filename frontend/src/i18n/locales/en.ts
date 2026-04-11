@@ -333,6 +333,7 @@ export default {
     usage: 'Usage',
     redeem: 'Redeem',
     referral: 'Referral',
+    referralManagement: 'Referral Mgmt',
     profile: 'Profile',
     users: 'Users',
     groups: 'Groups',
@@ -4251,6 +4252,24 @@ export default {
         resetZoomHint: 'Reset zoom (if enabled)',
         downloadChart: 'Download',
         downloadChartHint: 'Download chart as image'
+      }
+    },
+
+    // Referral Management
+    referral: {
+      title: 'Referral Commissions',
+      description: 'View all referral commission records',
+      statusCompleted: 'Completed',
+      statusPending: 'Pending',
+      columns: {
+        referrerId: 'Referrer ID',
+        referredEmail: 'Referred Email',
+        orderCode: 'Order Code',
+        orderAmount: 'Order Amount',
+        commissionRate: 'Rate',
+        commissionAmount: 'Commission',
+        status: 'Status',
+        createdAt: 'Time'
       }
     },
 
