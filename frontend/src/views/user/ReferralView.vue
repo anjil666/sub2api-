@@ -109,10 +109,10 @@
                   <td class="px-6 py-3 font-medium text-green-600 dark:text-green-400">+${{ commission.commission_amount.toFixed(2) }}</td>
                   <td class="px-6 py-3">
                     <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                      :class="commission.status === 'credited'
+                      :class="commission.status === 'completed'
                         ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                         : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'">
-                      {{ commission.status === 'credited' ? t('referral.statusCredited') : t('referral.statusPending') }}
+                      {{ commission.status === 'completed' ? t('referral.statusCredited') : t('referral.statusPending') }}
                     </span>
                   </td>
                   <td class="px-6 py-3 text-gray-500 dark:text-gray-400">{{ formatDateTime(commission.created_at) }}</td>
