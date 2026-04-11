@@ -36,12 +36,11 @@ func (r *upstreamManagedResourceRepo) Upsert(ctx context.Context, res *service.U
 			upstream_key_name = EXCLUDED.upstream_key_name,
 			upstream_group_id = EXCLUDED.upstream_group_id,
 			api_key_encrypted = EXCLUDED.api_key_encrypted,
-			status = EXCLUDED.status,
 			updated_at = NOW()
-		 RETURNING id, created_at, updated_at`,
+		 RETURNING id, status, created_at, updated_at`,
 		res.UpstreamSiteID, res.UpstreamKeyID, res.UpstreamKeyPrefix, res.UpstreamKeyName,
 		toNullInt64(res.UpstreamGroupID), apiKeyEnc, res.Status,
-	).Scan(&res.ID, &res.CreatedAt, &res.UpdatedAt)
+	).Scan(&res.ID, &res.Status, &res.CreatedAt, &res.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("upsert managed resource: %w", err)
 	}
@@ -250,6 +249,17 @@ func (r *upstreamManagedResourceRepo) UpdateUpstreamRateMultiplier(ctx context.C
 	)
 	if err != nil {
 		return fmt.Errorf("update upstream rate multiplier: %w", err)
+	}
+	return nil
+}
+
+func (r *upstreamManagedResourceRepo) UpdateStatus(ctx context.Context, id int64, status string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE upstream_managed_resources SET status=$1, updated_at=NOW() WHERE id=$2`,
+		status, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update resource status: %w", err)
 	}
 	return nil
 }

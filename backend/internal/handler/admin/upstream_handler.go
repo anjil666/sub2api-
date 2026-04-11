@@ -545,3 +545,25 @@ func (h *UpstreamHandler) UpdateResource(c *gin.Context) {
 	}
 	response.Success(c, resourceToResponse(updated))
 }
+
+// ToggleResource 切换托管资源状态 (active ↔ disabled)
+// POST /api/v1/admin/upstream-sites/:id/resources/:resourceId/toggle
+func (h *UpstreamHandler) ToggleResource(c *gin.Context) {
+	_, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_ID", "Invalid upstream site ID"))
+		return
+	}
+	resourceID, err := strconv.ParseInt(c.Param("resourceId"), 10, 64)
+	if err != nil {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_ID", "Invalid resource ID"))
+		return
+	}
+
+	updated, err := h.syncService.ToggleResource(c.Request.Context(), resourceID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, resourceToResponse(updated))
+}

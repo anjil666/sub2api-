@@ -147,6 +147,11 @@ async function updateResource(siteId: number, resourceId: number, req: { price_m
   return data
 }
 
+async function toggleResource(siteId: number, resourceId: number): Promise<UpstreamManagedResource> {
+  const { data } = await apiClient.post(`/admin/upstream-sites/${siteId}/resources/${resourceId}/toggle`)
+  return data
+}
+
 async function toggle(id: number): Promise<UpstreamSite> {
   const { data } = await apiClient.post(`/admin/upstream-sites/${id}/toggle`)
   return data
@@ -163,6 +168,7 @@ export const upstreamAPI = {
   getModels,
   listResources,
   updateResource,
+  toggleResource,
   toggle
 }
 

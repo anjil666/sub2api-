@@ -193,6 +193,22 @@ func (s *UpstreamSyncService) UpdateResourceMultiplier(ctx context.Context, reso
 	return s.resourceRepo.GetByID(ctx, resourceID)
 }
 
+// ToggleResource 切换资源状态 (active ↔ disabled)
+func (s *UpstreamSyncService) ToggleResource(ctx context.Context, resourceID int64) (*UpstreamManagedResource, error) {
+	res, err := s.resourceRepo.GetByID(ctx, resourceID)
+	if err != nil || res == nil {
+		return nil, fmt.Errorf("resource not found")
+	}
+	newStatus := "disabled"
+	if res.Status == "disabled" {
+		newStatus = "active"
+	}
+	if err := s.resourceRepo.UpdateStatus(ctx, resourceID, newStatus); err != nil {
+		return nil, err
+	}
+	return s.resourceRepo.GetByID(ctx, resourceID)
+}
+
 // ── 核心同步逻辑 ──
 
 func (s *UpstreamSyncService) syncSite(ctx context.Context, site *UpstreamSite) SyncResult {
@@ -269,8 +285,8 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 
 	log.Printf("[UpstreamSync] Site %q: discovered %d API key(s)", site.Name, len(keys))
 
-	// 3. 获取上游分组倍率信息
-	groupRates := s.fetchUpstreamGroupRates(ctx, site, accessToken)
+	// 3. 获取上游分组元信息（名称+倍率）
+	groupMeta := s.fetchUpstreamGroupMeta(ctx, site, accessToken)
 
 	// 4. 对每个 key 获取模型并创建本地资源
 	totalModels := 0
@@ -286,20 +302,28 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 			continue
 		}
 
+		// 确定显示名称：优先使用上游分组名称，否则用 key name
+		displayName := key.Name
+		if key.GroupID != nil {
+			if gm, ok := groupMeta[*key.GroupID]; ok && gm.Name != "" {
+				displayName = gm.Name
+			}
+		}
+
 		// Upsert managed resource
 		res := &UpstreamManagedResource{
 			UpstreamSiteID:  site.ID,
 			UpstreamKeyID:   keyID,
 			UpstreamKeyPrefix: maskAPIKey(key.Key),
-			UpstreamKeyName: key.Name,
+			UpstreamKeyName: displayName,
 			APIKey:          key.Key,
 			Status:          "active",
 		}
 		if key.GroupID != nil {
 			res.UpstreamGroupID = key.GroupID
 			// 记录上游分组倍率
-			if rate, ok := groupRates[*key.GroupID]; ok {
-				res.UpstreamRateMultiplier = rate
+			if gm, ok := groupMeta[*key.GroupID]; ok {
+				res.UpstreamRateMultiplier = gm.RateMultiplier
 			}
 		}
 		if err := s.resourceRepo.Upsert(ctx, res); err != nil {
@@ -312,10 +336,17 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 			_ = s.resourceRepo.UpdateUpstreamRateMultiplier(ctx, res.ID, res.UpstreamRateMultiplier)
 		}
 
-		// 从已有记录获取资源自定义倍率
+		// 从已有记录获取资源状态和自定义倍率
 		existing, _ := s.resourceRepo.GetBySiteAndKeyID(ctx, site.ID, res.UpstreamKeyID)
 		if existing != nil {
 			res.PriceMultiplier = existing.PriceMultiplier
+			// 跳过已禁用的资源（不创建/更新本地分组）
+			if existing.Status == "disabled" {
+				log.Printf("[UpstreamSync] Site %q key %s: resource disabled, skipping local resources", site.Name, displayName)
+				_ = s.resourceRepo.UpdateModelCount(ctx, res.ID, len(models))
+				totalModels += len(models)
+				continue
+			}
 		}
 
 		// 确定实际使用的倍率：资源自定义 > 站点默认
@@ -370,8 +401,14 @@ type upstreamGroupInfo struct {
 	RateMultiplier float64 `json:"rate_multiplier"`
 }
 
-// fetchUpstreamGroupRates 获取上游分组倍率映射 (groupID → rateMultiplier)
-func (s *UpstreamSyncService) fetchUpstreamGroupRates(ctx context.Context, site *UpstreamSite, accessToken string) map[int64]float64 {
+// upstreamGroupMeta 分组元信息（名称+倍率）
+type upstreamGroupMeta struct {
+	Name           string
+	RateMultiplier float64
+}
+
+// fetchUpstreamGroupMeta 获取上游分组元信息映射 (groupID → {Name, RateMultiplier})
+func (s *UpstreamSyncService) fetchUpstreamGroupMeta(ctx context.Context, site *UpstreamSite, accessToken string) map[int64]upstreamGroupMeta {
 	url := strings.TrimRight(site.BaseURL, "/") + "/api/v1/groups/available"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -402,11 +439,12 @@ func (s *UpstreamSyncService) fetchUpstreamGroupRates(ctx context.Context, site 
 		return nil
 	}
 
-	rates := make(map[int64]float64, len(result.Data))
+	meta := make(map[int64]upstreamGroupMeta, len(result.Data))
 	for _, g := range result.Data {
-		rates[g.ID] = g.RateMultiplier
+		meta[g.ID] = upstreamGroupMeta{Name: g.Name, RateMultiplier: g.RateMultiplier}
 	}
-	return rates
+	log.Printf("[UpstreamSync] Site %q: fetched %d upstream groups", site.Name, len(meta))
+	return meta
 }
 
 // getAccessToken 获取上游的 JWT access token（优先缓存 → 刷新 → 登录）
@@ -638,10 +676,10 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 		log.Printf("[UpstreamSync] Managed group %d not found, will recreate", *existing.ManagedGroupID)
 	}
 
-	// 创建新分组
+	// 创建新分组 — 使用上游分组名称
 	groupName := fmt.Sprintf("上游: %s", site.Name)
 	if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
-		groupName = fmt.Sprintf("上游: %s - %s", site.Name, res.UpstreamKeyName)
+		groupName = fmt.Sprintf("%s (%s)", res.UpstreamKeyName, site.Name)
 	}
 
 	group := &Group{
@@ -691,7 +729,7 @@ func (s *UpstreamSyncService) ensureAccount(ctx context.Context, site *UpstreamS
 	// 创建新账号
 	accountName := fmt.Sprintf("上游: %s", site.Name)
 	if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
-		accountName = fmt.Sprintf("上游: %s - %s", site.Name, res.UpstreamKeyName)
+		accountName = fmt.Sprintf("%s (%s)", res.UpstreamKeyName, site.Name)
 	}
 
 	concurrency := 5
@@ -735,7 +773,7 @@ func (s *UpstreamSyncService) ensureChannel(ctx context.Context, site *UpstreamS
 	// 创建新渠道
 	channelName := fmt.Sprintf("上游: %s", site.Name)
 	if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
-		channelName = fmt.Sprintf("上游: %s - %s", site.Name, res.UpstreamKeyName)
+		channelName = fmt.Sprintf("%s (%s)", res.UpstreamKeyName, site.Name)
 	}
 
 	createInput := &CreateChannelInput{
@@ -744,7 +782,7 @@ func (s *UpstreamSyncService) ensureChannel(ctx context.Context, site *UpstreamS
 		GroupIDs:           []int64{groupID},
 		ModelPricing:       pricingList,
 		BillingModelSource: BillingModelSourceChannelMapped,
-		RestrictModels:     false,
+		RestrictModels:     true,
 	}
 	channel, err := s.channelService.Create(ctx, createInput)
 	if err != nil {

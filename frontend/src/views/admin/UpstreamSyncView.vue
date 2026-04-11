@@ -76,9 +76,6 @@
           <template #cell-last_sync_model_count="{ value }">
             <span class="font-medium">{{ value }}</span>
           </template>
-          <template #cell-price_multiplier="{ value }">
-            <span class="font-medium">{{ Number(value).toFixed(2) }}x</span>
-          </template>
           <template #cell-managed="{ row }">
             <button
               v-if="row.managed_resource_count > 0"
@@ -183,11 +180,7 @@
           </div>
         </template>
 
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="label">{{ t('admin.upstream.form.priceMultiplier') }}</label>
-            <input v-model.number="form.price_multiplier" type="number" class="input" step="0.01" min="0.01" />
-          </div>
+        <div class="grid grid-cols-1 gap-4">
           <div>
             <label class="label">{{ t('admin.upstream.form.syncInterval') }}</label>
             <input v-model.number="form.sync_interval_minutes" type="number" class="input" min="1" />
@@ -250,12 +243,13 @@
               <div class="flex items-center gap-2">
                 <span class="font-medium text-sm">{{ res.upstream_key_name || 'Unnamed Key' }}</span>
                 <span
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium cursor-pointer"
                   :class="res.status === 'active'
                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                     : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'"
+                  @click="handleToggleResource(res)"
                 >
-                  {{ res.status }}
+                  {{ res.status === 'active' ? t('admin.upstream.statusActive') : t('admin.upstream.statusDisabled') }}
                 </span>
               </div>
               <span class="text-xs text-gray-400">{{ res.model_count }} {{ t('admin.upstream.models') }}</span>
@@ -336,7 +330,6 @@ const columns = computed<Column[]>(() => [
   { key: 'status', label: t('admin.upstream.columns.status'), width: '90px' },
   { key: 'sync_status', label: t('admin.upstream.columns.syncStatus'), width: '120px' },
   { key: 'last_sync_model_count', label: t('admin.upstream.columns.modelCount'), width: '80px' },
-  { key: 'price_multiplier', label: t('admin.upstream.columns.multiplier'), width: '80px' },
   { key: 'managed', label: t('admin.upstream.columns.resources'), width: '120px' },
   { key: 'actions', label: t('common.actions'), width: '320px' }
 ])
@@ -580,6 +573,19 @@ async function handleUpdateResourceMultiplier(res: UpstreamManagedResource) {
     alert(err?.message || 'Failed to update multiplier')
     // 恢复原值
     resourceMultipliers[res.id] = res.price_multiplier
+  }
+}
+
+async function handleToggleResource(res: UpstreamManagedResource) {
+  if (currentResourceSiteId.value == null) return
+  try {
+    const updated = await adminAPI.upstream.toggleResource(currentResourceSiteId.value, res.id)
+    const idx = resourcesList.value.findIndex(r => r.id === res.id)
+    if (idx >= 0) {
+      resourcesList.value[idx] = updated
+    }
+  } catch (err: any) {
+    alert(err?.message || 'Failed to toggle resource')
   }
 }
 

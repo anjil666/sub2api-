@@ -4336,7 +4336,7 @@ export default {
       upstreamRate: 'Upstream Rate',
       localRate: 'Local Rate',
       defaultRate: 'Default',
-      zeroMeansDefault: '(0=use site default)',
+      zeroMeansDefault: '(0=default 1x)',
       confirmDelete: 'Delete upstream site "{name}"? Existing groups, accounts, and channels will not be removed.'
     },
 
