@@ -243,8 +243,8 @@
     <BaseDialog :show="resourcesDialogVisible" :title="t('admin.upstream.resourcesTitle')" @close="resourcesDialogVisible = false">
       <div v-if="resourcesLoading" class="py-8 text-center text-gray-500">{{ t('common.loading') }}...</div>
       <div v-else-if="resourcesList.length === 0" class="py-8 text-center text-gray-500">{{ t('admin.upstream.noResources') }}</div>
-      <div v-else class="max-h-96 overflow-y-auto">
-        <div class="space-y-2">
+      <div v-else class="max-h-[32rem] overflow-y-auto">
+        <div class="space-y-3">
           <div v-for="res in resourcesList" :key="res.id" class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
             <div class="flex items-center justify-between mb-2">
               <div class="flex items-center gap-2">
@@ -260,8 +260,29 @@
               </div>
               <span class="text-xs text-gray-400">{{ res.model_count }} {{ t('admin.upstream.models') }}</span>
             </div>
-            <div class="text-xs text-gray-500 dark:text-gray-400 font-mono mb-1">
+            <div class="text-xs text-gray-500 dark:text-gray-400 font-mono mb-2">
               {{ t('admin.upstream.keyPrefix') }}: {{ res.upstream_key_prefix }}
+            </div>
+            <!-- 倍率设置 -->
+            <div class="flex items-center gap-3 mb-2 bg-gray-50 dark:bg-gray-800 rounded p-2">
+              <div class="flex items-center gap-1 text-xs">
+                <span class="text-gray-500">{{ t('admin.upstream.upstreamRate') }}:</span>
+                <span class="font-medium">{{ res.upstream_rate_multiplier > 0 ? res.upstream_rate_multiplier.toFixed(2) + 'x' : '-' }}</span>
+              </div>
+              <div class="flex items-center gap-1 text-xs">
+                <span class="text-gray-500">{{ t('admin.upstream.localRate') }}:</span>
+                <input
+                  v-model.number="resourceMultipliers[res.id]"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input input-xs w-20 text-center"
+                  :placeholder="t('admin.upstream.defaultRate')"
+                  @blur="handleUpdateResourceMultiplier(res)"
+                  @keyup.enter="handleUpdateResourceMultiplier(res)"
+                />
+                <span class="text-gray-400 text-xs">{{ t('admin.upstream.zeroMeansDefault') }}</span>
+              </div>
             </div>
             <div class="flex flex-wrap gap-2 text-xs">
               <span v-if="res.managed_group_id" class="text-blue-600 dark:text-blue-400">
@@ -353,7 +374,8 @@ const balanceInfo = ref<UpstreamBalanceInfo | null>(null)
 const resourcesDialogVisible = ref(false)
 const resourcesLoading = ref(false)
 const resourcesList = ref<UpstreamManagedResource[]>([])
-
+const resourceMultipliers = reactive<Record<number, number>>({})
+const currentResourceSiteId = ref<number | null>(null)
 // ── 数据加载 ──
 const loadItems = async () => {
   loading.value = true
@@ -433,9 +455,9 @@ async function handleSubmit() {
         api_key: form.credential_mode === 'api_key' ? form.api_key : undefined,
         email: form.credential_mode === 'login' ? form.email : undefined,
         password: form.credential_mode === 'login' ? form.password : undefined,
-        price_multiplier: form.price_multiplier,
+        price_multiplier: Number(form.price_multiplier) || 1,
         sync_enabled: form.sync_enabled,
-        sync_interval_minutes: form.sync_interval_minutes
+        sync_interval_minutes: Number(form.sync_interval_minutes) || 60
       })
     } else if (editingId.value) {
       await adminAPI.upstream.update(editingId.value, {
@@ -445,9 +467,9 @@ async function handleSubmit() {
         api_key: form.credential_mode === 'api_key' && form.api_key ? form.api_key : undefined,
         email: form.credential_mode === 'login' && form.email ? form.email : undefined,
         password: form.credential_mode === 'login' && form.password ? form.password : undefined,
-        price_multiplier: form.price_multiplier,
+        price_multiplier: Number(form.price_multiplier) || 1,
         sync_enabled: form.sync_enabled,
-        sync_interval_minutes: form.sync_interval_minutes
+        sync_interval_minutes: Number(form.sync_interval_minutes) || 60
       })
     }
     dialogVisible.value = false
@@ -525,13 +547,39 @@ async function handleViewResources(site: UpstreamSite) {
   resourcesDialogVisible.value = true
   resourcesLoading.value = true
   resourcesList.value = []
+  currentResourceSiteId.value = site.id
   try {
     resourcesList.value = await adminAPI.upstream.listResources(site.id)
+    // 初始化每个资源的倍率输入值
+    for (const res of resourcesList.value) {
+      resourceMultipliers[res.id] = res.price_multiplier
+    }
   } catch (err: any) {
     alert(err?.message || 'Failed to fetch resources')
     resourcesDialogVisible.value = false
   } finally {
     resourcesLoading.value = false
+  }
+}
+
+async function handleUpdateResourceMultiplier(res: UpstreamManagedResource) {
+  if (currentResourceSiteId.value == null) return
+  const newVal = Number(resourceMultipliers[res.id]) || 0
+  if (newVal === res.price_multiplier) return
+  try {
+    const updated = await adminAPI.upstream.updateResource(currentResourceSiteId.value, res.id, {
+      price_multiplier: newVal
+    })
+    // 更新列表中的数据
+    const idx = resourcesList.value.findIndex(r => r.id === res.id)
+    if (idx >= 0) {
+      resourcesList.value[idx] = updated
+      resourceMultipliers[res.id] = updated.price_multiplier
+    }
+  } catch (err: any) {
+    alert(err?.message || 'Failed to update multiplier')
+    // 恢复原值
+    resourceMultipliers[res.id] = res.price_multiplier
   }
 }
 

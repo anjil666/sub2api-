@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -11,6 +13,50 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// flexFloat64 可以从 JSON number 或 string 反序列化为 float64
+type flexFloat64 float64
+
+func (f *flexFloat64) UnmarshalJSON(data []byte) error {
+	// 尝试直接 number
+	var n float64
+	if err := json.Unmarshal(data, &n); err == nil {
+		*f = flexFloat64(n)
+		return nil
+	}
+	// 尝试 string → float64
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		v, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return fmt.Errorf("cannot parse %q as float64", s)
+		}
+		*f = flexFloat64(v)
+		return nil
+	}
+	return fmt.Errorf("cannot unmarshal %s into float64", string(data))
+}
+
+// flexInt 可以从 JSON number 或 string 反序列化为 int
+type flexInt int
+
+func (f *flexInt) UnmarshalJSON(data []byte) error {
+	var n int
+	if err := json.Unmarshal(data, &n); err == nil {
+		*f = flexInt(n)
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			return fmt.Errorf("cannot parse %q as int", s)
+		}
+		*f = flexInt(v)
+		return nil
+	}
+	return fmt.Errorf("cannot unmarshal %s into int", string(data))
+}
 
 // UpstreamHandler handles admin upstream site management
 type UpstreamHandler struct {
@@ -26,28 +72,28 @@ func NewUpstreamHandler(siteRepo service.UpstreamSiteRepository, syncService *se
 // --- Request / Response types ---
 
 type createUpstreamSiteRequest struct {
-	Name                string  `json:"name" binding:"required,max=200"`
-	BaseURL             string  `json:"base_url" binding:"required,max=500"`
-	CredentialMode      string  `json:"credential_mode" binding:"required,oneof=api_key login"`
-	APIKey              string  `json:"api_key"`
-	Email               string  `json:"email"`
-	Password            string  `json:"password"`
-	PriceMultiplier     float64 `json:"price_multiplier"`
-	SyncEnabled         bool    `json:"sync_enabled"`
-	SyncIntervalMinutes int     `json:"sync_interval_minutes"`
+	Name                string      `json:"name" binding:"required,max=200"`
+	BaseURL             string      `json:"base_url" binding:"required,max=500"`
+	CredentialMode      string      `json:"credential_mode" binding:"required,oneof=api_key login"`
+	APIKey              string      `json:"api_key"`
+	Email               string      `json:"email"`
+	Password            string      `json:"password"`
+	PriceMultiplier     flexFloat64 `json:"price_multiplier"`
+	SyncEnabled         bool        `json:"sync_enabled"`
+	SyncIntervalMinutes flexInt     `json:"sync_interval_minutes"`
 }
 
 type updateUpstreamSiteRequest struct {
-	Name                string  `json:"name" binding:"required,max=200"`
-	BaseURL             string  `json:"base_url" binding:"required,max=500"`
-	CredentialMode      string  `json:"credential_mode" binding:"required,oneof=api_key login"`
-	APIKey              string  `json:"api_key"`
-	Email               string  `json:"email"`
-	Password            string  `json:"password"`
-	PriceMultiplier     float64 `json:"price_multiplier"`
-	SyncEnabled         bool    `json:"sync_enabled"`
-	SyncIntervalMinutes int     `json:"sync_interval_minutes"`
-	Status              string  `json:"status" binding:"omitempty,oneof=active disabled"`
+	Name                string      `json:"name" binding:"required,max=200"`
+	BaseURL             string      `json:"base_url" binding:"required,max=500"`
+	CredentialMode      string      `json:"credential_mode" binding:"required,oneof=api_key login"`
+	APIKey              string      `json:"api_key"`
+	Email               string      `json:"email"`
+	Password            string      `json:"password"`
+	PriceMultiplier     flexFloat64 `json:"price_multiplier"`
+	SyncEnabled         bool        `json:"sync_enabled"`
+	SyncIntervalMinutes flexInt     `json:"sync_interval_minutes"`
+	Status              string      `json:"status" binding:"omitempty,oneof=active disabled"`
 }
 
 type upstreamSiteResponse struct {
@@ -73,19 +119,21 @@ type upstreamSiteResponse struct {
 }
 
 type managedResourceResponse struct {
-	ID               int64   `json:"id"`
-	UpstreamKeyID    string  `json:"upstream_key_id"`
-	UpstreamKeyPrefix string `json:"upstream_key_prefix"`
-	UpstreamKeyName  string  `json:"upstream_key_name"`
-	UpstreamGroupID  *int64  `json:"upstream_group_id"`
-	ManagedGroupID   *int64  `json:"managed_group_id"`
-	ManagedAccountID *int64  `json:"managed_account_id"`
-	ManagedChannelID *int64  `json:"managed_channel_id"`
-	ModelCount       int     `json:"model_count"`
-	Status           string  `json:"status"`
-	LastSyncedAt     *string `json:"last_synced_at"`
-	CreatedAt        string  `json:"created_at"`
-	UpdatedAt        string  `json:"updated_at"`
+	ID                     int64   `json:"id"`
+	UpstreamKeyID          string  `json:"upstream_key_id"`
+	UpstreamKeyPrefix      string  `json:"upstream_key_prefix"`
+	UpstreamKeyName        string  `json:"upstream_key_name"`
+	UpstreamGroupID        *int64  `json:"upstream_group_id"`
+	ManagedGroupID         *int64  `json:"managed_group_id"`
+	ManagedAccountID       *int64  `json:"managed_account_id"`
+	ManagedChannelID       *int64  `json:"managed_channel_id"`
+	PriceMultiplier        float64 `json:"price_multiplier"`
+	UpstreamRateMultiplier float64 `json:"upstream_rate_multiplier"`
+	ModelCount             int     `json:"model_count"`
+	Status                 string  `json:"status"`
+	LastSyncedAt           *string `json:"last_synced_at"`
+	CreatedAt              string  `json:"created_at"`
+	UpdatedAt              string  `json:"updated_at"`
 }
 
 func siteToResponse(s *service.UpstreamSite) *upstreamSiteResponse {
@@ -122,18 +170,20 @@ func siteListItemToResponse(s *service.UpstreamSite) *upstreamSiteResponse {
 
 func resourceToResponse(r *service.UpstreamManagedResource) *managedResourceResponse {
 	resp := &managedResourceResponse{
-		ID:               r.ID,
-		UpstreamKeyID:    r.UpstreamKeyID,
-		UpstreamKeyPrefix: r.UpstreamKeyPrefix,
-		UpstreamKeyName:  r.UpstreamKeyName,
-		UpstreamGroupID:  r.UpstreamGroupID,
-		ManagedGroupID:   r.ManagedGroupID,
-		ManagedAccountID: r.ManagedAccountID,
-		ManagedChannelID: r.ManagedChannelID,
-		ModelCount:       r.ModelCount,
-		Status:           r.Status,
-		CreatedAt:        r.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:        r.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:                     r.ID,
+		UpstreamKeyID:          r.UpstreamKeyID,
+		UpstreamKeyPrefix:      r.UpstreamKeyPrefix,
+		UpstreamKeyName:        r.UpstreamKeyName,
+		UpstreamGroupID:        r.UpstreamGroupID,
+		ManagedGroupID:         r.ManagedGroupID,
+		ManagedAccountID:       r.ManagedAccountID,
+		ManagedChannelID:       r.ManagedChannelID,
+		PriceMultiplier:        r.PriceMultiplier,
+		UpstreamRateMultiplier: r.UpstreamRateMultiplier,
+		ModelCount:             r.ModelCount,
+		Status:                 r.Status,
+		CreatedAt:              r.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:              r.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 	if r.LastSyncedAt != nil {
 		t := r.LastSyncedAt.Format("2006-01-02T15:04:05Z")
@@ -263,9 +313,9 @@ func (h *UpstreamHandler) Create(c *gin.Context) {
 		APIKey:              req.APIKey,
 		Email:               req.Email,
 		Password:            req.Password,
-		PriceMultiplier:     req.PriceMultiplier,
+		PriceMultiplier:     float64(req.PriceMultiplier),
 		SyncEnabled:         req.SyncEnabled,
-		SyncIntervalMinutes: req.SyncIntervalMinutes,
+		SyncIntervalMinutes: int(req.SyncIntervalMinutes),
 		Status:              service.StatusActive,
 	}
 
@@ -323,9 +373,9 @@ func (h *UpstreamHandler) Update(c *gin.Context) {
 		APIKey:              req.APIKey, // 空字符串 = 不修改
 		Email:               req.Email,
 		Password:            req.Password,
-		PriceMultiplier:     req.PriceMultiplier,
+		PriceMultiplier:     float64(req.PriceMultiplier),
 		SyncEnabled:         req.SyncEnabled,
-		SyncIntervalMinutes: req.SyncIntervalMinutes,
+		SyncIntervalMinutes: int(req.SyncIntervalMinutes),
 		Status:              req.Status,
 	}
 
@@ -467,4 +517,34 @@ func (h *UpstreamHandler) Toggle(c *gin.Context) {
 	}
 
 	response.Success(c, siteToResponse(site))
+}
+
+// UpdateResource 更新单个托管资源（倍率等）
+// PUT /api/v1/admin/upstream-sites/:id/resources/:resourceId
+func (h *UpstreamHandler) UpdateResource(c *gin.Context) {
+	_, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_ID", "Invalid upstream site ID"))
+		return
+	}
+	resourceID, err := strconv.ParseInt(c.Param("resourceId"), 10, 64)
+	if err != nil {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_ID", "Invalid resource ID"))
+		return
+	}
+
+	var req struct {
+		PriceMultiplier flexFloat64 `json:"price_multiplier"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.ErrorFrom(c, infraerrors.BadRequest("VALIDATION_ERROR", err.Error()))
+		return
+	}
+
+	updated, err := h.syncService.UpdateResourceMultiplier(c.Request.Context(), resourceID, float64(req.PriceMultiplier))
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, resourceToResponse(updated))
 }

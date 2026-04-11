@@ -70,6 +70,8 @@ export interface UpstreamManagedResource {
   managed_group_id: number | null
   managed_account_id: number | null
   managed_channel_id: number | null
+  price_multiplier: number
+  upstream_rate_multiplier: number
   model_count: number
   status: string
   last_synced_at: string | null
@@ -140,6 +142,11 @@ async function listResources(id: number): Promise<UpstreamManagedResource[]> {
   return data
 }
 
+async function updateResource(siteId: number, resourceId: number, req: { price_multiplier: number }): Promise<UpstreamManagedResource> {
+  const { data } = await apiClient.put(`/admin/upstream-sites/${siteId}/resources/${resourceId}`, req)
+  return data
+}
+
 async function toggle(id: number): Promise<UpstreamSite> {
   const { data } = await apiClient.post(`/admin/upstream-sites/${id}/toggle`)
   return data
@@ -155,6 +162,7 @@ export const upstreamAPI = {
   getBalance,
   getModels,
   listResources,
+  updateResource,
   toggle
 }
 

@@ -4498,6 +4498,10 @@ export default {
       account: '账号',
       channel: '渠道',
       notSynced: '未同步',
+      upstreamRate: '上游倍率',
+      localRate: '本地倍率',
+      defaultRate: '默认',
+      zeroMeansDefault: '(0=用站点默认)',
       confirmDelete: '确定要删除上游站点「{name}」吗？已创建的分组、账号和渠道不会被删除。'
     },
 

@@ -185,6 +185,14 @@ func (s *UpstreamSyncService) ListManagedResources(ctx context.Context, siteID i
 	return s.resourceRepo.ListBySiteID(ctx, siteID)
 }
 
+// UpdateResourceMultiplier 更新单个托管资源的倍率
+func (s *UpstreamSyncService) UpdateResourceMultiplier(ctx context.Context, resourceID int64, multiplier float64) (*UpstreamManagedResource, error) {
+	if err := s.resourceRepo.UpdatePriceMultiplier(ctx, resourceID, multiplier); err != nil {
+		return nil, err
+	}
+	return s.resourceRepo.GetByID(ctx, resourceID)
+}
+
 // ── 核心同步逻辑 ──
 
 func (s *UpstreamSyncService) syncSite(ctx context.Context, site *UpstreamSite) SyncResult {
@@ -220,7 +228,7 @@ func (s *UpstreamSyncService) syncSiteAPIKeyMode(ctx context.Context, site *Upst
 	}
 
 	// 3. 确保分组/账号/渠道存在
-	groupID, accountID, channelID, err := s.ensureLocalResources(ctx, site, res, models)
+	groupID, accountID, channelID, err := s.ensureLocalResources(ctx, site, res, models, site.PriceMultiplier)
 	if err != nil {
 		return SyncResult{Error: err.Error()}
 	}
@@ -257,7 +265,10 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 
 	log.Printf("[UpstreamSync] Site %q: discovered %d API key(s)", site.Name, len(keys))
 
-	// 3. 对每个 key 获取模型并创建本地资源
+	// 3. 获取上游分组倍率信息
+	groupRates := s.fetchUpstreamGroupRates(ctx, site, accessToken)
+
+	// 4. 对每个 key 获取模型并创建本地资源
 	totalModels := 0
 	var activeKeyIDs []string
 	for _, key := range keys {
@@ -282,14 +293,35 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 		}
 		if key.GroupID != nil {
 			res.UpstreamGroupID = key.GroupID
+			// 记录上游分组倍率
+			if rate, ok := groupRates[*key.GroupID]; ok {
+				res.UpstreamRateMultiplier = rate
+			}
 		}
 		if err := s.resourceRepo.Upsert(ctx, res); err != nil {
 			log.Printf("[UpstreamSync] Site %q key %s: upsert resource failed: %v", site.Name, key.Name, err)
 			continue
 		}
 
+		// 更新上游倍率
+		if res.UpstreamRateMultiplier > 0 {
+			_ = s.resourceRepo.UpdateUpstreamRateMultiplier(ctx, res.ID, res.UpstreamRateMultiplier)
+		}
+
+		// 从已有记录获取资源自定义倍率
+		existing, _ := s.resourceRepo.GetBySiteAndKeyID(ctx, site.ID, res.UpstreamKeyID)
+		if existing != nil {
+			res.PriceMultiplier = existing.PriceMultiplier
+		}
+
+		// 确定实际使用的倍率：资源自定义 > 站点默认
+		effectiveMultiplier := site.PriceMultiplier
+		if res.PriceMultiplier > 0 {
+			effectiveMultiplier = res.PriceMultiplier
+		}
+
 		// 确保本地 group/account/channel
-		groupID, accountID, channelID, err := s.ensureLocalResources(ctx, site, res, models)
+		groupID, accountID, channelID, err := s.ensureLocalResources(ctx, site, res, models, effectiveMultiplier)
 		if err != nil {
 			log.Printf("[UpstreamSync] Site %q key %s: ensure resources failed: %v", site.Name, key.Name, err)
 			continue
@@ -302,7 +334,7 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 		totalModels += len(models)
 	}
 
-	// 4. 清理上游已删除的 key
+	// 5. 清理上游已删除的 key
 	staleCount, err := s.resourceRepo.DeleteStale(ctx, site.ID, activeKeyIDs)
 	if err != nil {
 		log.Printf("[UpstreamSync] Site %q: delete stale resources failed: %v", site.Name, err)
@@ -325,6 +357,52 @@ type upstreamKeyInfo struct {
 	Name    string `json:"name"`
 	GroupID *int64 `json:"group_id"`
 	Status  string `json:"status"`
+}
+
+// upstreamGroupInfo 上游分组信息（来自 /api/v1/groups/available）
+type upstreamGroupInfo struct {
+	ID             int64   `json:"id"`
+	Name           string  `json:"name"`
+	RateMultiplier float64 `json:"rate_multiplier"`
+}
+
+// fetchUpstreamGroupRates 获取上游分组倍率映射 (groupID → rateMultiplier)
+func (s *UpstreamSyncService) fetchUpstreamGroupRates(ctx context.Context, site *UpstreamSite, accessToken string) map[int64]float64 {
+	url := strings.TrimRight(site.BaseURL, "/") + "/api/v1/groups/available"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		log.Printf("[UpstreamSync] Site %q: create groups request failed: %v", site.Name, err)
+		return nil
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		log.Printf("[UpstreamSync] Site %q: fetch groups failed: %v", site.Name, err)
+		return nil
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		log.Printf("[UpstreamSync] Site %q: groups endpoint returned %d: %s", site.Name, resp.StatusCode, string(body))
+		return nil
+	}
+
+	var result struct {
+		Code int                 `json:"code"`
+		Data []upstreamGroupInfo `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		log.Printf("[UpstreamSync] Site %q: decode groups response: %v", site.Name, err)
+		return nil
+	}
+
+	rates := make(map[int64]float64, len(result.Data))
+	for _, g := range result.Data {
+		rates[g.ID] = g.RateMultiplier
+	}
+	return rates
 }
 
 // getAccessToken 获取上游的 JWT access token（优先缓存 → 刷新 → 登录）
@@ -513,12 +591,13 @@ func (s *UpstreamSyncService) ensureLocalResources(
 	site *UpstreamSite,
 	res *UpstreamManagedResource,
 	models []UpstreamModelInfo,
+	effectiveMultiplier float64,
 ) (groupID, accountID, channelID int64, err error) {
 	// 从已有的 managed resource 获取之前创建的 ID
 	existing, _ := s.resourceRepo.GetBySiteAndKeyID(ctx, site.ID, res.UpstreamKeyID)
 
 	// 1. 确保分组
-	groupID, err = s.ensureGroup(ctx, site, res, existing)
+	groupID, err = s.ensureGroup(ctx, site, res, existing, effectiveMultiplier)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("ensure group: %v", err)
 	}
@@ -530,7 +609,7 @@ func (s *UpstreamSyncService) ensureLocalResources(
 	}
 
 	// 3. 确保渠道
-	channelID, err = s.ensureChannel(ctx, site, res, existing, groupID, models)
+	channelID, err = s.ensureChannel(ctx, site, res, existing, groupID, models, effectiveMultiplier)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("ensure channel: %v", err)
 	}
@@ -539,13 +618,13 @@ func (s *UpstreamSyncService) ensureLocalResources(
 }
 
 // ensureGroup 确保分组存在（幂等）
-func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSite, res *UpstreamManagedResource, existing *UpstreamManagedResource) (int64, error) {
+func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSite, res *UpstreamManagedResource, existing *UpstreamManagedResource, effectiveMultiplier float64) (int64, error) {
 	// 如果已有 managed_group_id，先检查是否还存在
 	if existing != nil && existing.ManagedGroupID != nil {
 		g, err := s.groupRepo.GetByIDLite(ctx, *existing.ManagedGroupID)
 		if err == nil && g != nil {
-			if g.RateMultiplier != site.PriceMultiplier {
-				g.RateMultiplier = site.PriceMultiplier
+			if g.RateMultiplier != effectiveMultiplier {
+				g.RateMultiplier = effectiveMultiplier
 				if err := s.groupRepo.Update(ctx, g); err != nil {
 					log.Printf("[UpstreamSync] Warning: failed to update group rate_multiplier: %v", err)
 				}
@@ -565,7 +644,7 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 		Name:             groupName,
 		Description:      fmt.Sprintf("自动同步自上游站点 %s (%s)", site.Name, site.BaseURL),
 		Platform:         PlatformAntigravity,
-		RateMultiplier:   site.PriceMultiplier,
+		RateMultiplier:   effectiveMultiplier,
 		Status:           StatusActive,
 		SubscriptionType: SubscriptionTypeStandard,
 	}
@@ -630,8 +709,8 @@ func (s *UpstreamSyncService) ensureAccount(ctx context.Context, site *UpstreamS
 }
 
 // ensureChannel 确保渠道存在（幂等），并更新模型定价
-func (s *UpstreamSyncService) ensureChannel(ctx context.Context, site *UpstreamSite, res *UpstreamManagedResource, existing *UpstreamManagedResource, groupID int64, models []UpstreamModelInfo) (int64, error) {
-	pricingList := s.buildModelPricing(models, site.PriceMultiplier)
+func (s *UpstreamSyncService) ensureChannel(ctx context.Context, site *UpstreamSite, res *UpstreamManagedResource, existing *UpstreamManagedResource, groupID int64, models []UpstreamModelInfo, effectiveMultiplier float64) (int64, error) {
+	pricingList := s.buildModelPricing(models, effectiveMultiplier)
 
 	// 如果已有 managed_channel_id，更新定价
 	if existing != nil && existing.ManagedChannelID != nil {

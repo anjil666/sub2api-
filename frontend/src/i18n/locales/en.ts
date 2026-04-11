@@ -4333,6 +4333,10 @@ export default {
       account: 'Account',
       channel: 'Channel',
       notSynced: 'Not synced',
+      upstreamRate: 'Upstream Rate',
+      localRate: 'Local Rate',
+      defaultRate: 'Default',
+      zeroMeansDefault: '(0=use site default)',
       confirmDelete: 'Delete upstream site "{name}"? Existing groups, accounts, and channels will not be removed.'
     },
 

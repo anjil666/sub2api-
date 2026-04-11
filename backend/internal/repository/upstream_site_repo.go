@@ -86,14 +86,20 @@ func (r *upstreamSiteRepo) GetByID(ctx context.Context, id int64) (*service.Upst
 	}
 
 	// 解密敏感字段
-	if site.APIKey, err = r.encryptor.Decrypt(apiKeyEnc); err != nil {
-		return nil, fmt.Errorf("decrypt api key: %w", err)
+	if apiKeyEnc != "" {
+		if site.APIKey, err = r.encryptor.Decrypt(apiKeyEnc); err != nil {
+			return nil, fmt.Errorf("decrypt api key: %w", err)
+		}
 	}
-	if site.Email, err = r.encryptor.Decrypt(emailEnc); err != nil {
-		return nil, fmt.Errorf("decrypt email: %w", err)
+	if emailEnc != "" {
+		if site.Email, err = r.encryptor.Decrypt(emailEnc); err != nil {
+			return nil, fmt.Errorf("decrypt email: %w", err)
+		}
 	}
-	if site.Password, err = r.encryptor.Decrypt(passwordEnc); err != nil {
-		return nil, fmt.Errorf("decrypt password: %w", err)
+	if passwordEnc != "" {
+		if site.Password, err = r.encryptor.Decrypt(passwordEnc); err != nil {
+			return nil, fmt.Errorf("decrypt password: %w", err)
+		}
 	}
 	if cachedAccessToken != "" {
 		if site.CachedAccessToken, err = r.encryptor.Decrypt(cachedAccessToken); err != nil {
@@ -304,14 +310,20 @@ func (r *upstreamSiteRepo) ListDueForSync(ctx context.Context) ([]service.Upstre
 
 		// 解密
 		var decErr error
-		if site.APIKey, decErr = r.encryptor.Decrypt(apiKeyEnc); decErr != nil {
-			return nil, fmt.Errorf("decrypt api key for site %d: %w", site.ID, decErr)
+		if apiKeyEnc != "" {
+			if site.APIKey, decErr = r.encryptor.Decrypt(apiKeyEnc); decErr != nil {
+				return nil, fmt.Errorf("decrypt api key for site %d: %w", site.ID, decErr)
+			}
 		}
-		if site.Email, decErr = r.encryptor.Decrypt(emailEnc); decErr != nil {
-			return nil, fmt.Errorf("decrypt email for site %d: %w", site.ID, decErr)
+		if emailEnc != "" {
+			if site.Email, decErr = r.encryptor.Decrypt(emailEnc); decErr != nil {
+				return nil, fmt.Errorf("decrypt email for site %d: %w", site.ID, decErr)
+			}
 		}
-		if site.Password, decErr = r.encryptor.Decrypt(passwordEnc); decErr != nil {
-			return nil, fmt.Errorf("decrypt password for site %d: %w", site.ID, decErr)
+		if passwordEnc != "" {
+			if site.Password, decErr = r.encryptor.Decrypt(passwordEnc); decErr != nil {
+				return nil, fmt.Errorf("decrypt password for site %d: %w", site.ID, decErr)
+			}
 		}
 		if cachedAccessToken != "" {
 			if site.CachedAccessToken, decErr = r.encryptor.Decrypt(cachedAccessToken); decErr != nil {

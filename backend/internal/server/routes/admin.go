@@ -585,6 +585,7 @@ func registerUpstreamSyncRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		upstream.GET("/:id/balance", h.Admin.UpstreamSync.GetBalance)
 		upstream.GET("/:id/models", h.Admin.UpstreamSync.GetModels)
 		upstream.GET("/:id/resources", h.Admin.UpstreamSync.ListResources)
+		upstream.PUT("/:id/resources/:resourceId", h.Admin.UpstreamSync.UpdateResource)
 		upstream.POST("/:id/toggle", h.Admin.UpstreamSync.Toggle)
 	}
 }

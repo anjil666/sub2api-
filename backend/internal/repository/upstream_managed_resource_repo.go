@@ -53,6 +53,7 @@ func (r *upstreamManagedResourceRepo) ListBySiteID(ctx context.Context, siteID i
 		`SELECT id, upstream_site_id, upstream_key_id, upstream_key_prefix, upstream_key_name,
 			upstream_group_id, api_key_encrypted,
 			managed_group_id, managed_account_id, managed_channel_id,
+			price_multiplier, upstream_rate_multiplier,
 			model_count, status, last_synced_at, created_at, updated_at
 		 FROM upstream_managed_resources
 		 WHERE upstream_site_id = $1 ORDER BY id`, siteID,
@@ -73,14 +74,17 @@ func (r *upstreamManagedResourceRepo) ListBySiteID(ctx context.Context, siteID i
 			&res.ID, &res.UpstreamSiteID, &res.UpstreamKeyID, &res.UpstreamKeyPrefix, &res.UpstreamKeyName,
 			&upstreamGroupID, &apiKeyEnc,
 			&managedGroupID, &managedAccountID, &managedChannelID,
+			&res.PriceMultiplier, &res.UpstreamRateMultiplier,
 			&res.ModelCount, &res.Status, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan managed resource: %w", err)
 		}
 
 		// 解密 API Key
-		if res.APIKey, err = r.encryptor.Decrypt(apiKeyEnc); err != nil {
-			return nil, fmt.Errorf("decrypt api key for resource %d: %w", res.ID, err)
+		if apiKeyEnc != "" {
+			if res.APIKey, err = r.encryptor.Decrypt(apiKeyEnc); err != nil {
+				return nil, fmt.Errorf("decrypt api key for resource %d: %w", res.ID, err)
+			}
 		}
 
 		if upstreamGroupID.Valid {
@@ -113,6 +117,7 @@ func (r *upstreamManagedResourceRepo) GetBySiteAndKeyID(ctx context.Context, sit
 		`SELECT id, upstream_site_id, upstream_key_id, upstream_key_prefix, upstream_key_name,
 			upstream_group_id, api_key_encrypted,
 			managed_group_id, managed_account_id, managed_channel_id,
+			price_multiplier, upstream_rate_multiplier,
 			model_count, status, last_synced_at, created_at, updated_at
 		 FROM upstream_managed_resources
 		 WHERE upstream_site_id = $1 AND upstream_key_id = $2`, siteID, upstreamKeyID,
@@ -120,6 +125,7 @@ func (r *upstreamManagedResourceRepo) GetBySiteAndKeyID(ctx context.Context, sit
 		&res.ID, &res.UpstreamSiteID, &res.UpstreamKeyID, &res.UpstreamKeyPrefix, &res.UpstreamKeyName,
 		&upstreamGroupID, &apiKeyEnc,
 		&managedGroupID, &managedAccountID, &managedChannelID,
+		&res.PriceMultiplier, &res.UpstreamRateMultiplier,
 		&res.ModelCount, &res.Status, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
 	)
 	if err != nil {
@@ -129,8 +135,10 @@ func (r *upstreamManagedResourceRepo) GetBySiteAndKeyID(ctx context.Context, sit
 		return nil, fmt.Errorf("get managed resource: %w", err)
 	}
 
-	if res.APIKey, err = r.encryptor.Decrypt(apiKeyEnc); err != nil {
-		return nil, fmt.Errorf("decrypt api key: %w", err)
+	if apiKeyEnc != "" {
+		if res.APIKey, err = r.encryptor.Decrypt(apiKeyEnc); err != nil {
+			return nil, fmt.Errorf("decrypt api key: %w", err)
+		}
 	}
 	if upstreamGroupID.Valid {
 		res.UpstreamGroupID = &upstreamGroupID.Int64
@@ -170,6 +178,78 @@ func (r *upstreamManagedResourceRepo) UpdateModelCount(ctx context.Context, id i
 	)
 	if err != nil {
 		return fmt.Errorf("update model count: %w", err)
+	}
+	return nil
+}
+
+func (r *upstreamManagedResourceRepo) GetByID(ctx context.Context, id int64) (*service.UpstreamManagedResource, error) {
+	res := &service.UpstreamManagedResource{}
+	var apiKeyEnc string
+	var upstreamGroupID, managedGroupID, managedAccountID, managedChannelID sql.NullInt64
+	var lastSyncedAt sql.NullTime
+
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, upstream_site_id, upstream_key_id, upstream_key_prefix, upstream_key_name,
+			upstream_group_id, api_key_encrypted,
+			managed_group_id, managed_account_id, managed_channel_id,
+			price_multiplier, upstream_rate_multiplier,
+			model_count, status, last_synced_at, created_at, updated_at
+		 FROM upstream_managed_resources WHERE id = $1`, id,
+	).Scan(
+		&res.ID, &res.UpstreamSiteID, &res.UpstreamKeyID, &res.UpstreamKeyPrefix, &res.UpstreamKeyName,
+		&upstreamGroupID, &apiKeyEnc,
+		&managedGroupID, &managedAccountID, &managedChannelID,
+		&res.PriceMultiplier, &res.UpstreamRateMultiplier,
+		&res.ModelCount, &res.Status, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get managed resource: %w", err)
+	}
+
+	if apiKeyEnc != "" {
+		if res.APIKey, err = r.encryptor.Decrypt(apiKeyEnc); err != nil {
+			return nil, fmt.Errorf("decrypt api key: %w", err)
+		}
+	}
+	if upstreamGroupID.Valid {
+		res.UpstreamGroupID = &upstreamGroupID.Int64
+	}
+	if managedGroupID.Valid {
+		res.ManagedGroupID = &managedGroupID.Int64
+	}
+	if managedAccountID.Valid {
+		res.ManagedAccountID = &managedAccountID.Int64
+	}
+	if managedChannelID.Valid {
+		res.ManagedChannelID = &managedChannelID.Int64
+	}
+	if lastSyncedAt.Valid {
+		res.LastSyncedAt = &lastSyncedAt.Time
+	}
+	return res, nil
+}
+
+func (r *upstreamManagedResourceRepo) UpdatePriceMultiplier(ctx context.Context, id int64, multiplier float64) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE upstream_managed_resources SET price_multiplier=$1, updated_at=NOW() WHERE id=$2`,
+		multiplier, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update price multiplier: %w", err)
+	}
+	return nil
+}
+
+func (r *upstreamManagedResourceRepo) UpdateUpstreamRateMultiplier(ctx context.Context, id int64, multiplier float64) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE upstream_managed_resources SET upstream_rate_multiplier=$1, updated_at=NOW() WHERE id=$2`,
+		multiplier, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update upstream rate multiplier: %w", err)
 	}
 	return nil
 }
