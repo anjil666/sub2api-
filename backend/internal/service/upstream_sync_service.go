@@ -248,11 +248,15 @@ func (s *UpstreamSyncService) syncSiteAPIKeyMode(ctx context.Context, site *Upst
 
 // syncSiteLoginMode 邮箱密码登录模式同步（多 Key 自动发现）
 func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *UpstreamSite) SyncResult {
+	log.Printf("[UpstreamSync] Site %q (#%d): starting login-mode sync (email=%q, hasPassword=%v)",
+		site.Name, site.ID, site.Email, site.Password != "")
+
 	// 1. 获取 access token
 	accessToken, err := s.getAccessToken(ctx, site)
 	if err != nil {
 		return SyncResult{Error: fmt.Sprintf("login failed: %v", err)}
 	}
+	log.Printf("[UpstreamSync] Site %q (#%d): got access token (len=%d)", site.Name, site.ID, len(accessToken))
 
 	// 2. 发现所有 API Key
 	keys, err := s.discoverKeys(ctx, site, accessToken)

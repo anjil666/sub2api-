@@ -3,6 +3,7 @@ package admin
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
@@ -420,11 +421,7 @@ func (h *UpstreamHandler) Sync(c *gin.Context) {
 
 	result, err := h.syncService.SyncSiteNow(c.Request.Context(), id)
 	if err != nil {
-		// 同步失败但仍返回 result
-		if result != nil {
-			response.Success(c, result)
-			return
-		}
+		log.Printf("[ERROR] POST /api/v1/admin/upstream-sites/%d/sync Error: %v", id, err)
 		response.ErrorFrom(c, err)
 		return
 	}
