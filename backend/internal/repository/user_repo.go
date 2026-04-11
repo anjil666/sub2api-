@@ -554,3 +554,48 @@ func (r *userRepository) UpdateLastCheckin(ctx context.Context, userID int64, ch
 	}
 	return nil
 }
+
+// GetByReferralCode 根据推荐码查找用户（raw SQL，因为 referral_code 未加入 Ent 生成）
+func (r *userRepository) GetByReferralCode(ctx context.Context, code string) (*service.User, error) {
+	rows, err := r.sql.QueryContext(ctx, "SELECT id FROM users WHERE referral_code = $1 AND deleted_at IS NULL LIMIT 1", code)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, service.ErrUserNotFound
+	}
+	var id int64
+	if err := rows.Scan(&id); err != nil {
+		return nil, err
+	}
+	return r.GetByID(ctx, id)
+}
+
+// UpdateReferralCode 设置用户推荐码（raw SQL）
+func (r *userRepository) UpdateReferralCode(ctx context.Context, userID int64, code string) error {
+	_, err := r.sql.ExecContext(ctx, "UPDATE users SET referral_code = $1, updated_at = NOW() WHERE id = $2", code, userID)
+	return err
+}
+
+// SetReferrerID 设置用户的推荐人（raw SQL）
+func (r *userRepository) SetReferrerID(ctx context.Context, userID int64, referrerID int64) error {
+	_, err := r.sql.ExecContext(ctx, "UPDATE users SET referrer_id = $1, updated_at = NOW() WHERE id = $2", referrerID, userID)
+	return err
+}
+
+// GetReferralFields 获取用户推荐码和推荐人ID（raw SQL）
+func (r *userRepository) GetReferralFields(ctx context.Context, userID int64) (referralCode *string, referrerID *int64, err error) {
+	rows, err := r.sql.QueryContext(ctx, "SELECT referral_code, referrer_id FROM users WHERE id = $1 AND deleted_at IS NULL", userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, nil, service.ErrUserNotFound
+	}
+	if err := rows.Scan(&referralCode, &referrerID); err != nil {
+		return nil, nil, err
+	}
+	return referralCode, referrerID, nil
+}

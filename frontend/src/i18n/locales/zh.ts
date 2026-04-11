@@ -332,6 +332,7 @@ export default {
     apiKeys: 'API 密钥',
     usage: '使用记录',
     redeem: '兑换',
+    referral: '推荐返利',
     profile: '个人资料',
     users: '用户管理',
     groups: '分组管理',
@@ -953,6 +954,37 @@ export default {
     alreadyDone: '今日已签到',
     success: '签到成功！奖励 {amount} 余额',
     disabled: '签到功能未开启'
+  },
+
+  // Referral
+  referral: {
+    title: '推荐返利',
+    description: '邀请好友注册，好友充值后获得返利奖励',
+    myReferralCode: '我的推荐码',
+    referralLink: '推荐链接',
+    copyCode: '复制推荐码',
+    copyLink: '复制链接',
+    copied: '已复制',
+    stats: {
+      totalReferrals: '推荐人数',
+      totalEarnings: '累计收益',
+      commissionRate: '返利比例'
+    },
+    referredUsers: '推荐用户',
+    referredUsersEmpty: '暂无推荐用户',
+    commissions: '返利记录',
+    commissionsEmpty: '暂无返利记录',
+    referredEmail: '被推荐用户',
+    orderAmount: '订单金额',
+    commissionAmount: '返利金额',
+    status: '状态',
+    statusCredited: '已到账',
+    statusPending: '待结算',
+    time: '时间',
+    registeredAt: '注册时间',
+    disabled: '推荐返利功能未开启',
+    loading: '加载中...',
+    error: '加载失败，请重试'
   },
 
   // Empty States
@@ -4891,6 +4923,14 @@ export default {
         enabledHint: '开启后，用户可在个人资料页面进行每日签到领取余额奖励',
         rewardAmount: '签到奖励金额',
         rewardAmountHint: '每次签到奖励的余额数量'
+      },
+      referral: {
+        title: '推荐返利设置',
+        description: '配置推荐返利功能',
+        enabled: '启用推荐返利',
+        enabledHint: '开启后，用户可通过推荐链接邀请新用户注册，被推荐用户充值时推荐人获得返利',
+        commissionRate: '返利比例',
+        commissionRateHint: '被推荐用户充值时，推荐人获得的返利百分比'
       },
       saveSettings: '保存设置',
       saving: '保存中...',

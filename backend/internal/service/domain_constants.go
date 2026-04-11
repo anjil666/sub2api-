@@ -244,6 +244,10 @@ const (
 	SettingKeyCheckinEnabled      = "checkin_enabled"       // 是否启用签到功能
 	SettingKeyCheckinRewardAmount = "checkin_reward_amount"  // 签到奖励金额
 
+	// 推荐返利设置
+	SettingKeyReferralEnabled        = "referral_enabled"         // 是否启用推荐返利
+	SettingKeyReferralCommissionRate = "referral_commission_rate"  // 返利比例（如 0.10 = 10%）
+
 	// Gateway Forwarding Behavior
 	// SettingKeyEnableFingerprintUnification 是否统一 OAuth 账号的 X-Stainless-* 指纹头（默认 true）
 	SettingKeyEnableFingerprintUnification = "enable_fingerprint_unification"

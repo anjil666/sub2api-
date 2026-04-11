@@ -35,6 +35,7 @@ export interface User {
   allowed_groups: number[] | null // Allowed group IDs (null = all non-exclusive groups)
   subscriptions?: UserSubscription[] // User's active subscriptions
   last_checkin_at?: string
+  referral_code?: string
   created_at: string
   updated_at: string
 }
@@ -61,6 +62,7 @@ export interface RegisterRequest {
   turnstile_token?: string
   promo_code?: string
   invitation_code?: string
+  referral_code?: string
 }
 
 export interface SendVerifyCodeRequest {
@@ -115,6 +117,7 @@ export interface PublicSettings {
   sora_client_enabled: boolean
   backend_mode_enabled: boolean
   checkin_enabled: boolean
+  referral_enabled: boolean
   version: string
 }
 

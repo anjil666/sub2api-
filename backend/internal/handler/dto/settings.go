@@ -125,6 +125,10 @@ type SystemSettings struct {
 	// Checkin settings
 	CheckinEnabled      bool    `json:"checkin_enabled"`
 	CheckinRewardAmount float64 `json:"checkin_reward_amount"`
+
+	// Referral settings
+	ReferralEnabled        bool    `json:"referral_enabled"`
+	ReferralCommissionRate float64 `json:"referral_commission_rate"`
 }
 
 type DefaultSubscriptionSetting struct {
@@ -159,6 +163,8 @@ type PublicSettings struct {
 	OIDCOAuthProviderName            string           `json:"oidc_oauth_provider_name"`
 	SoraClientEnabled                bool             `json:"sora_client_enabled"`
 	BackendModeEnabled               bool             `json:"backend_mode_enabled"`
+	CheckinEnabled                   bool             `json:"checkin_enabled"`
+	ReferralEnabled                  bool             `json:"referral_enabled"`
 	Version                          string           `json:"version"`
 }
 

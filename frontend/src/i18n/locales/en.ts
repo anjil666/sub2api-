@@ -332,6 +332,7 @@ export default {
     apiKeys: 'API Keys',
     usage: 'Usage',
     redeem: 'Redeem',
+    referral: 'Referral',
     profile: 'Profile',
     users: 'Users',
     groups: 'Groups',
@@ -949,6 +950,37 @@ export default {
     alreadyDone: 'Checked In',
     success: 'Check-in successful! Reward: {amount}',
     disabled: 'Check-in is not enabled'
+  },
+
+  // Referral
+  referral: {
+    title: 'Referral',
+    description: 'Invite friends to register and earn commission when they top up',
+    myReferralCode: 'My Referral Code',
+    referralLink: 'Referral Link',
+    copyCode: 'Copy Code',
+    copyLink: 'Copy Link',
+    copied: 'Copied',
+    stats: {
+      totalReferrals: 'Total Referrals',
+      totalEarnings: 'Total Earnings',
+      commissionRate: 'Commission Rate'
+    },
+    referredUsers: 'Referred Users',
+    referredUsersEmpty: 'No referred users yet',
+    commissions: 'Commission Records',
+    commissionsEmpty: 'No commission records yet',
+    referredEmail: 'Referred User',
+    orderAmount: 'Order Amount',
+    commissionAmount: 'Commission',
+    status: 'Status',
+    statusCredited: 'Credited',
+    statusPending: 'Pending',
+    time: 'Time',
+    registeredAt: 'Registered',
+    disabled: 'Referral feature is not enabled',
+    loading: 'Loading...',
+    error: 'Failed to load, please retry'
   },
 
   // Empty States
@@ -4728,6 +4760,14 @@ export default {
         enabledHint: 'When enabled, users can check in daily on their profile page to receive a balance reward',
         rewardAmount: 'Reward Amount',
         rewardAmountHint: 'Balance reward for each daily check-in'
+      },
+      referral: {
+        title: 'Referral Settings',
+        description: 'Configure referral commission feature',
+        enabled: 'Enable Referral',
+        enabledHint: 'When enabled, users can invite others via referral link and earn commission when referred users top up',
+        commissionRate: 'Commission Rate',
+        commissionRateHint: 'Percentage of the referred user\'s top-up amount that the referrer receives as commission'
       },
       saveSettings: 'Save Settings',
       saving: 'Saving...',

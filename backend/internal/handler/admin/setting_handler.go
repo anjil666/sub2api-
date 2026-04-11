@@ -162,6 +162,8 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		EnableCCHSigning:                     settings.EnableCCHSigning,
 		CheckinEnabled:                       settings.CheckinEnabled,
 		CheckinRewardAmount:                  settings.CheckinRewardAmount,
+		ReferralEnabled:                      settings.ReferralEnabled,
+		ReferralCommissionRate:               settings.ReferralCommissionRate,
 	})
 }
 
@@ -274,6 +276,9 @@ type UpdateSettingsRequest struct {
 	// Checkin settings
 	CheckinEnabled      bool    `json:"checkin_enabled"`
 	CheckinRewardAmount float64 `json:"checkin_reward_amount"`
+
+	ReferralEnabled        bool    `json:"referral_enabled"`
+	ReferralCommissionRate float64 `json:"referral_commission_rate"`
 }
 
 // UpdateSettings 更新系统设置
@@ -823,6 +828,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		}(),
 		CheckinEnabled:      req.CheckinEnabled,
 		CheckinRewardAmount: req.CheckinRewardAmount,
+		ReferralEnabled:        req.ReferralEnabled,
+		ReferralCommissionRate: req.ReferralCommissionRate,
 	}
 
 	if err := h.settingService.UpdateSettings(c.Request.Context(), settings); err != nil {

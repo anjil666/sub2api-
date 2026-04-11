@@ -31,6 +31,7 @@ type AdminHandlers struct {
 	APIKey                *admin.AdminAPIKeyHandler
 	ScheduledTest         *admin.ScheduledTestHandler
 	Channel               *admin.ChannelHandler
+	Referral              *admin.ReferralHandler
 }
 
 // Handlers contains all HTTP handlers
@@ -48,6 +49,7 @@ type Handlers struct {
 	Setting       *SettingHandler
 	Totp          *TotpHandler
 	ModelSquare   *ModelSquareHandler
+	Referral      *ReferralHandler
 }
 
 // BuildInfo contains build-time information

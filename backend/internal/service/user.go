@@ -33,6 +33,10 @@ type User struct {
 	// 签到字段
 	LastCheckinAt *time.Time // 最后签到时间
 
+	// 推荐返利字段
+	ReferralCode *string // 推荐码（8位字母数字）
+	ReferrerID   *int64  // 推荐人用户ID
+
 	APIKeys       []APIKey
 	Subscriptions []UserSubscription
 }

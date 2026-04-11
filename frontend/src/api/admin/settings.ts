@@ -118,6 +118,10 @@ export interface SystemSettings {
   // Checkin settings
   checkin_enabled: boolean
   checkin_reward_amount: number
+
+  // Referral settings
+  referral_enabled: boolean
+  referral_commission_rate: number
 }
 
 export interface UpdateSettingsRequest {
@@ -200,6 +204,8 @@ export interface UpdateSettingsRequest {
   enable_cch_signing?: boolean
   checkin_enabled?: boolean
   checkin_reward_amount?: number
+  referral_enabled?: boolean
+  referral_commission_rate?: number
 }
 
 /**

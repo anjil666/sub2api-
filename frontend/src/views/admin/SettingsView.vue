@@ -1628,6 +1628,52 @@
             </div>
           </div>
         </div>
+
+        <!-- Referral Settings -->
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.settings.referral.title') }}
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin.settings.referral.description') }}
+            </p>
+          </div>
+          <div class="space-y-5 p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="font-medium text-gray-900 dark:text-white">
+                  {{ t('admin.settings.referral.enabled') }}
+                </label>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.referral.enabledHint') }}
+                </p>
+              </div>
+              <Toggle v-model="form.referral_enabled" />
+            </div>
+            <div v-if="form.referral_enabled" class="space-y-4 border-t border-gray-100 pt-4 dark:border-dark-700">
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.referral.commissionRate') }}
+                </label>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model.number="form.referral_commission_rate"
+                    type="number"
+                    step="1"
+                    min="0"
+                    max="100"
+                    class="input w-32"
+                  />
+                  <span class="text-sm text-gray-500 dark:text-gray-400">%</span>
+                </div>
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.referral.commissionRateHint') }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
         </div><!-- /Tab: Users -->
 
         <!-- Tab: Gateway — Claude Code, Scheduling -->
@@ -2652,7 +2698,10 @@ const form = reactive<SettingsForm>({
   enable_cch_signing: false,
   // Checkin settings
   checkin_enabled: false,
-  checkin_reward_amount: 1.0
+  checkin_reward_amount: 1.0,
+  // Referral settings
+  referral_enabled: false,
+  referral_commission_rate: 10
 })
 
 const defaultSubscriptionGroupOptions = computed<DefaultSubscriptionGroupOption[]>(() =>
@@ -3001,7 +3050,9 @@ async function saveSettings() {
       enable_metadata_passthrough: form.enable_metadata_passthrough,
       enable_cch_signing: form.enable_cch_signing,
       checkin_enabled: form.checkin_enabled,
-      checkin_reward_amount: form.checkin_reward_amount
+      checkin_reward_amount: form.checkin_reward_amount,
+      referral_enabled: form.referral_enabled,
+      referral_commission_rate: form.referral_commission_rate
     }
     const updated = await adminAPI.settings.updateSettings(payload)
     Object.assign(form, updated)

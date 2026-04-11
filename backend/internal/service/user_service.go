@@ -59,6 +59,12 @@ type UserRepository interface {
 
 	// 签到
 	UpdateLastCheckin(ctx context.Context, userID int64, checkinAt time.Time) error
+
+	// 推荐返利
+	GetByReferralCode(ctx context.Context, code string) (*User, error)
+	UpdateReferralCode(ctx context.Context, userID int64, code string) error
+	SetReferrerID(ctx context.Context, userID int64, referrerID int64) error
+	GetReferralFields(ctx context.Context, userID int64) (referralCode *string, referrerID *int64, err error)
 }
 
 // UpdateProfileRequest 更新用户资料请求

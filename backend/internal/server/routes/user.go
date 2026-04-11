@@ -27,6 +27,14 @@ func RegisterUserRoutes(
 			user.PUT("", h.User.UpdateProfile)
 			user.POST("/checkin", h.User.DailyCheckin)
 
+			// 推荐返利
+			referral := user.Group("/referral")
+			{
+				referral.GET("/info", h.Referral.GetReferralInfo)
+				referral.GET("/users", h.Referral.GetReferredUsers)
+				referral.GET("/commissions", h.Referral.GetCommissions)
+			}
+
 			// TOTP 双因素认证
 			totp := user.Group("/totp")
 			{

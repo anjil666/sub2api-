@@ -24,6 +24,7 @@ func UserFromServiceShallow(u *service.User) *User {
 		CreatedAt:     u.CreatedAt,
 		UpdatedAt:     u.UpdatedAt,
 		LastCheckinAt: u.LastCheckinAt,
+		ReferralCode:  u.ReferralCode,
 	}
 }
 

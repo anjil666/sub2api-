@@ -347,6 +347,9 @@ const oidcOAuthEnabled = ref<boolean>(false)
 const oidcOAuthProviderName = ref<string>('OIDC')
 const registrationEmailSuffixWhitelist = ref<string[]>([])
 
+// Referral code from URL
+const referralCode = ref<string>('')
+
 // Turnstile
 const turnstileRef = ref<InstanceType<typeof TurnstileWidget> | null>(null)
 const turnstileToken = ref<string>('')
@@ -402,6 +405,12 @@ onMounted(async () => {
     registrationEmailSuffixWhitelist.value = normalizeRegistrationEmailSuffixWhitelist(
       settings.registration_email_suffix_whitelist || []
     )
+
+    // Read referral code from URL parameter
+    const refParam = route.query.ref as string
+    if (refParam) {
+      referralCode.value = refParam
+    }
 
     // Read promo code from URL parameter only if promo code is enabled
     if (promoCodeEnabled.value) {
@@ -713,7 +722,8 @@ async function handleRegister(): Promise<void> {
           password: formData.password,
           turnstile_token: turnstileToken.value,
           promo_code: formData.promo_code || undefined,
-          invitation_code: formData.invitation_code || undefined
+          invitation_code: formData.invitation_code || undefined,
+          referral_code: referralCode.value || undefined
         })
       )
 
@@ -728,7 +738,8 @@ async function handleRegister(): Promise<void> {
       password: formData.password,
       turnstile_token: turnstileEnabled.value ? turnstileToken.value : undefined,
       promo_code: formData.promo_code || undefined,
-      invitation_code: formData.invitation_code || undefined
+      invitation_code: formData.invitation_code || undefined,
+      referral_code: referralCode.value || undefined
     })
 
     // Show success toast

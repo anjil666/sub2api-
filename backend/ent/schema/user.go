@@ -77,6 +77,15 @@ func (User) Fields() []ent.Field {
 		field.Time("last_checkin_at").
 			Optional().
 			Nillable(),
+
+		// 推荐返利字段
+		field.String("referral_code").
+			MaxLen(16).
+			Optional().
+			Nillable(),
+		field.Int64("referrer_id").
+			Optional().
+			Nillable(),
 	}
 }
 

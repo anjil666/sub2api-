@@ -70,6 +70,7 @@ type AuthService struct {
 	turnstileService   *TurnstileService
 	emailQueueService  *EmailQueueService
 	promoService       *PromoService
+	referralService    *ReferralService
 	defaultSubAssigner DefaultSubscriptionAssigner
 }
 
@@ -106,13 +107,18 @@ func NewAuthService(
 	}
 }
 
-// Register 用户注册，返回token和用户
-func (s *AuthService) Register(ctx context.Context, email, password string) (string, *User, error) {
-	return s.RegisterWithVerification(ctx, email, password, "", "", "")
+// SetReferralService 设置推荐返利服务（可选注入，避免循环依赖）
+func (s *AuthService) SetReferralService(referralService *ReferralService) {
+	s.referralService = referralService
 }
 
-// RegisterWithVerification 用户注册（支持邮件验证、优惠码和邀请码），返回token和用户
-func (s *AuthService) RegisterWithVerification(ctx context.Context, email, password, verifyCode, promoCode, invitationCode string) (string, *User, error) {
+// Register 用户注册，返回token和用户
+func (s *AuthService) Register(ctx context.Context, email, password string) (string, *User, error) {
+	return s.RegisterWithVerification(ctx, email, password, "", "", "", "")
+}
+
+// RegisterWithVerification 用户注册（支持邮件验证、优惠码、邀请码和推荐码），返回token和用户
+func (s *AuthService) RegisterWithVerification(ctx context.Context, email, password, verifyCode, promoCode, invitationCode, referralCode string) (string, *User, error) {
 	// 检查是否开放注册（默认关闭：settingService 未配置时不允许注册）
 	if s.settingService == nil || !s.settingService.IsRegistrationEnabled(ctx) {
 		return "", nil, ErrRegDisabled
@@ -224,6 +230,13 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 			if updatedUser, err := s.userRepo.GetByID(ctx, user.ID); err == nil {
 				user = updatedUser
 			}
+		}
+	}
+
+	// 绑定推荐关系（如果提供了推荐码）
+	if referralCode != "" && s.referralService != nil {
+		if err := s.referralService.BindReferrer(ctx, user.ID, referralCode); err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to bind referrer for user %d: %v", user.ID, err)
 		}
 	}
 

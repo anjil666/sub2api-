@@ -18,6 +18,7 @@ type User struct {
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 	LastCheckinAt *time.Time `json:"last_checkin_at,omitempty"`
+	ReferralCode  *string    `json:"referral_code,omitempty"`
 
 	APIKeys       []APIKey           `json:"api_keys,omitempty"`
 	Subscriptions []UserSubscription `json:"subscriptions,omitempty"`

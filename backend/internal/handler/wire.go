@@ -34,6 +34,7 @@ func ProvideAdminHandlers(
 	apiKeyHandler *admin.AdminAPIKeyHandler,
 	scheduledTestHandler *admin.ScheduledTestHandler,
 	channelHandler *admin.ChannelHandler,
+	referralHandler *admin.ReferralHandler,
 ) *AdminHandlers {
 	return &AdminHandlers{
 		Dashboard:             dashboardHandler,
@@ -61,6 +62,7 @@ func ProvideAdminHandlers(
 		APIKey:                apiKeyHandler,
 		ScheduledTest:         scheduledTestHandler,
 		Channel:               channelHandler,
+		Referral:              referralHandler,
 	}
 }
 
@@ -89,6 +91,7 @@ func ProvideHandlers(
 	settingHandler *SettingHandler,
 	totpHandler *TotpHandler,
 	modelSquareHandler *ModelSquareHandler,
+	referralHandler *ReferralHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
@@ -106,6 +109,7 @@ func ProvideHandlers(
 		Setting:       settingHandler,
 		Totp:          totpHandler,
 		ModelSquare:   modelSquareHandler,
+		Referral:      referralHandler,
 	}
 }
 
@@ -123,6 +127,7 @@ var ProviderSet = wire.NewSet(
 	NewOpenAIGatewayHandler,
 	NewTotpHandler,
 	NewModelSquareHandler,
+	NewReferralHandler,
 	ProvideSettingHandler,
 
 	// Admin handlers
@@ -151,6 +156,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewAdminAPIKeyHandler,
 	admin.NewScheduledTestHandler,
 	admin.NewChannelHandler,
+	admin.NewReferralHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

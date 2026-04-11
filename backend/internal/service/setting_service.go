@@ -168,6 +168,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyOIDCConnectEnabled,
 		SettingKeyOIDCConnectProviderName,
 		SettingKeyCheckinEnabled,
+		SettingKeyReferralEnabled,
 	}
 
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)
@@ -227,6 +228,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		LinuxDoOAuthEnabled:              linuxDoEnabled,
 		BackendModeEnabled:               settings[SettingKeyBackendModeEnabled] == "true",
 		CheckinEnabled:                   settings[SettingKeyCheckinEnabled] == "true",
+		ReferralEnabled:                  settings[SettingKeyReferralEnabled] == "true",
 		OIDCOAuthEnabled:                 oidcEnabled,
 		OIDCOAuthProviderName:            oidcProviderName,
 	}, nil
@@ -277,6 +279,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		LinuxDoOAuthEnabled              bool            `json:"linuxdo_oauth_enabled"`
 		BackendModeEnabled               bool            `json:"backend_mode_enabled"`
 		CheckinEnabled                   bool            `json:"checkin_enabled"`
+		ReferralEnabled                  bool            `json:"referral_enabled"`
 		OIDCOAuthEnabled                 bool            `json:"oidc_oauth_enabled"`
 		OIDCOAuthProviderName            string          `json:"oidc_oauth_provider_name"`
 		Version                          string          `json:"version,omitempty"`
@@ -305,6 +308,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		LinuxDoOAuthEnabled:              settings.LinuxDoOAuthEnabled,
 		BackendModeEnabled:               settings.BackendModeEnabled,
 		CheckinEnabled:                   settings.CheckinEnabled,
+		ReferralEnabled:                  settings.ReferralEnabled,
 		OIDCOAuthEnabled:                 settings.OIDCOAuthEnabled,
 		OIDCOAuthProviderName:            settings.OIDCOAuthProviderName,
 		Version:                          s.version,
@@ -570,6 +574,10 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	// 签到设置
 	updates[SettingKeyCheckinEnabled] = strconv.FormatBool(settings.CheckinEnabled)
 	updates[SettingKeyCheckinRewardAmount] = strconv.FormatFloat(settings.CheckinRewardAmount, 'f', 8, 64)
+
+	// 推荐返利设置
+	updates[SettingKeyReferralEnabled] = strconv.FormatBool(settings.ReferralEnabled)
+	updates[SettingKeyReferralCommissionRate] = strconv.FormatFloat(settings.ReferralCommissionRate, 'f', 4, 64)
 
 	// Gateway forwarding behavior
 	updates[SettingKeyEnableFingerprintUnification] = strconv.FormatBool(settings.EnableFingerprintUnification)
@@ -981,6 +989,14 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		result.CheckinRewardAmount = reward
 	} else {
 		result.CheckinRewardAmount = 1.0
+	}
+
+	// 推荐返利设置
+	result.ReferralEnabled = settings[SettingKeyReferralEnabled] == "true"
+	if rate, err := strconv.ParseFloat(settings[SettingKeyReferralCommissionRate], 64); err == nil {
+		result.ReferralCommissionRate = rate
+	} else {
+		result.ReferralCommissionRate = 10 // 默认 10%
 	}
 
 	result.DefaultSubscriptions = parseDefaultSubscriptions(settings[SettingKeyDefaultSubscriptions])
@@ -2065,4 +2081,27 @@ func (s *SettingService) SetStreamTimeoutSettings(ctx context.Context, settings 
 	}
 
 	return s.settingRepo.Set(ctx, SettingKeyStreamTimeoutSettings, string(data))
+}
+
+// IsReferralEnabled 检查是否启用推荐返利功能
+func (s *SettingService) IsReferralEnabled(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyReferralEnabled)
+	if err != nil {
+		return false // 默认关闭
+	}
+	return value == "true"
+}
+
+// GetReferralCommissionRate 获取推荐返利比例
+func (s *SettingService) GetReferralCommissionRate(ctx context.Context) float64 {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyReferralCommissionRate)
+	if err != nil {
+		return 0.10 // 默认 10%
+	}
+	rate, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return 0.10
+	}
+	// 数据库存储的是百分比（如 10 代表 10%），返回小数形式
+	return rate / 100
 }

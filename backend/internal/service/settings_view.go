@@ -104,6 +104,10 @@ type SystemSettings struct {
 	CheckinEnabled      bool
 	CheckinRewardAmount float64
 
+	// 推荐返利设置
+	ReferralEnabled        bool
+	ReferralCommissionRate float64
+
 	// Gateway forwarding behavior
 	EnableFingerprintUnification bool // 是否统一 OAuth 账号的指纹头（默认 true）
 	EnableMetadataPassthrough    bool // 是否透传客户端原始 metadata（默认 false）
@@ -142,6 +146,7 @@ type PublicSettings struct {
 	LinuxDoOAuthEnabled   bool
 	BackendModeEnabled    bool
 	CheckinEnabled        bool
+	ReferralEnabled       bool
 	OIDCOAuthEnabled      bool
 	OIDCOAuthProviderName string
 	Version               string
