@@ -48,7 +48,7 @@ func (r *referralCommissionRepository) ListByReferrer(ctx context.Context, refer
 		return nil, nil, err
 	}
 	defer countRows.Close()
-	var total int
+	var total int64
 	if countRows.Next() {
 		if err := countRows.Scan(&total); err != nil {
 			return nil, nil, err
@@ -84,12 +84,12 @@ func (r *referralCommissionRepository) ListByReferrer(ctx context.Context, refer
 		results = append(results, c)
 	}
 
+	pages := int((total + int64(pageSize) - 1) / int64(pageSize))
 	paging := &pagination.PaginationResult{
-		Total:       total,
-		Page:        page,
-		PageSize:    pageSize,
-		TotalPages:  (total + pageSize - 1) / pageSize,
-		HasNextPage: page*pageSize < total,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+		Pages:    pages,
 	}
 	return results, paging, nil
 }
@@ -102,7 +102,7 @@ func (r *referralCommissionRepository) ListAll(ctx context.Context, params pagin
 		return nil, nil, err
 	}
 	defer countRows.Close()
-	var total int
+	var total int64
 	if countRows.Next() {
 		if err := countRows.Scan(&total); err != nil {
 			return nil, nil, err
@@ -137,12 +137,12 @@ func (r *referralCommissionRepository) ListAll(ctx context.Context, params pagin
 		results = append(results, c)
 	}
 
+	pages := int((total + int64(pageSize) - 1) / int64(pageSize))
 	paging := &pagination.PaginationResult{
-		Total:       total,
-		Page:        page,
-		PageSize:    pageSize,
-		TotalPages:  (total + pageSize - 1) / pageSize,
-		HasNextPage: page*pageSize < total,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+		Pages:    pages,
 	}
 	return results, paging, nil
 }
@@ -175,7 +175,7 @@ func (r *referralCommissionRepository) GetReferredUsers(ctx context.Context, ref
 		return nil, nil, err
 	}
 	defer countRows.Close()
-	var total int
+	var total int64
 	if countRows.Next() {
 		if err := countRows.Scan(&total); err != nil {
 			return nil, nil, err
@@ -206,12 +206,12 @@ func (r *referralCommissionRepository) GetReferredUsers(ctx context.Context, ref
 		results = append(results, u)
 	}
 
+	pages := int((total + int64(pageSize) - 1) / int64(pageSize))
 	paging := &pagination.PaginationResult{
-		Total:       total,
-		Page:        page,
-		PageSize:    pageSize,
-		TotalPages:  (total + pageSize - 1) / pageSize,
-		HasNextPage: page*pageSize < total,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+		Pages:    pages,
 	}
 	return results, paging, nil
 }
