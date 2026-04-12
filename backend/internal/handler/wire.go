@@ -96,6 +96,8 @@ func ProvideHandlers(
 	totpHandler *TotpHandler,
 	paymentHandler *PaymentHandler,
 	paymentWebhookHandler *PaymentWebhookHandler,
+	referralHandler *ReferralHandler,
+	modelSquareHandler *ModelSquareHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
@@ -114,6 +116,8 @@ func ProvideHandlers(
 		Totp:           totpHandler,
 		Payment:        paymentHandler,
 		PaymentWebhook: paymentWebhookHandler,
+		Referral:       referralHandler,
+		ModelSquare:    modelSquareHandler,
 	}
 }
 

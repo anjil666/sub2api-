@@ -52,6 +52,8 @@ type Handlers struct {
 	Totp           *TotpHandler
 	Payment        *PaymentHandler
 	PaymentWebhook *PaymentWebhookHandler
+	Referral       *ReferralHandler
+	ModelSquare    *ModelSquareHandler
 }
 
 // BuildInfo contains build-time information
