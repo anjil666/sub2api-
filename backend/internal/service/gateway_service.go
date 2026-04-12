@@ -8702,6 +8702,15 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 		return nil
 	}
 
+	// Filter by channel restriction (RestrictModels)
+	if groupID != nil && s.channelService != nil {
+		for model := range modelSet {
+			if s.channelService.IsModelRestricted(ctx, *groupID, model) {
+				delete(modelSet, model)
+			}
+		}
+	}
+
 	// Convert to slice
 	models := make([]string, 0, len(modelSet))
 	for model := range modelSet {

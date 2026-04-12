@@ -221,12 +221,38 @@ func (s *UpstreamSyncService) ListManagedResources(ctx context.Context, siteID i
 	return s.resourceRepo.ListBySiteID(ctx, siteID)
 }
 
-// UpdateResourceMultiplier 更新单个托管资源的倍率
+// UpdateResourceMultiplier 更新单个托管资源的倍率，并同步更新本地分组的 rate_multiplier
 func (s *UpstreamSyncService) UpdateResourceMultiplier(ctx context.Context, resourceID int64, multiplier float64) (*UpstreamManagedResource, error) {
 	if err := s.resourceRepo.UpdatePriceMultiplier(ctx, resourceID, multiplier); err != nil {
 		return nil, err
 	}
-	return s.resourceRepo.GetByID(ctx, resourceID)
+
+	// 同步更新本地分组的 rate_multiplier
+	res, err := s.resourceRepo.GetByID(ctx, resourceID)
+	if err != nil {
+		return nil, err
+	}
+	if res != nil && res.ManagedGroupID != nil {
+		effectiveMultiplier := multiplier
+		if effectiveMultiplier == 0 {
+			// 0 意味着使用站点默认倍率
+			site, err := s.siteRepo.GetByID(ctx, res.UpstreamSiteID)
+			if err == nil && site != nil {
+				effectiveMultiplier = site.PriceMultiplier
+			}
+			if effectiveMultiplier == 0 {
+				effectiveMultiplier = 1.0
+			}
+		}
+		g, err := s.groupRepo.GetByIDLite(ctx, *res.ManagedGroupID)
+		if err == nil && g != nil && g.RateMultiplier != effectiveMultiplier {
+			g.RateMultiplier = effectiveMultiplier
+			if err := s.groupRepo.Update(ctx, g); err != nil {
+				log.Printf("[UpstreamSync] Warning: failed to update group rate_multiplier: %v", err)
+			}
+		}
+	}
+	return res, nil
 }
 
 // ToggleResource 切换资源状态 (active ↔ disabled)
