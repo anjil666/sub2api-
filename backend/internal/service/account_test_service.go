@@ -225,7 +225,9 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 			return s.sendErrorAndEnd(c, "No API key available")
 		}
 
-		baseURL := account.GetBaseURL()
+		// 测试连接使用原始 base_url（不用 GetBaseURL() 以免 antigravity 拼接 /antigravity 路径）
+		// 上游 sub2api 的 /v1/messages 通用路由会根据 key 所属分组的平台自动路由
+		baseURL := account.GetCredential("base_url")
 		if baseURL == "" {
 			baseURL = "https://api.anthropic.com"
 		}
