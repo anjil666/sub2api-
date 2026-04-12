@@ -618,12 +618,126 @@ func (s *AccountTestService) testGeminiAccountConnection(c *gin.Context, account
 // APIKey 类型走原生协议（与 gateway_handler 路由一致），OAuth/Upstream 走 CRS 中转。
 func (s *AccountTestService) routeAntigravityTest(c *gin.Context, account *Account, modelID string, prompt string) error {
 	if account.Type == AccountTypeAPIKey {
-		if strings.HasPrefix(modelID, "gemini-") {
+		lower := strings.ToLower(modelID)
+		if strings.HasPrefix(lower, "gemini-") || strings.HasPrefix(lower, "tab_") {
 			return s.testGeminiAccountConnection(c, account, modelID, prompt)
+		}
+		if strings.HasPrefix(lower, "gpt") || strings.HasPrefix(lower, "o1") ||
+			strings.HasPrefix(lower, "o3") || strings.HasPrefix(lower, "o4") ||
+			strings.HasPrefix(lower, "chatgpt") {
+			return s.testAntigravityOpenAIConnection(c, account, modelID, prompt)
 		}
 		return s.testClaudeAccountConnection(c, account, modelID)
 	}
 	return s.testAntigravityAccountConnection(c, account, modelID)
+}
+
+// testAntigravityOpenAIConnection 测试 antigravity 账号的 OpenAI 兼容模型
+// 通过上游站点的 /v1/chat/completions 端点发送非流式请求
+func (s *AccountTestService) testAntigravityOpenAIConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	ctx := c.Request.Context()
+
+	testModelID := modelID
+	if testModelID == "" {
+		testModelID = "gpt-4o"
+	}
+
+	// 应用 model_mapping
+	testModelID = account.GetMappedModel(testModelID)
+
+	apiKey := account.GetCredential("api_key")
+	if apiKey == "" {
+		return s.sendErrorAndEnd(c, "No API key available")
+	}
+	baseURL := account.GetCredential("base_url")
+	if baseURL == "" {
+		return s.sendErrorAndEnd(c, "No base_url configured")
+	}
+	normalizedBaseURL, err := s.validateUpstreamBaseURL(baseURL)
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
+	}
+	apiURL := strings.TrimSuffix(normalizedBaseURL, "/") + "/v1/chat/completions"
+
+	// SSE headers
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	c.Writer.Flush()
+
+	s.sendEvent(c, TestEvent{Type: "status", Text: "已连接到 API"})
+	s.sendEvent(c, TestEvent{Type: "status", Text: fmt.Sprintf("使用模型：%s", testModelID)})
+
+	testPrompt := prompt
+	if testPrompt == "" {
+		testPrompt = "hi"
+	}
+	s.sendEvent(c, TestEvent{Type: "status", Text: fmt.Sprintf("发送测试消息：%q", testPrompt)})
+
+	// 构造 OpenAI chat completions 请求 (非流式)
+	reqBody := map[string]any{
+		"model": testModelID,
+		"messages": []map[string]string{
+			{"role": "user", "content": testPrompt},
+		},
+		"max_tokens": 100,
+		"stream":     false,
+	}
+	bodyJSON, _ := json.Marshal(reqBody)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to create request: %v", err))
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %v", err))
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("API returned %d: %s", resp.StatusCode, string(respBody)))
+	}
+
+	// 解析 OpenAI chat completions 响应
+	var chatResp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(respBody, &chatResp); err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to parse response: %v", err))
+	}
+
+	responseModel := chatResp.Model
+	if responseModel == "" {
+		responseModel = testModelID
+	}
+
+	content := ""
+	if len(chatResp.Choices) > 0 {
+		content = chatResp.Choices[0].Message.Content
+	}
+
+	if content == "" {
+		return s.sendErrorAndEnd(c, "No response content from API")
+	}
+
+	s.sendEvent(c, TestEvent{Type: "response", Text: "响应：", Model: responseModel})
+	s.sendEvent(c, TestEvent{Type: "text", Text: content})
+	s.sendEvent(c, TestEvent{Type: "done", Success: true})
+
+	return nil
 }
 
 // testAntigravityAccountConnection tests an Antigravity account's connection
