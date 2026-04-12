@@ -8703,10 +8703,15 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 	}
 
 	// Filter by channel restriction (RestrictModels)
+	// 直接用 Channel.GetModelPricing 检查，绕过 isPlatformPricingMatch 的严格平台匹配
+	// (antigravity 分组的定价条目 platform 为 openai/anthropic 等，与 group.platform 不同)
 	if groupID != nil && s.channelService != nil {
-		for model := range modelSet {
-			if s.channelService.IsModelRestricted(ctx, *groupID, model) {
-				delete(modelSet, model)
+		ch, err := s.channelService.GetChannelForGroup(ctx, *groupID)
+		if err == nil && ch != nil && ch.RestrictModels && len(ch.ModelPricing) > 0 {
+			for model := range modelSet {
+				if ch.GetModelPricing(model) == nil {
+					delete(modelSet, model)
+				}
 			}
 		}
 	}
