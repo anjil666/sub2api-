@@ -3236,6 +3236,12 @@ async function saveSettings() {
       enable_fingerprint_unification: form.enable_fingerprint_unification,
       enable_metadata_passthrough: form.enable_metadata_passthrough,
       enable_cch_signing: form.enable_cch_signing,
+      // Checkin settings
+      checkin_enabled: form.checkin_enabled,
+      checkin_reward_amount: form.checkin_reward_amount,
+      // Referral settings
+      referral_enabled: form.referral_enabled,
+      referral_commission_rate: form.referral_commission_rate,
       // Payment configuration
       payment_enabled: form.payment_enabled,
       payment_min_amount: Number(form.payment_min_amount) || 0,
