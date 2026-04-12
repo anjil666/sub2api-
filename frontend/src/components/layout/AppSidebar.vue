@@ -709,7 +709,9 @@ const adminNavItems = computed((): NavItem[] => {
           },
         ]
       : []),
-    { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon }
+    { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
+    { path: '/admin/referral', label: t('nav.referralManagement'), icon: GiftIcon, hideInSimpleMode: true },
+    { path: '/admin/upstream-sync', label: t('nav.upstreamSync'), icon: GlobeIcon }
   ]
 
   // 简单模式下，在系统设置前插入 API密钥
