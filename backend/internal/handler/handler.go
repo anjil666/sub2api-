@@ -32,6 +32,8 @@ type AdminHandlers struct {
 	ScheduledTest         *admin.ScheduledTestHandler
 	Channel               *admin.ChannelHandler
 	Payment               *admin.PaymentHandler
+	Referral              *admin.ReferralHandler
+	UpstreamSync          *admin.UpstreamHandler
 }
 
 // Handlers contains all HTTP handlers
