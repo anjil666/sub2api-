@@ -707,13 +707,21 @@ func (s *AccountTestService) testAntigravityOpenAIConnection(c *gin.Context, acc
 	}
 
 	// 解析 OpenAI chat completions 响应
+	// 上游 sub2api 的 /v1/chat/completions 兼容层可能返回不同格式，逐层尝试
 	var chatResp struct {
 		Choices []struct {
 			Message struct {
 				Content string `json:"content"`
 			} `json:"message"`
+			Delta struct {
+				Content string `json:"content"`
+			} `json:"delta"`
 		} `json:"choices"`
-		Model string `json:"model"`
+		Model   string `json:"model"`
+		Content []struct {
+			Text string `json:"text"`
+			Type string `json:"type"`
+		} `json:"content"`
 	}
 	if err := json.Unmarshal(respBody, &chatResp); err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to parse response: %v", err))
@@ -724,13 +732,31 @@ func (s *AccountTestService) testAntigravityOpenAIConnection(c *gin.Context, acc
 		responseModel = testModelID
 	}
 
+	// 尝试多种格式提取内容
 	content := ""
 	if len(chatResp.Choices) > 0 {
 		content = chatResp.Choices[0].Message.Content
+		if content == "" {
+			content = chatResp.Choices[0].Delta.Content
+		}
 	}
-
+	// Claude /v1/messages 兼容格式 (content[].text)
+	if content == "" && len(chatResp.Content) > 0 {
+		for _, c := range chatResp.Content {
+			if c.Type == "text" && c.Text != "" {
+				content = c.Text
+				break
+			}
+		}
+	}
+	// 最后尝试：直接输出原始响应片段供调试
 	if content == "" {
-		return s.sendErrorAndEnd(c, "No response content from API")
+		// 截取前500字节用于诊断
+		preview := string(respBody)
+		if len(preview) > 500 {
+			preview = preview[:500]
+		}
+		return s.sendErrorAndEnd(c, fmt.Sprintf("No response content (raw: %s)", preview))
 	}
 
 	s.sendEvent(c, TestEvent{Type: "response", Text: "响应：", Model: responseModel})
