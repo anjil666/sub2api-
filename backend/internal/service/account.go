@@ -447,11 +447,15 @@ func (a *Account) resolveModelMapping(rawMapping map[string]any) map[string]stri
 	}
 	if len(result) > 0 {
 		if a.Platform == domain.PlatformAntigravity {
-			ensureAntigravityDefaultPassthroughs(result, []string{
-				"gemini-3-flash",
-				"gemini-3.1-pro-high",
-				"gemini-3.1-pro-low",
-			})
+			// 上游同步账号（有 base_url）的 model_mapping 已是完整列表，不注入额外模型
+			_, hasBaseURL := a.Credentials["base_url"]
+			if !hasBaseURL {
+				ensureAntigravityDefaultPassthroughs(result, []string{
+					"gemini-3-flash",
+					"gemini-3.1-pro-high",
+					"gemini-3.1-pro-low",
+				})
+			}
 		}
 		return result
 	}
