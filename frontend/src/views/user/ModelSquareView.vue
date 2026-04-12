@@ -26,9 +26,26 @@
         <Select
           :model-value="selectedGroupId"
           :options="groupFilterOptions"
-          class="w-full sm:w-44"
+          class="w-full sm:w-auto sm:min-w-44"
           @update:model-value="onGroupFilterChange"
-        />
+        >
+          <template #selected="{ option }">
+            <span class="flex items-center gap-1.5">
+              <span class="truncate">{{ option?.label ?? t('modelSquare.allGroups') }}</span>
+              <span v-if="option?.rate && option.rate !== 1" :class="['inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold', ratePillClass(option.platform)]">
+                {{ option.rate }}x
+              </span>
+            </span>
+          </template>
+          <template #option="{ option }">
+            <span class="flex w-full items-center justify-between gap-2">
+              <span class="select-option-label truncate">{{ option.label }}</span>
+              <span v-if="option.rate && option.rate !== 1" :class="['inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold', ratePillClass(option.platform)]">
+                {{ option.rate }}x
+              </span>
+            </span>
+          </template>
+        </Select>
 
         <!-- Provider Filter -->
         <Select
@@ -316,17 +333,33 @@ const flatModels = computed<FlatModel[]>(() => {
 
 // --- Filter Options ---
 const groupFilterOptions = computed(() => {
-  const options: { value: string | number; label: string }[] = [
+  const options: { value: string | number; label: string; rate?: number; platform?: string }[] = [
     { value: 'all', label: t('modelSquare.allGroups') }
   ]
   for (const group of groupsData.value) {
-    const rateLabel = group.rate_multiplier !== 1
-      ? ` (${group.rate_multiplier}x)`
-      : ''
-    options.push({ value: group.group_id, label: group.group_name + rateLabel })
+    options.push({
+      value: group.group_id,
+      label: group.group_name,
+      rate: group.rate_multiplier,
+      platform: group.platform
+    })
   }
   return options
 })
+
+// Rate pill color (same as GroupOptionItem)
+function ratePillClass(platform?: string): string {
+  switch (platform) {
+    case 'anthropic':
+      return 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400'
+    case 'openai':
+      return 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+    case 'gemini':
+      return 'bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400'
+    default:
+      return 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
+  }
+}
 
 const providerFilterOptions = computed(() => {
   const providers = new Set<string>()
