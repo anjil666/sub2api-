@@ -21,4 +21,7 @@ type UpstreamManagedResource struct {
 	LastSyncedAt          *time.Time
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
+
+	// 非持久化字段（仅同步期间使用）
+	UpstreamGroupDescription string `json:"-"` // 上游分组描述
 }

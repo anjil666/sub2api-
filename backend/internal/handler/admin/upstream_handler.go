@@ -394,7 +394,7 @@ func (h *UpstreamHandler) Update(c *gin.Context) {
 	response.Success(c, siteToResponse(updated))
 }
 
-// Delete 删除上游站点
+// Delete 删除上游站点（含级联清理本地分组/账号/渠道）
 // DELETE /api/v1/admin/upstream-sites/:id
 func (h *UpstreamHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -403,7 +403,7 @@ func (h *UpstreamHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.siteRepo.Delete(c.Request.Context(), id); err != nil {
+	if err := h.syncService.DeleteSiteWithResources(c.Request.Context(), id); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}

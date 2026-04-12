@@ -180,6 +180,42 @@ func (s *UpstreamSyncService) CheckUpstreamBalance(ctx context.Context, siteID i
 	return s.fetchBalanceViaAPIKey(ctx, site)
 }
 
+// DeleteSiteWithResources 删除上游站点及其所有本地资源（分组/账号/渠道）
+func (s *UpstreamSyncService) DeleteSiteWithResources(ctx context.Context, siteID int64) error {
+	// 1. 列出该站点所有 managed resources
+	resources, err := s.resourceRepo.ListBySiteID(ctx, siteID)
+	if err != nil {
+		return fmt.Errorf("list managed resources: %w", err)
+	}
+
+	// 2. 逐个删除本地资源（渠道 → 账号 → 分组 顺序，避免外键冲突）
+	for _, res := range resources {
+		if res.ManagedChannelID != nil {
+			if err := s.channelService.Delete(ctx, *res.ManagedChannelID); err != nil {
+				log.Printf("[UpstreamSync] Warning: failed to delete channel %d: %v", *res.ManagedChannelID, err)
+			}
+		}
+		if res.ManagedAccountID != nil {
+			if err := s.adminService.DeleteAccount(ctx, *res.ManagedAccountID); err != nil {
+				log.Printf("[UpstreamSync] Warning: failed to delete account %d: %v", *res.ManagedAccountID, err)
+			}
+		}
+		if res.ManagedGroupID != nil {
+			if err := s.adminService.DeleteGroup(ctx, *res.ManagedGroupID); err != nil {
+				log.Printf("[UpstreamSync] Warning: failed to delete group %d: %v", *res.ManagedGroupID, err)
+			}
+		}
+	}
+
+	// 3. 删除 managed resources 记录
+	if err := s.resourceRepo.DeleteBySiteID(ctx, siteID); err != nil {
+		log.Printf("[UpstreamSync] Warning: failed to delete managed resources for site %d: %v", siteID, err)
+	}
+
+	// 4. 删除站点
+	return s.siteRepo.Delete(ctx, siteID)
+}
+
 // ListManagedResources 列出站点的托管资源
 func (s *UpstreamSyncService) ListManagedResources(ctx context.Context, siteID int64) ([]*UpstreamManagedResource, error) {
 	return s.resourceRepo.ListBySiteID(ctx, siteID)
@@ -321,9 +357,10 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 		}
 		if key.GroupID != nil {
 			res.UpstreamGroupID = key.GroupID
-			// 记录上游分组倍率
+			// 记录上游分组倍率和描述
 			if gm, ok := groupMeta[*key.GroupID]; ok {
 				res.UpstreamRateMultiplier = gm.RateMultiplier
+				res.UpstreamGroupDescription = gm.Description
 			}
 		}
 		if err := s.resourceRepo.Upsert(ctx, res); err != nil {
@@ -398,12 +435,14 @@ type upstreamKeyInfo struct {
 type upstreamGroupInfo struct {
 	ID             int64   `json:"id"`
 	Name           string  `json:"name"`
+	Description    string  `json:"description"`
 	RateMultiplier float64 `json:"rate_multiplier"`
 }
 
-// upstreamGroupMeta 分组元信息（名称+倍率）
+// upstreamGroupMeta 分组元信息（名称+描述+倍率）
 type upstreamGroupMeta struct {
 	Name           string
+	Description    string
 	RateMultiplier float64
 }
 
@@ -441,7 +480,7 @@ func (s *UpstreamSyncService) fetchUpstreamGroupMeta(ctx context.Context, site *
 
 	meta := make(map[int64]upstreamGroupMeta, len(result.Data))
 	for _, g := range result.Data {
-		meta[g.ID] = upstreamGroupMeta{Name: g.Name, RateMultiplier: g.RateMultiplier}
+		meta[g.ID] = upstreamGroupMeta{Name: g.Name, Description: g.Description, RateMultiplier: g.RateMultiplier}
 	}
 	log.Printf("[UpstreamSync] Site %q: fetched %d upstream groups", site.Name, len(meta))
 	return meta
@@ -661,14 +700,36 @@ func (s *UpstreamSyncService) ensureLocalResources(
 
 // ensureGroup 确保分组存在（幂等）
 func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSite, res *UpstreamManagedResource, existing *UpstreamManagedResource, effectiveMultiplier float64) (int64, error) {
+	// 计算期望的名称
+	groupName := fmt.Sprintf("上游: %s", site.Name)
+	if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
+		groupName = fmt.Sprintf("%s (%s)", res.UpstreamKeyName, site.Name)
+	}
+	groupDesc := fmt.Sprintf("自动同步自上游站点 %s", site.Name)
+	if res.UpstreamGroupDescription != "" {
+		groupDesc = res.UpstreamGroupDescription
+	}
+
 	// 如果已有 managed_group_id，先检查是否还存在
 	if existing != nil && existing.ManagedGroupID != nil {
 		g, err := s.groupRepo.GetByIDLite(ctx, *existing.ManagedGroupID)
 		if err == nil && g != nil {
+			needUpdate := false
 			if g.RateMultiplier != effectiveMultiplier {
 				g.RateMultiplier = effectiveMultiplier
+				needUpdate = true
+			}
+			if g.Name != groupName {
+				g.Name = groupName
+				needUpdate = true
+			}
+			if g.Description != groupDesc {
+				g.Description = groupDesc
+				needUpdate = true
+			}
+			if needUpdate {
 				if err := s.groupRepo.Update(ctx, g); err != nil {
-					log.Printf("[UpstreamSync] Warning: failed to update group rate_multiplier: %v", err)
+					log.Printf("[UpstreamSync] Warning: failed to update group: %v", err)
 				}
 			}
 			return g.ID, nil
@@ -677,14 +738,9 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 	}
 
 	// 创建新分组 — 使用上游分组名称
-	groupName := fmt.Sprintf("上游: %s", site.Name)
-	if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
-		groupName = fmt.Sprintf("%s (%s)", res.UpstreamKeyName, site.Name)
-	}
-
 	group := &Group{
 		Name:             groupName,
-		Description:      fmt.Sprintf("自动同步自上游站点 %s (%s)", site.Name, site.BaseURL),
+		Description:      groupDesc,
 		Platform:         PlatformAntigravity,
 		RateMultiplier:   effectiveMultiplier,
 		Status:           StatusActive,
@@ -711,15 +767,20 @@ func (s *UpstreamSyncService) ensureAccount(ctx context.Context, site *UpstreamS
 		"model_mapping": modelMapping,
 	}
 
-	// 如果已有 managed_account_id，更新凭证
+	// 如果已有 managed_account_id，更新凭证和名称
 	if existing != nil && existing.ManagedAccountID != nil {
 		existingAccount, err := s.adminService.GetAccount(ctx, *existing.ManagedAccountID)
 		if err == nil && existingAccount != nil {
+			accountName := fmt.Sprintf("上游: %s", site.Name)
+			if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
+				accountName = fmt.Sprintf("%s (%s)", res.UpstreamKeyName, site.Name)
+			}
 			updateInput := &UpdateAccountInput{
+				Name:        accountName,
 				Credentials: credentials,
 			}
 			if _, err := s.adminService.UpdateAccount(ctx, existingAccount.ID, updateInput); err != nil {
-				log.Printf("[UpstreamSync] Warning: failed to update account credentials: %v", err)
+				log.Printf("[UpstreamSync] Warning: failed to update account: %v", err)
 			}
 			return existingAccount.ID, nil
 		}
@@ -754,16 +815,23 @@ func (s *UpstreamSyncService) ensureAccount(ctx context.Context, site *UpstreamS
 func (s *UpstreamSyncService) ensureChannel(ctx context.Context, site *UpstreamSite, res *UpstreamManagedResource, existing *UpstreamManagedResource, groupID int64, models []UpstreamModelInfo, effectiveMultiplier float64) (int64, error) {
 	pricingList := s.buildModelPricing(models, effectiveMultiplier)
 
-	// 如果已有 managed_channel_id，更新定价
+	// 如果已有 managed_channel_id，更新定价、名称和模型限制
 	if existing != nil && existing.ManagedChannelID != nil {
 		existingChannel, err := s.channelService.GetByID(ctx, *existing.ManagedChannelID)
 		if err == nil && existingChannel != nil {
+			channelName := fmt.Sprintf("上游: %s", site.Name)
+			if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
+				channelName = fmt.Sprintf("%s (%s)", res.UpstreamKeyName, site.Name)
+			}
+			restrictModels := true
 			updateInput := &UpdateChannelInput{
+				Name:               channelName,
 				ModelPricing:       &pricingList,
 				BillingModelSource: BillingModelSourceChannelMapped,
+				RestrictModels:     &restrictModels,
 			}
 			if _, err := s.channelService.Update(ctx, existingChannel.ID, updateInput); err != nil {
-				log.Printf("[UpstreamSync] Warning: failed to update channel pricing: %v", err)
+				log.Printf("[UpstreamSync] Warning: failed to update channel: %v", err)
 			}
 			return existingChannel.ID, nil
 		}
