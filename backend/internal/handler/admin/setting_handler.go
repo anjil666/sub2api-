@@ -325,6 +325,12 @@ type UpdateSettingsRequest struct {
 	PaymentCancelRateLimitWindow  *int    `json:"payment_cancel_rate_limit_window"`
 	PaymentCancelRateLimitUnit    *string `json:"payment_cancel_rate_limit_unit"`
 	PaymentCancelRateLimitMode    *string `json:"payment_cancel_rate_limit_window_mode"`
+
+	// 签到与推荐
+	CheckinEnabled         bool    `json:"checkin_enabled"`
+	CheckinRewardAmount    float64 `json:"checkin_reward_amount"`
+	ReferralEnabled        bool    `json:"referral_enabled"`
+	ReferralCommissionRate float64 `json:"referral_commission_rate"`
 }
 
 // UpdateSettings 更新系统设置
