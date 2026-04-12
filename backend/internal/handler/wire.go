@@ -34,8 +34,7 @@ func ProvideAdminHandlers(
 	apiKeyHandler *admin.AdminAPIKeyHandler,
 	scheduledTestHandler *admin.ScheduledTestHandler,
 	channelHandler *admin.ChannelHandler,
-	referralHandler *admin.ReferralHandler,
-	upstreamHandler *admin.UpstreamHandler,
+	paymentHandler *admin.PaymentHandler,
 ) *AdminHandlers {
 	return &AdminHandlers{
 		Dashboard:             dashboardHandler,
@@ -63,8 +62,7 @@ func ProvideAdminHandlers(
 		APIKey:                apiKeyHandler,
 		ScheduledTest:         scheduledTestHandler,
 		Channel:               channelHandler,
-		Referral:              referralHandler,
-		UpstreamSync:          upstreamHandler,
+		Payment:               paymentHandler,
 	}
 }
 
@@ -92,26 +90,26 @@ func ProvideHandlers(
 	openaiGatewayHandler *OpenAIGatewayHandler,
 	settingHandler *SettingHandler,
 	totpHandler *TotpHandler,
-	modelSquareHandler *ModelSquareHandler,
-	referralHandler *ReferralHandler,
+	paymentHandler *PaymentHandler,
+	paymentWebhookHandler *PaymentWebhookHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
 	return &Handlers{
-		Auth:          authHandler,
-		User:          userHandler,
-		APIKey:        apiKeyHandler,
-		Usage:         usageHandler,
-		Redeem:        redeemHandler,
-		Subscription:  subscriptionHandler,
-		Announcement:  announcementHandler,
-		Admin:         adminHandlers,
-		Gateway:       gatewayHandler,
-		OpenAIGateway: openaiGatewayHandler,
-		Setting:       settingHandler,
-		Totp:          totpHandler,
-		ModelSquare:   modelSquareHandler,
-		Referral:      referralHandler,
+		Auth:           authHandler,
+		User:           userHandler,
+		APIKey:         apiKeyHandler,
+		Usage:          usageHandler,
+		Redeem:         redeemHandler,
+		Subscription:   subscriptionHandler,
+		Announcement:   announcementHandler,
+		Admin:          adminHandlers,
+		Gateway:        gatewayHandler,
+		OpenAIGateway:  openaiGatewayHandler,
+		Setting:        settingHandler,
+		Totp:           totpHandler,
+		Payment:        paymentHandler,
+		PaymentWebhook: paymentWebhookHandler,
 	}
 }
 
@@ -131,6 +129,8 @@ var ProviderSet = wire.NewSet(
 	NewModelSquareHandler,
 	NewReferralHandler,
 	ProvideSettingHandler,
+	NewPaymentHandler,
+	NewPaymentWebhookHandler,
 
 	// Admin handlers
 	admin.NewDashboardHandler,
@@ -158,8 +158,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewAdminAPIKeyHandler,
 	admin.NewScheduledTestHandler,
 	admin.NewChannelHandler,
-	admin.NewReferralHandler,
-	admin.NewUpstreamHandler,
+	admin.NewPaymentHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

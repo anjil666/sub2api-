@@ -26,8 +26,7 @@ import scheduledTestsAPI from './scheduledTests'
 import backupAPI from './backup'
 import tlsFingerprintProfileAPI from './tlsFingerprintProfile'
 import channelsAPI from './channels'
-import referralAPI from './referral'
-import upstreamAPI from './upstream'
+import adminPaymentAPI from './payment'
 
 /**
  * Unified admin API object for convenient access
@@ -56,8 +55,7 @@ export const adminAPI = {
   backup: backupAPI,
   tlsFingerprintProfiles: tlsFingerprintProfileAPI,
   channels: channelsAPI,
-  referral: referralAPI,
-  upstream: upstreamAPI
+  payment: adminPaymentAPI
 }
 
 export {
@@ -84,8 +82,7 @@ export {
   backupAPI,
   tlsFingerprintProfileAPI,
   channelsAPI,
-  referralAPI,
-  upstreamAPI
+  adminPaymentAPI
 }
 
 export default adminAPI
