@@ -1868,10 +1868,34 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		return
 	}
 
-	// Handle Antigravity accounts: return Claude + Gemini models
+	// Handle Antigravity accounts: prefer model_mapping, fallback to defaults
 	if account.Platform == service.PlatformAntigravity {
-		// 直接复用 antigravity.DefaultModels()，与 /v1/models 端点保持同步
-		response.Success(c, antigravity.DefaultModels())
+		mapping := account.GetModelMapping()
+		if len(mapping) == 0 {
+			response.Success(c, antigravity.DefaultModels())
+			return
+		}
+		// 使用 model_mapping 中的模型列表（即上游同步的实际模型）
+		defaultModels := antigravity.DefaultModels()
+		var models []antigravity.ClaudeModel
+		for requestedModel := range mapping {
+			var found bool
+			for _, dm := range defaultModels {
+				if dm.ID == requestedModel {
+					models = append(models, dm)
+					found = true
+					break
+				}
+			}
+			if !found {
+				models = append(models, antigravity.ClaudeModel{
+					ID:          requestedModel,
+					Type:        "model",
+					DisplayName: requestedModel,
+				})
+			}
+		}
+		response.Success(c, models)
 		return
 	}
 

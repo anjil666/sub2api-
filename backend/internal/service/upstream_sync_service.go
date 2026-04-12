@@ -255,7 +255,7 @@ func (s *UpstreamSyncService) UpdateResourceMultiplier(ctx context.Context, reso
 	return res, nil
 }
 
-// ToggleResource 切换资源状态 (active ↔ disabled)，同步更新本地账号和渠道状态
+// ToggleResource 切换资源状态 (active ↔ disabled)，同步更新本地分组/账号/渠道状态
 func (s *UpstreamSyncService) ToggleResource(ctx context.Context, resourceID int64) (*UpstreamManagedResource, error) {
 	res, err := s.resourceRepo.GetByID(ctx, resourceID)
 	if err != nil || res == nil {
@@ -267,6 +267,17 @@ func (s *UpstreamSyncService) ToggleResource(ctx context.Context, resourceID int
 	}
 	if err := s.resourceRepo.UpdateStatus(ctx, resourceID, newStatus); err != nil {
 		return nil, err
+	}
+
+	// 同步更新本地分组状态
+	if res.ManagedGroupID != nil {
+		g, err := s.groupRepo.GetByIDLite(ctx, *res.ManagedGroupID)
+		if err == nil && g != nil && g.Status != newStatus {
+			g.Status = newStatus
+			if err := s.groupRepo.Update(ctx, g); err != nil {
+				log.Printf("[UpstreamSync] Warning: failed to update group %d status to %s: %v", *res.ManagedGroupID, newStatus, err)
+			}
+		}
 	}
 
 	// 同步更新本地账号状态
