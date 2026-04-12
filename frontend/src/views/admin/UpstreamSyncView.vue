@@ -180,7 +180,15 @@
           </div>
         </template>
 
-        <div class="grid grid-cols-1 gap-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="label">{{ t('admin.upstream.form.markupPercent') }}</label>
+            <div class="flex items-center gap-2">
+              <input v-model.number="form.price_multiplier" type="number" class="input" min="0" max="500" step="1" />
+              <span class="text-sm text-gray-500">%</span>
+            </div>
+            <span class="text-xs text-gray-400">{{ t('admin.upstream.form.markupHint') }}</span>
+          </div>
           <div>
             <label class="label">{{ t('admin.upstream.form.syncInterval') }}</label>
             <input v-model.number="form.sync_interval_minutes" type="number" class="input" min="1" />
@@ -268,13 +276,14 @@
                 <input
                   v-model.number="resourceMultipliers[res.id]"
                   type="number"
-                  step="0.01"
+                  step="1"
                   min="0"
                   class="input input-xs w-20 text-center"
                   :placeholder="t('admin.upstream.defaultRate')"
                   @blur="handleUpdateResourceMultiplier(res)"
                   @keyup.enter="handleUpdateResourceMultiplier(res)"
                 />
+                <span class="text-gray-500">%</span>
                 <span class="text-gray-400 text-xs">{{ t('admin.upstream.zeroMeansDefault') }}</span>
               </div>
             </div>
@@ -351,7 +360,7 @@ const form = reactive({
   api_key: '',
   email: '',
   password: '',
-  price_multiplier: 1.0,
+  price_multiplier: 0,
   sync_enabled: true,
   sync_interval_minutes: 60
 })
@@ -411,7 +420,7 @@ function openCreateDialog() {
     api_key: '',
     email: '',
     password: '',
-    price_multiplier: 1.0,
+    price_multiplier: 0,
     sync_enabled: true,
     sync_interval_minutes: 60
   })

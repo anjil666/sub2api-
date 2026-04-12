@@ -287,9 +287,9 @@ func (h *UpstreamHandler) Create(c *gin.Context) {
 	// 规范化 base_url
 	req.BaseURL = strings.TrimRight(req.BaseURL, "/")
 
-	// 默认值
-	if req.PriceMultiplier <= 0 {
-		req.PriceMultiplier = 1.0
+	// 默认值 — price_multiplier 现在是加价百分比，0 = 不加价
+	if req.PriceMultiplier < 0 {
+		req.PriceMultiplier = 0
 	}
 	if req.SyncIntervalMinutes <= 0 {
 		req.SyncIntervalMinutes = 60
@@ -356,8 +356,8 @@ func (h *UpstreamHandler) Update(c *gin.Context) {
 		return
 	}
 
-	if req.PriceMultiplier <= 0 {
-		req.PriceMultiplier = 1.0
+	if req.PriceMultiplier < 0 {
+		req.PriceMultiplier = 0
 	}
 	if req.SyncIntervalMinutes <= 0 {
 		req.SyncIntervalMinutes = 60

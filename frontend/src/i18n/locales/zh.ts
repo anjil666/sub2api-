@@ -4474,7 +4474,9 @@ export default {
         emailPlaceholder: '留空则不修改',
         password: '密码',
         passwordPlaceholder: '留空则不修改',
-        priceMultiplier: '价格倍率',
+        priceMultiplier: '加价百分比',
+        markupPercent: '加价百分比',
+        markupHint: '在上游倍率基础上加价，0 = 不加价。例如 30 表示加价 30%',
         syncInterval: '同步间隔',
         minutes: '分钟',
         syncEnabled: '启用自动同步'
@@ -4499,9 +4501,9 @@ export default {
       channel: '渠道',
       notSynced: '未同步',
       upstreamRate: '上游倍率',
-      localRate: '本地倍率',
+      localRate: '加价',
       defaultRate: '默认',
-      zeroMeansDefault: '(0=默认1x)',
+      zeroMeansDefault: '(0=站点默认)',
       confirmDelete: '确定要删除上游站点「{name}」吗？已创建的分组、账号和渠道不会被删除。'
     },
 

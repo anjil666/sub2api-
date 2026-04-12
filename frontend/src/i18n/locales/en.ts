@@ -4309,7 +4309,9 @@ export default {
         emailPlaceholder: 'Leave empty to keep current',
         password: 'Password',
         passwordPlaceholder: 'Leave empty to keep current',
-        priceMultiplier: 'Price Multiplier',
+        priceMultiplier: 'Markup Percentage',
+        markupPercent: 'Markup Percentage',
+        markupHint: 'Markup on top of upstream rate. 0 = no markup. E.g. 30 = +30%',
         syncInterval: 'Sync Interval',
         minutes: 'minutes',
         syncEnabled: 'Enable Auto Sync'
@@ -4334,9 +4336,9 @@ export default {
       channel: 'Channel',
       notSynced: 'Not synced',
       upstreamRate: 'Upstream Rate',
-      localRate: 'Local Rate',
+      localRate: 'Markup',
       defaultRate: 'Default',
-      zeroMeansDefault: '(0=default 1x)',
+      zeroMeansDefault: '(0=site default)',
       confirmDelete: 'Delete upstream site "{name}"? Existing groups, accounts, and channels will not be removed.'
     },
 

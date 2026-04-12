@@ -233,16 +233,23 @@ func (s *UpstreamSyncService) UpdateResourceMultiplier(ctx context.Context, reso
 		return nil, err
 	}
 	if res != nil && res.ManagedGroupID != nil {
-		effectiveMultiplier := multiplier
-		if effectiveMultiplier == 0 {
-			// 0 意味着使用站点默认倍率
+		// multiplier 现在是加价百分比，0 表示使用站点默认
+		markupPercent := multiplier
+		if markupPercent == 0 {
+			// 使用站点默认加价百分比
 			site, err := s.siteRepo.GetByID(ctx, res.UpstreamSiteID)
 			if err == nil && site != nil {
-				effectiveMultiplier = site.PriceMultiplier
+				markupPercent = site.PriceMultiplier
 			}
-			if effectiveMultiplier == 0 {
-				effectiveMultiplier = 1.0
-			}
+		}
+		// 本地倍率 = 上游倍率 × (1 + 加价百分比/100)
+		upstreamRate := res.UpstreamRateMultiplier
+		if upstreamRate <= 0 {
+			upstreamRate = 1.0
+		}
+		effectiveMultiplier := upstreamRate * (1 + markupPercent/100)
+		if effectiveMultiplier <= 0 {
+			effectiveMultiplier = upstreamRate
 		}
 		g, err := s.groupRepo.GetByIDLite(ctx, *res.ManagedGroupID)
 		if err == nil && g != nil && g.RateMultiplier != effectiveMultiplier {
@@ -336,7 +343,12 @@ func (s *UpstreamSyncService) syncSiteAPIKeyMode(ctx context.Context, site *Upst
 	}
 
 	// 3. 确保分组/账号/渠道存在
-	groupID, accountID, channelID, err := s.ensureLocalResources(ctx, site, res, models, site.PriceMultiplier)
+	// api_key 模式没有上游倍率信息，基准倍率 = 1.0
+	effectiveMultiplier := 1.0 * (1 + site.PriceMultiplier/100)
+	if effectiveMultiplier <= 0 {
+		effectiveMultiplier = 1.0
+	}
+	groupID, accountID, channelID, err := s.ensureLocalResources(ctx, site, res, models, effectiveMultiplier)
 	if err != nil {
 		return SyncResult{Error: err.Error()}
 	}
@@ -442,10 +454,19 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 			}
 		}
 
-		// 确定实际使用的倍率：资源自定义 > 站点默认
-		effectiveMultiplier := site.PriceMultiplier
+		// 确定加价百分比：资源自定义 > 站点默认
+		markupPercent := site.PriceMultiplier // 语义：加价百分比（如 30 = 加价 30%）
 		if res.PriceMultiplier > 0 {
-			effectiveMultiplier = res.PriceMultiplier
+			markupPercent = res.PriceMultiplier
+		}
+		// 本地倍率 = 上游倍率 × (1 + 加价百分比/100)
+		upstreamRate := res.UpstreamRateMultiplier
+		if upstreamRate <= 0 {
+			upstreamRate = 1.0
+		}
+		effectiveMultiplier := upstreamRate * (1 + markupPercent/100)
+		if effectiveMultiplier <= 0 {
+			effectiveMultiplier = upstreamRate
 		}
 
 		// 确保本地 group/account/channel
