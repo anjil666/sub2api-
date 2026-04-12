@@ -320,7 +320,10 @@ const groupFilterOptions = computed(() => {
     { value: 'all', label: t('modelSquare.allGroups') }
   ]
   for (const group of groupsData.value) {
-    options.push({ value: group.group_id, label: group.group_name })
+    const rateLabel = group.rate_multiplier !== 1
+      ? ` (${group.rate_multiplier}x)`
+      : ''
+    options.push({ value: group.group_id, label: group.group_name + rateLabel })
   }
   return options
 })
