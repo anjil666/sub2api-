@@ -633,7 +633,7 @@ func (s *AccountTestService) routeAntigravityTest(c *gin.Context, account *Accou
 }
 
 // testAntigravityOpenAIConnection 测试 antigravity 账号的 OpenAI 兼容模型
-// 通过上游站点的 /v1/chat/completions 端点发送非流式请求
+// 通过上游站点的 /v1/chat/completions 端点发送流式请求，读取首个 chunk 判断连通性
 func (s *AccountTestService) testAntigravityOpenAIConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
 	ctx := c.Request.Context()
 
@@ -666,104 +666,128 @@ func (s *AccountTestService) testAntigravityOpenAIConnection(c *gin.Context, acc
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
 	c.Writer.Flush()
 
-	s.sendEvent(c, TestEvent{Type: "status", Text: "已连接到 API"})
-	s.sendEvent(c, TestEvent{Type: "status", Text: fmt.Sprintf("使用模型：%s", testModelID)})
+	s.sendEvent(c, TestEvent{Type: "test_start", Model: testModelID})
 
 	testPrompt := prompt
 	if testPrompt == "" {
 		testPrompt = "hi"
 	}
-	s.sendEvent(c, TestEvent{Type: "status", Text: fmt.Sprintf("发送测试消息：%q", testPrompt)})
 
-	// 构造 OpenAI chat completions 请求 (非流式)
+	// 构造 OpenAI chat completions 流式请求
 	reqBody := map[string]any{
 		"model": testModelID,
 		"messages": []map[string]string{
 			{"role": "user", "content": testPrompt},
 		},
 		"max_tokens": 100,
-		"stream":     false,
+		"stream":     true,
 	}
 	bodyJSON, _ := json.Marshal(reqBody)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyJSON))
+	// 使用带超时的 context，确保即使上游挂住也能 30 秒后取消
+	timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(timeoutCtx, "POST", apiURL, bytes.NewReader(bodyJSON))
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to create request: %v", err))
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %v", err))
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	respBody, _ := io.ReadAll(resp.Body)
-
 	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
 		return s.sendErrorAndEnd(c, fmt.Sprintf("API returned %d: %s", resp.StatusCode, string(respBody)))
 	}
 
-	// 解析 OpenAI chat completions 响应
-	// 上游 sub2api 的 /v1/chat/completions 兼容层可能返回不同格式，逐层尝试
-	var chatResp struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-			Delta struct {
-				Content string `json:"content"`
-			} `json:"delta"`
-		} `json:"choices"`
-		Model   string `json:"model"`
-		Content []struct {
-			Text string `json:"text"`
-			Type string `json:"type"`
-		} `json:"content"`
-	}
-	if err := json.Unmarshal(respBody, &chatResp); err != nil {
-		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to parse response: %v", err))
-	}
+	// 处理 SSE 流 — 上游 sub2api 的 /v1/chat/completions 返回 OpenAI 兼容的 SSE 流
+	return s.processAntigravityOpenAIStream(c, resp.Body)
+}
 
-	responseModel := chatResp.Model
-	if responseModel == "" {
-		responseModel = testModelID
-	}
+// processAntigravityOpenAIStream 处理上游 sub2api 的 /v1/chat/completions SSE 流
+// 上游兼容层可能返回标准 OpenAI chat.completion.chunk 格式，也可能返回其他变体
+func (s *AccountTestService) processAntigravityOpenAIStream(c *gin.Context, body io.Reader) error {
+	reader := bufio.NewReader(body)
 
-	// 尝试多种格式提取内容
-	content := ""
-	if len(chatResp.Choices) > 0 {
-		content = chatResp.Choices[0].Message.Content
-		if content == "" {
-			content = chatResp.Choices[0].Delta.Content
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
+				return nil
+			}
+			return s.sendErrorAndEnd(c, fmt.Sprintf("Stream read error: %s", err.Error()))
 		}
-	}
-	// Claude /v1/messages 兼容格式 (content[].text)
-	if content == "" && len(chatResp.Content) > 0 {
-		for _, c := range chatResp.Content {
-			if c.Type == "text" && c.Text != "" {
-				content = c.Text
-				break
+
+		line = strings.TrimSpace(line)
+		if line == "" || !sseDataPrefix.MatchString(line) {
+			continue
+		}
+
+		jsonStr := sseDataPrefix.ReplaceAllString(line, "")
+		if jsonStr == "[DONE]" {
+			s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
+			return nil
+		}
+
+		var data map[string]any
+		if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+			continue
+		}
+
+		// 检查错误
+		if errData, ok := data["error"].(map[string]any); ok {
+			errorMsg := "Unknown error"
+			if msg, ok := errData["message"].(string); ok {
+				errorMsg = msg
+			}
+			return s.sendErrorAndEnd(c, errorMsg)
+		}
+
+		// 标准 OpenAI chat.completion.chunk: choices[].delta.content
+		if choices, ok := data["choices"].([]any); ok && len(choices) > 0 {
+			if choice, ok := choices[0].(map[string]any); ok {
+				// finish_reason 非空表示结束
+				if fr, ok := choice["finish_reason"].(string); ok && fr != "" {
+					s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
+					return nil
+				}
+				if delta, ok := choice["delta"].(map[string]any); ok {
+					if content, ok := delta["content"].(string); ok && content != "" {
+						s.sendEvent(c, TestEvent{Type: "content", Text: content})
+					}
+				}
+				// 有些上游直接在 message 里返回（非标准）
+				if msg, ok := choice["message"].(map[string]any); ok {
+					if content, ok := msg["content"].(string); ok && content != "" {
+						s.sendEvent(c, TestEvent{Type: "content", Text: content})
+					}
+				}
+			}
+		}
+
+		// Claude /v1/messages 兼容格式 (content_block_delta)
+		if eventType, ok := data["type"].(string); ok {
+			switch eventType {
+			case "content_block_delta":
+				if delta, ok := data["delta"].(map[string]any); ok {
+					if text, ok := delta["text"].(string); ok && text != "" {
+						s.sendEvent(c, TestEvent{Type: "content", Text: text})
+					}
+				}
+			case "message_stop":
+				s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
+				return nil
 			}
 		}
 	}
-	// 最后尝试：直接输出原始响应片段供调试
-	if content == "" {
-		// 截取前500字节用于诊断
-		preview := string(respBody)
-		if len(preview) > 500 {
-			preview = preview[:500]
-		}
-		return s.sendErrorAndEnd(c, fmt.Sprintf("No response content (raw: %s)", preview))
-	}
-
-	s.sendEvent(c, TestEvent{Type: "response", Text: "响应：", Model: responseModel})
-	s.sendEvent(c, TestEvent{Type: "text", Text: content})
-	s.sendEvent(c, TestEvent{Type: "done", Success: true})
-
-	return nil
 }
 
 // testAntigravityAccountConnection tests an Antigravity account's connection
