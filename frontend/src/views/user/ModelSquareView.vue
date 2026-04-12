@@ -32,7 +32,7 @@
           <template #selected="{ option }">
             <span class="flex items-center gap-1.5">
               <span class="truncate">{{ option?.label ?? t('modelSquare.allGroups') }}</span>
-              <span v-if="option?.rate && option.rate !== 1" :class="['inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold', ratePillClass(option.platform)]">
+              <span v-if="option?.rate && option.rate !== 1" :class="['inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold', ratePillClass(option.platform as string)]">
                 {{ option.rate }}x
               </span>
             </span>
@@ -40,7 +40,7 @@
           <template #option="{ option }">
             <span class="flex w-full items-center justify-between gap-2">
               <span class="select-option-label truncate">{{ option.label }}</span>
-              <span v-if="option.rate && option.rate !== 1" :class="['inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold', ratePillClass(option.platform)]">
+              <span v-if="option.rate && option.rate !== 1" :class="['inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold', ratePillClass(option.platform as string)]">
                 {{ option.rate }}x
               </span>
             </span>
