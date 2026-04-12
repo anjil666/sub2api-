@@ -115,6 +115,14 @@ export interface SystemSettings {
   enable_metadata_passthrough: boolean
   enable_cch_signing: boolean
 
+  // Checkin settings
+  checkin_enabled: boolean
+  checkin_reward_amount: number
+
+  // Referral settings
+  referral_enabled: boolean
+  referral_commission_rate: number
+
   // Payment configuration
   payment_enabled: boolean
   payment_min_amount: number
@@ -214,6 +222,12 @@ export interface UpdateSettingsRequest {
   enable_fingerprint_unification?: boolean
   enable_metadata_passthrough?: boolean
   enable_cch_signing?: boolean
+  // Checkin settings
+  checkin_enabled?: boolean
+  checkin_reward_amount?: number
+  // Referral settings
+  referral_enabled?: boolean
+  referral_commission_rate?: number
   // Payment configuration
   payment_enabled?: boolean
   payment_min_amount?: number
