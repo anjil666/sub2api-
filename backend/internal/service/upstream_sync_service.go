@@ -782,7 +782,7 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 	if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
 		groupName = fmt.Sprintf("%s (%s)", res.UpstreamKeyName, site.Name)
 	}
-	groupDesc := fmt.Sprintf("自动同步自上游站点 %s", site.Name)
+	groupDesc := ""
 	if res.UpstreamGroupDescription != "" {
 		groupDesc = res.UpstreamGroupDescription
 	}
@@ -923,7 +923,7 @@ func (s *UpstreamSyncService) ensureChannel(ctx context.Context, site *UpstreamS
 
 	createInput := &CreateChannelInput{
 		Name:               channelName,
-		Description:        fmt.Sprintf("自动同步自上游站点 %s", site.Name),
+		Description:        "",
 		GroupIDs:           []int64{groupID},
 		ModelPricing:       pricingList,
 		BillingModelSource: BillingModelSourceChannelMapped,
