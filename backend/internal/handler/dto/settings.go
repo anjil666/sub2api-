@@ -124,6 +124,14 @@ type SystemSettings struct {
 	EnableMetadataPassthrough    bool `json:"enable_metadata_passthrough"`
 	EnableCCHSigning             bool `json:"enable_cch_signing"`
 
+	// Checkin settings
+	CheckinEnabled      bool    `json:"checkin_enabled"`
+	CheckinRewardAmount float64 `json:"checkin_reward_amount"`
+
+	// Referral settings
+	ReferralEnabled        bool    `json:"referral_enabled"`
+	ReferralCommissionRate float64 `json:"referral_commission_rate"`
+
 	// Payment configuration
 	PaymentEnabled           bool     `json:"payment_enabled"`
 	PaymentMinAmount         float64  `json:"payment_min_amount"`
