@@ -28,8 +28,8 @@ export interface CallbackPaths {
 /** Maps provider key → available payment types. */
 export const PROVIDER_SUPPORTED_TYPES: Record<string, string[]> = {
   easypay: ['alipay', 'wxpay'],
-  alipay: ['alipay'],
-  wxpay: ['wxpay'],
+  alipay: ['alipay_direct'],
+  wxpay: ['wxpay_direct'],
   stripe: ['card', 'alipay', 'wxpay', 'link'],
 }
 
