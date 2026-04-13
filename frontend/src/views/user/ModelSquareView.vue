@@ -180,12 +180,12 @@
               </div>
             </div>
             <!-- Cache Read / Cache Write side by side -->
-            <div v-if="model.cache_read_price_per_million > 0 || model.cache_write_price_per_million > 0" class="grid grid-cols-2 gap-3">
-              <div v-if="model.cache_read_price_per_million > 0" class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-dark-700">
+            <div v-if="model.supports_prompt_caching" class="grid grid-cols-2 gap-3">
+              <div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-dark-700">
                 <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('modelSquare.columns.cacheReadPrice') }}</div>
                 <div class="mt-0.5 font-mono text-sm font-medium text-gray-900 dark:text-white">${{ formatPrice(model.cache_read_price_per_million) }}</div>
               </div>
-              <div v-if="model.cache_write_price_per_million > 0" class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-dark-700">
+              <div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-dark-700">
                 <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('modelSquare.columns.cacheWritePrice') }}</div>
                 <div class="mt-0.5 font-mono text-sm font-medium text-gray-900 dark:text-white">${{ formatPrice(model.cache_write_price_per_million) }}</div>
               </div>
@@ -246,11 +246,11 @@
                 <span v-else class="text-gray-400">-</span>
               </td>
               <td class="table-cell text-right font-mono text-sm">
-                <template v-if="model.has_pricing && model.cache_read_price_per_million > 0">${{ formatPrice(model.cache_read_price_per_million) }}</template>
+                <template v-if="model.has_pricing && model.supports_prompt_caching">${{ formatPrice(model.cache_read_price_per_million) }}</template>
                 <span v-else class="text-gray-400">-</span>
               </td>
               <td class="table-cell text-right font-mono text-sm">
-                <template v-if="model.has_pricing && model.cache_write_price_per_million > 0">${{ formatPrice(model.cache_write_price_per_million) }}</template>
+                <template v-if="model.has_pricing && model.supports_prompt_caching">${{ formatPrice(model.cache_write_price_per_million) }}</template>
                 <span v-else class="text-gray-400">-</span>
               </td>
               <td class="table-cell">
