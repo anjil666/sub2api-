@@ -225,14 +225,14 @@ func (s *PaymentService) buildPaymentSubject(plan *dbent.SubscriptionPlan, payAm
 		if plan.ProductName != "" {
 			return plan.ProductName
 		}
-		return "Sub2API Subscription " + plan.Name
+		return "虚拟商品充值"
 	}
 	pf := strings.TrimSpace(cfg.ProductNamePrefix)
 	sf := strings.TrimSpace(cfg.ProductNameSuffix)
 	if pf != "" || sf != "" {
 		return strings.TrimSpace(pf + " " + payAmountStr + " " + sf)
 	}
-	return "Sub2API " + payAmountStr + " CNY"
+	return "虚拟商品充值"
 }
 
 // --- Order Queries ---
