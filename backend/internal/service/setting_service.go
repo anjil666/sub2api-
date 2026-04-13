@@ -171,6 +171,8 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyOIDCConnectEnabled,
 		SettingKeyOIDCConnectProviderName,
 		SettingPaymentEnabled,
+		SettingKeyCheckinEnabled,
+		SettingKeyReferralEnabled,
 	}
 
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)

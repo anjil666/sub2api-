@@ -188,6 +188,8 @@ type PublicSettings struct {
 	OIDCOAuthEnabled                 bool             `json:"oidc_oauth_enabled"`
 	OIDCOAuthProviderName            string           `json:"oidc_oauth_provider_name"`
 	BackendModeEnabled               bool             `json:"backend_mode_enabled"`
+	CheckinEnabled                   bool             `json:"checkin_enabled"`
+	ReferralEnabled                  bool             `json:"referral_enabled"`
 	PaymentEnabled                   bool             `json:"payment_enabled"`
 	Version                          string           `json:"version"`
 }
