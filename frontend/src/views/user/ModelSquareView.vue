@@ -165,22 +165,30 @@
           </div>
 
           <!-- Pricing -->
-          <div v-if="model.has_pricing" class="space-y-2">
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-gray-500 dark:text-gray-400">{{ t('modelSquare.columns.inputPrice') }}</span>
-              <span class="font-mono font-medium text-gray-900 dark:text-white">${{ formatPrice(model.input_price_per_million) }}</span>
+          <div v-if="model.has_pricing" class="space-y-3">
+            <!-- Input / Output side by side -->
+            <div class="grid grid-cols-2 gap-3">
+              <div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-dark-700">
+                <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('modelSquare.columns.inputPrice') }}</div>
+                <div class="mt-0.5 font-mono text-base font-semibold text-gray-900 dark:text-white">${{ formatPrice(model.input_price_per_million) }}</div>
+                <div class="text-[10px] text-gray-400 dark:text-gray-500">{{ t('modelSquare.perMillionTokens') }}</div>
+              </div>
+              <div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-dark-700">
+                <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('modelSquare.columns.outputPrice') }}</div>
+                <div class="mt-0.5 font-mono text-base font-semibold text-gray-900 dark:text-white">${{ formatPrice(model.output_price_per_million) }}</div>
+                <div class="text-[10px] text-gray-400 dark:text-gray-500">{{ t('modelSquare.perMillionTokens') }}</div>
+              </div>
             </div>
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-gray-500 dark:text-gray-400">{{ t('modelSquare.columns.outputPrice') }}</span>
-              <span class="font-mono font-medium text-gray-900 dark:text-white">${{ formatPrice(model.output_price_per_million) }}</span>
-            </div>
-            <div v-if="model.cache_read_price_per_million > 0" class="flex items-center justify-between text-sm">
-              <span class="text-gray-500 dark:text-gray-400">{{ t('modelSquare.columns.cacheReadPrice') }}</span>
-              <span class="font-mono font-medium text-gray-900 dark:text-white">${{ formatPrice(model.cache_read_price_per_million) }}</span>
-            </div>
-            <div v-if="model.cache_write_price_per_million > 0" class="flex items-center justify-between text-sm">
-              <span class="text-gray-500 dark:text-gray-400">{{ t('modelSquare.columns.cacheWritePrice') }}</span>
-              <span class="font-mono font-medium text-gray-900 dark:text-white">${{ formatPrice(model.cache_write_price_per_million) }}</span>
+            <!-- Cache Read / Cache Write side by side -->
+            <div v-if="model.cache_read_price_per_million > 0 || model.cache_write_price_per_million > 0" class="grid grid-cols-2 gap-3">
+              <div v-if="model.cache_read_price_per_million > 0" class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-dark-700">
+                <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('modelSquare.columns.cacheReadPrice') }}</div>
+                <div class="mt-0.5 font-mono text-sm font-medium text-gray-900 dark:text-white">${{ formatPrice(model.cache_read_price_per_million) }}</div>
+              </div>
+              <div v-if="model.cache_write_price_per_million > 0" class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-dark-700">
+                <div class="text-xs text-gray-500 dark:text-gray-400">{{ t('modelSquare.columns.cacheWritePrice') }}</div>
+                <div class="mt-0.5 font-mono text-sm font-medium text-gray-900 dark:text-white">${{ formatPrice(model.cache_write_price_per_million) }}</div>
+              </div>
             </div>
           </div>
           <div v-else class="py-3 text-center text-sm text-gray-400 dark:text-gray-500">
@@ -188,12 +196,12 @@
           </div>
 
           <!-- Card Footer -->
-          <div class="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-dark-700">
-            <span class="truncate text-xs text-gray-400 dark:text-gray-500" :title="model.group_name">
-              {{ model.group_name }}
+          <div class="mt-3 flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-3 dark:border-dark-700">
+            <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+              {{ translateMode(model.mode) }}
             </span>
-            <span v-if="model.rate_multiplier !== 1" class="text-xs text-gray-400 dark:text-gray-500">
-              {{ t('modelSquare.rateMultiplier') }}: {{ model.rate_multiplier }}x
+            <span :class="ratePillClass(model.platform)" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
+              {{ model.group_name }}<template v-if="model.rate_multiplier !== 1"> {{ model.rate_multiplier }}x</template>
             </span>
           </div>
         </div>
@@ -206,10 +214,10 @@
             <tr>
               <th class="table-header-cell">{{ t('modelSquare.columns.provider') }}</th>
               <th class="table-header-cell">{{ t('modelSquare.columns.modelName') }}</th>
-              <th class="table-header-cell text-right">{{ t('modelSquare.columns.inputPrice') }}</th>
-              <th class="table-header-cell text-right">{{ t('modelSquare.columns.outputPrice') }}</th>
-              <th class="table-header-cell text-right">{{ t('modelSquare.columns.cacheReadPrice') }}</th>
-              <th class="table-header-cell text-right">{{ t('modelSquare.columns.cacheWritePrice') }}</th>
+              <th class="table-header-cell text-right">{{ t('modelSquare.columns.inputPrice') }}<br><span class="font-normal normal-case tracking-normal text-gray-400">{{ t('modelSquare.perMillionTokens') }}</span></th>
+              <th class="table-header-cell text-right">{{ t('modelSquare.columns.outputPrice') }}<br><span class="font-normal normal-case tracking-normal text-gray-400">{{ t('modelSquare.perMillionTokens') }}</span></th>
+              <th class="table-header-cell text-right">{{ t('modelSquare.columns.cacheReadPrice') }}<br><span class="font-normal normal-case tracking-normal text-gray-400">{{ t('modelSquare.perMillionTokens') }}</span></th>
+              <th class="table-header-cell text-right">{{ t('modelSquare.columns.cacheWritePrice') }}<br><span class="font-normal normal-case tracking-normal text-gray-400">{{ t('modelSquare.perMillionTokens') }}</span></th>
               <th class="table-header-cell">{{ t('modelSquare.columns.mode') }}</th>
               <th class="table-header-cell">{{ t('modelSquare.columns.group') }}</th>
             </tr>
