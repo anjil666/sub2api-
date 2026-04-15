@@ -18,6 +18,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"go.uber.org/zap"
 )
 
@@ -511,6 +512,14 @@ func (s *GatewayService) forwardCCDirectToUpstream(
 	mappedModel := account.GetMappedModel(originalModel)
 	if mappedModel != originalModel {
 		body = s.ReplaceModelInBody(body, mappedModel)
+	}
+
+	// For streaming requests, inject stream_options.include_usage so upstream
+	// returns usage in the final chunk (needed for billing)
+	if clientStream {
+		if !gjson.GetBytes(body, "stream_options.include_usage").Exists() {
+			body, _ = sjson.SetBytes(body, "stream_options.include_usage", true)
+		}
 	}
 
 	// Build upstream URL — use raw credential base_url, not GetBaseURL() which
