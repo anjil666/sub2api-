@@ -38,7 +38,7 @@ func (s *GatewayService) ForwardAsChatCompletions(
 	// APIKey accounts with custom base_url: forward directly as OpenAI format
 	// to upstream's /v1/chat/completions. This avoids Anthropic format conversion
 	// which some upstream providers (e.g. gAI) reject for certain model groups.
-	if account.Type == AccountTypeAPIKey && account.GetBaseURL() != "" {
+	if account.Type == AccountTypeAPIKey && account.GetCredential("base_url") != "" {
 		return s.forwardCCDirectToUpstream(ctx, c, account, body, startTime)
 	}
 
@@ -513,8 +513,9 @@ func (s *GatewayService) forwardCCDirectToUpstream(
 		body = s.ReplaceModelInBody(body, mappedModel)
 	}
 
-	// Build upstream URL
-	baseURL := strings.TrimRight(account.GetBaseURL(), "/")
+	// Build upstream URL — use raw credential base_url, not GetBaseURL() which
+	// appends "/antigravity" for PlatformAntigravity accounts
+	baseURL := strings.TrimRight(account.GetCredential("base_url"), "/")
 	validatedURL, err := s.validateUpstreamBaseURL(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid upstream base_url: %w", err)
