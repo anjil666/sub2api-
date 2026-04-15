@@ -35,6 +35,13 @@ func (s *GatewayService) ForwardAsChatCompletions(
 ) (*ForwardResult, error) {
 	startTime := time.Now()
 
+	// APIKey accounts with custom base_url: forward directly as OpenAI format
+	// to upstream's /v1/chat/completions. This avoids Anthropic format conversion
+	// which some upstream providers (e.g. gAI) reject for certain model groups.
+	if account.Type == AccountTypeAPIKey && account.GetBaseURL() != "" {
+		return s.forwardCCDirectToUpstream(ctx, c, account, body, startTime)
+	}
+
 	// 1. Parse Chat Completions request
 	var ccReq apicompat.ChatCompletionsRequest
 	if err := json.Unmarshal(body, &ccReq); err != nil {
@@ -482,4 +489,186 @@ func writeGatewayCCError(c *gin.Context, statusCode int, errType, message string
 			"message": message,
 		},
 	})
+}
+
+// forwardCCDirectToUpstream forwards an OpenAI Chat Completions request directly
+// to an upstream provider's /v1/chat/completions endpoint without converting to
+// Anthropic format. This is used for AccountTypeAPIKey accounts with a custom
+// base_url (e.g. upstream-synced accounts pointing to API aggregators like gAI)
+// where the upstream may not support /v1/messages for all model groups.
+func (s *GatewayService) forwardCCDirectToUpstream(
+	ctx context.Context,
+	c *gin.Context,
+	account *Account,
+	body []byte,
+	startTime time.Time,
+) (*ForwardResult, error) {
+	// Parse request for model and stream info
+	originalModel := gjson.GetBytes(body, "model").String()
+	clientStream := gjson.GetBytes(body, "stream").Bool()
+
+	// Apply model mapping
+	mappedModel := account.GetMappedModel(originalModel)
+	if mappedModel != originalModel {
+		body = s.ReplaceModelInBody(body, mappedModel)
+	}
+
+	// Build upstream URL
+	baseURL := strings.TrimRight(account.GetBaseURL(), "/")
+	validatedURL, err := s.validateUpstreamBaseURL(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid upstream base_url: %w", err)
+	}
+	targetURL := validatedURL + "/v1/chat/completions"
+
+	// Get API key
+	apiKey := account.GetCredential("api_key")
+	if apiKey == "" {
+		return nil, fmt.Errorf("api_key not found in credentials")
+	}
+
+	// Build request
+	req, err := http.NewRequestWithContext(ctx, "POST", targetURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build upstream request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	logger.L().Debug("gateway forward_cc_direct: forwarding to upstream",
+		zap.Int64("account_id", account.ID),
+		zap.String("target_url", targetURL),
+		zap.String("original_model", originalModel),
+		zap.String("mapped_model", mappedModel),
+		zap.Bool("stream", clientStream),
+	)
+
+	// Send request
+	proxyURL := ""
+	if account.ProxyID != nil && account.Proxy != nil {
+		proxyURL = account.Proxy.URL()
+	}
+	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
+	if err != nil {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		safeErr := sanitizeUpstreamErrorMessage(err.Error())
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "Upstream request failed")
+		return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	// Handle error response
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+		upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
+		upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
+
+		if s.shouldFailoverUpstreamError(resp.StatusCode) {
+			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+				Platform:           account.Platform,
+				AccountID:          account.ID,
+				AccountName:        account.Name,
+				UpstreamStatusCode: resp.StatusCode,
+				Kind:               "failover",
+				Message:            upstreamMsg,
+			})
+			if s.rateLimitService != nil {
+				s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
+			}
+			return nil, &UpstreamFailoverError{
+				StatusCode:   resp.StatusCode,
+				ResponseBody: respBody,
+			}
+		}
+
+		writeGatewayCCError(c, mapUpstreamStatusCode(resp.StatusCode), "server_error", upstreamMsg)
+		return nil, fmt.Errorf("upstream error: %d %s", resp.StatusCode, upstreamMsg)
+	}
+
+	// Forward response — proxy through directly since both sides use OpenAI format
+	var usage ClaudeUsage
+	requestID := resp.Header.Get("x-request-id")
+
+	if clientStream {
+		// Streaming: pipe SSE events through, extract usage from final chunks
+		c.Writer.Header().Set("Content-Type", "text/event-stream")
+		c.Writer.Header().Set("Cache-Control", "no-cache")
+		c.Writer.Header().Set("Connection", "keep-alive")
+		c.Writer.WriteHeader(http.StatusOK)
+		flusher, _ := c.Writer.(http.Flusher)
+
+		scanner := bufio.NewScanner(resp.Body)
+		scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
+		firstToken := true
+		var firstTokenMs *int
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			// Write every line through
+			_, _ = fmt.Fprintf(c.Writer, "%s\n", line)
+			if flusher != nil {
+				flusher.Flush()
+			}
+
+			// Extract usage from data lines
+			if strings.HasPrefix(line, "data: ") {
+				data := line[6:]
+				if data == "[DONE]" {
+					continue
+				}
+				if firstToken {
+					firstToken = false
+					ms := int(time.Since(startTime).Milliseconds())
+					firstTokenMs = &ms
+				}
+				// Try to extract usage from chunk
+				if u := gjson.Get(data, "usage"); u.Exists() {
+					usage.InputTokens = int(gjson.Get(data, "usage.prompt_tokens").Int())
+					usage.OutputTokens = int(gjson.Get(data, "usage.completion_tokens").Int())
+				}
+			}
+		}
+
+		upstreamModel := ""
+		if mappedModel != originalModel {
+			upstreamModel = mappedModel
+		}
+		return &ForwardResult{
+			RequestID:    requestID,
+			Usage:        usage,
+			Model:        originalModel,
+			UpstreamModel: upstreamModel,
+			Stream:       true,
+			Duration:     time.Since(startTime),
+			FirstTokenMs: firstTokenMs,
+		}, nil
+	}
+
+	// Non-streaming: read full response and forward
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
+	if err != nil {
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "Failed to read upstream response")
+		return nil, fmt.Errorf("read upstream response: %w", err)
+	}
+
+	// Extract usage
+	usage.InputTokens = int(gjson.GetBytes(respBody, "usage.prompt_tokens").Int())
+	usage.OutputTokens = int(gjson.GetBytes(respBody, "usage.completion_tokens").Int())
+
+	c.Data(resp.StatusCode, "application/json", respBody)
+
+	upstreamModel := ""
+	if mappedModel != originalModel {
+		upstreamModel = mappedModel
+	}
+	return &ForwardResult{
+		RequestID:     requestID,
+		Usage:         usage,
+		Model:         originalModel,
+		UpstreamModel: upstreamModel,
+		Stream:        false,
+		Duration:      time.Since(startTime),
+	}, nil
 }
