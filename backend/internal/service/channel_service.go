@@ -329,6 +329,9 @@ func isPlatformPricingMatch(groupPlatform, pricingPlatform string) bool {
 // matchingPlatforms 返回分组平台对应的可匹配平台列表。
 // 各平台严格独立，只返回自身。
 func matchingPlatforms(groupPlatform string) []string {
+	if groupPlatform == PlatformAntigravity {
+		return []string{PlatformAntigravity, PlatformOpenAI, PlatformAnthropic, PlatformGemini}
+	}
 	return []string{groupPlatform}
 }
 func (s *ChannelService) invalidateCache() {
