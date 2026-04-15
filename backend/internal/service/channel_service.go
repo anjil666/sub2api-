@@ -323,7 +323,12 @@ func populateChannelCache(channels []Channel, groupPlatforms map[int64]string) *
 // isPlatformPricingMatch 判断定价条目的平台是否匹配分组平台。
 // 各平台（antigravity / anthropic / gemini / openai）严格独立，不跨平台匹配。
 func isPlatformPricingMatch(groupPlatform, pricingPlatform string) bool {
-	return groupPlatform == pricingPlatform
+	for _, p := range matchingPlatforms(groupPlatform) {
+		if p == pricingPlatform {
+			return true
+		}
+	}
+	return false
 }
 
 // matchingPlatforms 返回分组平台对应的可匹配平台列表。
