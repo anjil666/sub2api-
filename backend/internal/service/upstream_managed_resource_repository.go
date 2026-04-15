@@ -13,7 +13,9 @@ type UpstreamManagedResourceRepository interface {
 	UpdatePriceMultiplier(ctx context.Context, id int64, multiplier float64) error
 	UpdateUpstreamRateMultiplier(ctx context.Context, id int64, multiplier float64) error
 	UpdateStatus(ctx context.Context, id int64, status string) error
+	UpdateDisabledBy(ctx context.Context, id int64, disabledBy string) error
 	DeleteBySiteID(ctx context.Context, siteID int64) error
 	DeleteStale(ctx context.Context, siteID int64, activeKeyIDs []string) (int, error)
+	DisableStale(ctx context.Context, siteID int64, activeKeyIDs []string) ([]*UpstreamManagedResource, error)
 	CountBySiteID(ctx context.Context, siteID int64) (int, error)
 }

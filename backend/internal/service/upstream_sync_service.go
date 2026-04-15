@@ -269,43 +269,48 @@ func (s *UpstreamSyncService) ToggleResource(ctx context.Context, resourceID int
 		return nil, fmt.Errorf("resource not found")
 	}
 	newStatus := "disabled"
+	disabledBy := "manual"
 	if res.Status == "disabled" {
 		newStatus = "active"
+		disabledBy = ""
 	}
 	if err := s.resourceRepo.UpdateStatus(ctx, resourceID, newStatus); err != nil {
 		return nil, err
 	}
+	if err := s.resourceRepo.UpdateDisabledBy(ctx, resourceID, disabledBy); err != nil {
+		log.Printf("[UpstreamSync] Warning: failed to update disabled_by for resource %d: %v", resourceID, err)
+	}
 
-	// 同步更新本地分组状态
+	s.setLocalResourceStatus(ctx, res, newStatus)
+
+	return s.resourceRepo.GetByID(ctx, resourceID)
+}
+
+// setLocalResourceStatus 设置资源关联的本地 group/account/channel 状态
+func (s *UpstreamSyncService) setLocalResourceStatus(ctx context.Context, res *UpstreamManagedResource, status string) {
 	if res.ManagedGroupID != nil {
 		g, err := s.groupRepo.GetByIDLite(ctx, *res.ManagedGroupID)
-		if err == nil && g != nil && g.Status != newStatus {
-			g.Status = newStatus
+		if err == nil && g != nil && g.Status != status {
+			g.Status = status
 			if err := s.groupRepo.Update(ctx, g); err != nil {
-				log.Printf("[UpstreamSync] Warning: failed to update group %d status to %s: %v", *res.ManagedGroupID, newStatus, err)
+				log.Printf("[UpstreamSync] Warning: failed to update group %d status to %s: %v", *res.ManagedGroupID, status, err)
 			}
 		}
 	}
-
-	// 同步更新本地账号状态
 	if res.ManagedAccountID != nil {
 		if _, err := s.adminService.UpdateAccount(ctx, *res.ManagedAccountID, &UpdateAccountInput{
-			Status: newStatus,
+			Status: status,
 		}); err != nil {
-			log.Printf("[UpstreamSync] Warning: failed to update account %d status to %s: %v", *res.ManagedAccountID, newStatus, err)
+			log.Printf("[UpstreamSync] Warning: failed to update account %d status to %s: %v", *res.ManagedAccountID, status, err)
 		}
 	}
-
-	// 同步更新本地渠道状态
 	if res.ManagedChannelID != nil {
 		if _, err := s.channelService.Update(ctx, *res.ManagedChannelID, &UpdateChannelInput{
-			Status: newStatus,
+			Status: status,
 		}); err != nil {
-			log.Printf("[UpstreamSync] Warning: failed to update channel %d status to %s: %v", *res.ManagedChannelID, newStatus, err)
+			log.Printf("[UpstreamSync] Warning: failed to update channel %d status to %s: %v", *res.ManagedChannelID, status, err)
 		}
 	}
-
-	return s.resourceRepo.GetByID(ctx, resourceID)
 }
 
 // ── 核心同步逻辑 ──
@@ -445,12 +450,20 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 		existing, _ := s.resourceRepo.GetBySiteAndKeyID(ctx, site.ID, res.UpstreamKeyID)
 		if existing != nil {
 			res.PriceMultiplier = existing.PriceMultiplier
-			// 跳过已禁用的资源（不创建/更新本地分组）
 			if existing.Status == "disabled" {
-				log.Printf("[UpstreamSync] Site %q key %s: resource disabled, skipping local resources", site.Name, displayName)
-				_ = s.resourceRepo.UpdateModelCount(ctx, res.ID, len(models))
-				totalModels += len(models)
-				continue
+				if existing.DisabledBy == "auto" {
+					// 上游重新上架，自动恢复
+					_ = s.resourceRepo.UpdateStatus(ctx, existing.ID, "active")
+					_ = s.resourceRepo.UpdateDisabledBy(ctx, existing.ID, "")
+					s.setLocalResourceStatus(ctx, existing, "active")
+					log.Printf("[UpstreamSync] Site %q key %s: auto-re-enabled (upstream restored)", site.Name, displayName)
+				} else {
+					// 手动禁用，跳过
+					log.Printf("[UpstreamSync] Site %q key %s: manually disabled, skipping", site.Name, displayName)
+					_ = s.resourceRepo.UpdateModelCount(ctx, res.ID, len(models))
+					totalModels += len(models)
+					continue
+				}
 			}
 		}
 
@@ -483,12 +496,15 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 		totalModels += len(models)
 	}
 
-	// 5. 清理上游已删除的 key
-	staleCount, err := s.resourceRepo.DeleteStale(ctx, site.ID, activeKeyIDs)
+	// 5. 自动禁用上游已下架的 key（软禁用，不删除，上架后自动恢复）
+	staleResources, err := s.resourceRepo.DisableStale(ctx, site.ID, activeKeyIDs)
 	if err != nil {
-		log.Printf("[UpstreamSync] Site %q: delete stale resources failed: %v", site.Name, err)
-	} else if staleCount > 0 {
-		log.Printf("[UpstreamSync] Site %q: removed %d stale resource(s)", site.Name, staleCount)
+		log.Printf("[UpstreamSync] Site %q: disable stale resources failed: %v", site.Name, err)
+	} else if len(staleResources) > 0 {
+		for _, res := range staleResources {
+			s.setLocalResourceStatus(ctx, res, "disabled")
+			log.Printf("[UpstreamSync] Site %q: auto-disabled resource %q (upstream removed)", site.Name, res.UpstreamKeyName)
+		}
 	}
 
 	return SyncResult{

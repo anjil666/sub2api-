@@ -53,7 +53,7 @@ func (r *upstreamManagedResourceRepo) ListBySiteID(ctx context.Context, siteID i
 			upstream_group_id, api_key_encrypted,
 			managed_group_id, managed_account_id, managed_channel_id,
 			price_multiplier, upstream_rate_multiplier,
-			model_count, status, last_synced_at, created_at, updated_at
+			model_count, status, disabled_by, last_synced_at, created_at, updated_at
 		 FROM upstream_managed_resources
 		 WHERE upstream_site_id = $1 ORDER BY id`, siteID,
 	)
@@ -74,7 +74,7 @@ func (r *upstreamManagedResourceRepo) ListBySiteID(ctx context.Context, siteID i
 			&upstreamGroupID, &apiKeyEnc,
 			&managedGroupID, &managedAccountID, &managedChannelID,
 			&res.PriceMultiplier, &res.UpstreamRateMultiplier,
-			&res.ModelCount, &res.Status, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
+			&res.ModelCount, &res.Status, &res.DisabledBy, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan managed resource: %w", err)
 		}
@@ -117,7 +117,7 @@ func (r *upstreamManagedResourceRepo) GetBySiteAndKeyID(ctx context.Context, sit
 			upstream_group_id, api_key_encrypted,
 			managed_group_id, managed_account_id, managed_channel_id,
 			price_multiplier, upstream_rate_multiplier,
-			model_count, status, last_synced_at, created_at, updated_at
+			model_count, status, disabled_by, last_synced_at, created_at, updated_at
 		 FROM upstream_managed_resources
 		 WHERE upstream_site_id = $1 AND upstream_key_id = $2`, siteID, upstreamKeyID,
 	).Scan(
@@ -125,7 +125,7 @@ func (r *upstreamManagedResourceRepo) GetBySiteAndKeyID(ctx context.Context, sit
 		&upstreamGroupID, &apiKeyEnc,
 		&managedGroupID, &managedAccountID, &managedChannelID,
 		&res.PriceMultiplier, &res.UpstreamRateMultiplier,
-		&res.ModelCount, &res.Status, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
+		&res.ModelCount, &res.Status, &res.DisabledBy, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -192,14 +192,14 @@ func (r *upstreamManagedResourceRepo) GetByID(ctx context.Context, id int64) (*s
 			upstream_group_id, api_key_encrypted,
 			managed_group_id, managed_account_id, managed_channel_id,
 			price_multiplier, upstream_rate_multiplier,
-			model_count, status, last_synced_at, created_at, updated_at
+			model_count, status, disabled_by, last_synced_at, created_at, updated_at
 		 FROM upstream_managed_resources WHERE id = $1`, id,
 	).Scan(
 		&res.ID, &res.UpstreamSiteID, &res.UpstreamKeyID, &res.UpstreamKeyPrefix, &res.UpstreamKeyName,
 		&upstreamGroupID, &apiKeyEnc,
 		&managedGroupID, &managedAccountID, &managedChannelID,
 		&res.PriceMultiplier, &res.UpstreamRateMultiplier,
-		&res.ModelCount, &res.Status, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
+		&res.ModelCount, &res.Status, &res.DisabledBy, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -285,6 +285,54 @@ func (r *upstreamManagedResourceRepo) DeleteStale(ctx context.Context, siteID in
 	}
 	n, _ := result.RowsAffected()
 	return int(n), nil
+}
+
+// DisableStale 将不在 activeKeyIDs 中且当前 active 的资源标记为 disabled（自动下架）
+func (r *upstreamManagedResourceRepo) DisableStale(ctx context.Context, siteID int64, activeKeyIDs []string) ([]*service.UpstreamManagedResource, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`UPDATE upstream_managed_resources
+		 SET status = 'disabled', disabled_by = 'auto', updated_at = NOW()
+		 WHERE upstream_site_id = $1
+		   AND upstream_key_id != ALL($2::text[])
+		   AND status = 'active'
+		 RETURNING id, managed_group_id, managed_account_id, managed_channel_id, upstream_key_name`,
+		siteID, pq.Array(activeKeyIDs),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("disable stale resources: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var resources []*service.UpstreamManagedResource
+	for rows.Next() {
+		res := &service.UpstreamManagedResource{}
+		var managedGroupID, managedAccountID, managedChannelID sql.NullInt64
+		if err := rows.Scan(&res.ID, &managedGroupID, &managedAccountID, &managedChannelID, &res.UpstreamKeyName); err != nil {
+			return nil, fmt.Errorf("scan disabled resource: %w", err)
+		}
+		if managedGroupID.Valid {
+			res.ManagedGroupID = &managedGroupID.Int64
+		}
+		if managedAccountID.Valid {
+			res.ManagedAccountID = &managedAccountID.Int64
+		}
+		if managedChannelID.Valid {
+			res.ManagedChannelID = &managedChannelID.Int64
+		}
+		resources = append(resources, res)
+	}
+	return resources, rows.Err()
+}
+
+func (r *upstreamManagedResourceRepo) UpdateDisabledBy(ctx context.Context, id int64, disabledBy string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE upstream_managed_resources SET disabled_by = $1, updated_at = NOW() WHERE id = $2`,
+		disabledBy, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update disabled_by: %w", err)
+	}
+	return nil
 }
 
 func (r *upstreamManagedResourceRepo) CountBySiteID(ctx context.Context, siteID int64) (int, error) {

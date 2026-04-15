@@ -17,7 +17,8 @@ type UpstreamManagedResource struct {
 	PriceMultiplier       float64 // 0 = 使用站点默认倍率
 	UpstreamRateMultiplier float64 // 上游分组的原始倍率（参考值）
 	ModelCount            int
-	Status                string // "active", "stale"
+	Status                string // "active", "disabled"
+	DisabledBy            string // "": not disabled, "auto": upstream removed, "manual": admin toggled
 	LastSyncedAt          *time.Time
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
