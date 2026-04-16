@@ -998,13 +998,16 @@ func (s *AntigravityGatewayService) getMappedModel(account *Account, requestedMo
 }
 
 // applyThinkingModelSuffix 根据 thinking 配置调整模型名
-// 当映射结果是 claude-sonnet-4-5 且请求开启了 thinking 时，改为 claude-sonnet-4-5-thinking
+// 当映射结果是 claude-sonnet-4-5 或 claude-opus-4-7 且请求开启了 thinking 时，追加 -thinking 后缀
 func applyThinkingModelSuffix(mappedModel string, thinkingEnabled bool) string {
 	if !thinkingEnabled {
 		return mappedModel
 	}
-	if mappedModel == "claude-sonnet-4-5" {
+	switch mappedModel {
+	case "claude-sonnet-4-5":
 		return "claude-sonnet-4-5-thinking"
+	case "claude-opus-4-7":
+		return "claude-opus-4-7-thinking"
 	}
 	return mappedModel
 }
