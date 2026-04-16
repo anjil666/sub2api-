@@ -537,8 +537,17 @@ func (s *GatewayService) forwardCCDirectToUpstream(
 		return nil, fmt.Errorf("api_key not found in credentials")
 	}
 
+	// For streaming requests, detach the upstream context so that client
+	// disconnection does not cancel the upstream read before the usage chunk
+	// is received. Without this, context cancellation races with the final
+	// SSE chunk that carries token counts, resulting in 0/0 usage records.
+	upstreamCtx := ctx
+	if clientStream {
+		upstreamCtx = context.WithoutCancel(ctx)
+	}
+
 	// Build request
-	req, err := http.NewRequestWithContext(ctx, "POST", targetURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(upstreamCtx, "POST", targetURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("build upstream request: %w", err)
 	}
@@ -639,6 +648,20 @@ func (s *GatewayService) forwardCCDirectToUpstream(
 					usage.OutputTokens = int(gjson.Get(data, "usage.completion_tokens").Int())
 				}
 			}
+		}
+
+		if scanErr := scanner.Err(); scanErr != nil {
+			logger.L().Warn("forward_cc_direct: scanner error during streaming",
+				zap.Int64("account_id", account.ID),
+				zap.Error(scanErr),
+			)
+		}
+
+		if usage.InputTokens == 0 && usage.OutputTokens == 0 {
+			logger.L().Warn("forward_cc_direct: zero usage after streaming — upstream may not support stream_options.include_usage",
+				zap.Int64("account_id", account.ID),
+				zap.String("model", originalModel),
+			)
 		}
 
 		upstreamModel := ""
