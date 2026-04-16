@@ -1119,6 +1119,8 @@ func ptrFloat(v float64) *float64 { return &v }
 // defaultModelPrices 内置默认价格（per token, USD）
 var defaultModelPrices = map[string]modelDefaultPrice{
 	// Claude 系列 (Anthropic)
+	"claude-opus-4-7-thinking":   {InputPerToken: 5e-6, OutputPerToken: 25e-6, CacheWritePerToken: ptrFloat(6.25e-6), CacheReadPerToken: ptrFloat(0.50e-6)},
+	"claude-opus-4-7":            {InputPerToken: 5e-6, OutputPerToken: 25e-6, CacheWritePerToken: ptrFloat(6.25e-6), CacheReadPerToken: ptrFloat(0.50e-6)},
 	"claude-opus-4-6-thinking":   {InputPerToken: 15e-6, OutputPerToken: 75e-6, CacheWritePerToken: ptrFloat(18.75e-6), CacheReadPerToken: ptrFloat(1.50e-6)},
 	"claude-opus-4-5-thinking":   {InputPerToken: 15e-6, OutputPerToken: 75e-6, CacheWritePerToken: ptrFloat(18.75e-6), CacheReadPerToken: ptrFloat(1.50e-6)},
 	"claude-sonnet-4-6":          {InputPerToken: 3e-6, OutputPerToken: 15e-6, CacheWritePerToken: ptrFloat(3.75e-6), CacheReadPerToken: ptrFloat(0.30e-6)},
