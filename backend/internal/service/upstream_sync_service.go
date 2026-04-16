@@ -402,14 +402,18 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 	var activeKeyIDs []string
 	for _, key := range keys {
 		keyID := strconv.FormatInt(key.ID, 10)
-		activeKeyIDs = append(activeKeyIDs, keyID)
 
 		// 获取该 key 下的模型
 		models, err := s.fetchModelsWithKey(ctx, site, key.Key)
 		if err != nil {
 			log.Printf("[UpstreamSync] Site %q key %s: fetch models failed: %v", site.Name, key.Name, err)
+			// Key exists but can't fetch models (e.g. not assigned to group) —
+			// don't add to activeKeyIDs so DisableStale can auto-disable it
 			continue
 		}
+
+		// Only mark key as active after successful model fetch
+		activeKeyIDs = append(activeKeyIDs, keyID)
 
 		// 确定显示名称：优先使用上游分组名称，否则用 key name
 		displayName := key.Name
