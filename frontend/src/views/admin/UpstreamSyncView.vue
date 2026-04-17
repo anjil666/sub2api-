@@ -260,7 +260,15 @@
                   {{ res.status === 'active' ? t('admin.upstream.statusActive') : t('admin.upstream.statusDisabled') }}
                 </span>
               </div>
-              <span class="text-xs text-gray-400">{{ res.model_count }} {{ t('admin.upstream.models') }}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-400">{{ res.model_count }} {{ t('admin.upstream.models') }}</span>
+                <button
+                  class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                  @click="handleDeleteResource(res)"
+                >
+                  {{ t('common.delete') }}
+                </button>
+              </div>
             </div>
             <div class="text-xs text-gray-500 dark:text-gray-400 font-mono mb-2">
               {{ t('admin.upstream.keyPrefix') }}: {{ res.upstream_key_prefix }}
@@ -595,6 +603,17 @@ async function handleToggleResource(res: UpstreamManagedResource) {
     }
   } catch (err: any) {
     alert(err?.message || 'Failed to toggle resource')
+  }
+}
+
+async function handleDeleteResource(res: UpstreamManagedResource) {
+  if (currentResourceSiteId.value == null) return
+  if (!confirm(`确定删除资源 "${res.upstream_key_name || res.upstream_key_prefix}" 及其关联的分组/账号/渠道？`)) return
+  try {
+    await adminAPI.upstream.deleteResource(currentResourceSiteId.value, res.id)
+    resourcesList.value = resourcesList.value.filter(r => r.id !== res.id)
+  } catch (err: any) {
+    alert(err?.message || 'Failed to delete resource')
   }
 }
 

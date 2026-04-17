@@ -274,6 +274,16 @@ func (r *upstreamManagedResourceRepo) DeleteBySiteID(ctx context.Context, siteID
 	return nil
 }
 
+func (r *upstreamManagedResourceRepo) DeleteByID(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM upstream_managed_resources WHERE id = $1`, id,
+	)
+	if err != nil {
+		return fmt.Errorf("delete managed resource: %w", err)
+	}
+	return nil
+}
+
 func (r *upstreamManagedResourceRepo) DeleteStale(ctx context.Context, siteID int64, activeKeyIDs []string) (int, error) {
 	result, err := r.db.ExecContext(ctx,
 		`DELETE FROM upstream_managed_resources

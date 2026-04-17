@@ -567,3 +567,24 @@ func (h *UpstreamHandler) ToggleResource(c *gin.Context) {
 	}
 	response.Success(c, resourceToResponse(updated))
 }
+
+// DeleteResource 删除单个托管资源及其关联的本地资源
+// DELETE /api/v1/admin/upstream-sites/:id/resources/:resourceId
+func (h *UpstreamHandler) DeleteResource(c *gin.Context) {
+	_, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_ID", "Invalid upstream site ID"))
+		return
+	}
+	resourceID, err := strconv.ParseInt(c.Param("resourceId"), 10, 64)
+	if err != nil {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_ID", "Invalid resource ID"))
+		return
+	}
+
+	if err := h.syncService.DeleteResource(c.Request.Context(), resourceID); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, nil)
+}

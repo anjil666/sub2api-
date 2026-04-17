@@ -15,6 +15,7 @@ type UpstreamManagedResourceRepository interface {
 	UpdateStatus(ctx context.Context, id int64, status string) error
 	UpdateDisabledBy(ctx context.Context, id int64, disabledBy string) error
 	DeleteBySiteID(ctx context.Context, siteID int64) error
+	DeleteByID(ctx context.Context, id int64) error
 	DeleteStale(ctx context.Context, siteID int64, activeKeyIDs []string) (int, error)
 	DisableStale(ctx context.Context, siteID int64, activeKeyIDs []string) ([]*UpstreamManagedResource, error)
 	CountBySiteID(ctx context.Context, siteID int64) (int, error)

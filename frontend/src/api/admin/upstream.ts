@@ -152,6 +152,10 @@ async function toggleResource(siteId: number, resourceId: number): Promise<Upstr
   return data
 }
 
+async function deleteResource(siteId: number, resourceId: number): Promise<void> {
+  await apiClient.delete(`/admin/upstream-sites/${siteId}/resources/${resourceId}`)
+}
+
 async function toggle(id: number): Promise<UpstreamSite> {
   const { data } = await apiClient.post(`/admin/upstream-sites/${id}/toggle`)
   return data
@@ -169,6 +173,7 @@ export const upstreamAPI = {
   listResources,
   updateResource,
   toggleResource,
+  deleteResource,
   toggle
 }
 

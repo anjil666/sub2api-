@@ -221,6 +221,32 @@ func (s *UpstreamSyncService) ListManagedResources(ctx context.Context, siteID i
 	return s.resourceRepo.ListBySiteID(ctx, siteID)
 }
 
+// DeleteResource 删除单个托管资源及其关联的本地 channel/account/group
+func (s *UpstreamSyncService) DeleteResource(ctx context.Context, resourceID int64) error {
+	res, err := s.resourceRepo.GetByID(ctx, resourceID)
+	if err != nil || res == nil {
+		return fmt.Errorf("resource not found")
+	}
+
+	if res.ManagedChannelID != nil {
+		if err := s.channelService.Delete(ctx, *res.ManagedChannelID); err != nil {
+			log.Printf("[UpstreamSync] Warning: failed to delete channel %d: %v", *res.ManagedChannelID, err)
+		}
+	}
+	if res.ManagedAccountID != nil {
+		if err := s.adminService.DeleteAccount(ctx, *res.ManagedAccountID); err != nil {
+			log.Printf("[UpstreamSync] Warning: failed to delete account %d: %v", *res.ManagedAccountID, err)
+		}
+	}
+	if res.ManagedGroupID != nil {
+		if err := s.adminService.DeleteGroup(ctx, *res.ManagedGroupID); err != nil {
+			log.Printf("[UpstreamSync] Warning: failed to delete group %d: %v", *res.ManagedGroupID, err)
+		}
+	}
+
+	return s.resourceRepo.DeleteByID(ctx, resourceID)
+}
+
 // UpdateResourceMultiplier 更新单个托管资源的倍率，并同步更新本地分组的 rate_multiplier
 func (s *UpstreamSyncService) UpdateResourceMultiplier(ctx context.Context, resourceID int64, multiplier float64) (*UpstreamManagedResource, error) {
 	if err := s.resourceRepo.UpdatePriceMultiplier(ctx, resourceID, multiplier); err != nil {

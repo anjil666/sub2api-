@@ -587,6 +587,7 @@ func registerUpstreamSyncRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		upstream.GET("/:id/resources", h.Admin.UpstreamSync.ListResources)
 		upstream.PUT("/:id/resources/:resourceId", h.Admin.UpstreamSync.UpdateResource)
 		upstream.POST("/:id/resources/:resourceId/toggle", h.Admin.UpstreamSync.ToggleResource)
+		upstream.DELETE("/:id/resources/:resourceId", h.Admin.UpstreamSync.DeleteResource)
 		upstream.POST("/:id/toggle", h.Admin.UpstreamSync.Toggle)
 	}
 }
