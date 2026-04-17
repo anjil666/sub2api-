@@ -937,6 +937,14 @@ func (s *UpstreamSyncService) ensureAccount(ctx context.Context, site *UpstreamS
 	}
 	account, err := s.adminService.CreateAccount(ctx, createInput)
 	if err != nil {
+		if strings.Contains(err.Error(), "EXISTS") || strings.Contains(err.Error(), "unique") {
+			createInput.Name = fmt.Sprintf("%s [%s]", accountName, res.UpstreamKeyPrefix)
+			account, err = s.adminService.CreateAccount(ctx, createInput)
+			if err != nil {
+				return 0, fmt.Errorf("create account (dedup): %w", err)
+			}
+			return account.ID, nil
+		}
 		return 0, fmt.Errorf("create account: %w", err)
 	}
 	return account.ID, nil
@@ -985,6 +993,14 @@ func (s *UpstreamSyncService) ensureChannel(ctx context.Context, site *UpstreamS
 	}
 	channel, err := s.channelService.Create(ctx, createInput)
 	if err != nil {
+		if strings.Contains(err.Error(), "EXISTS") || strings.Contains(err.Error(), "unique") {
+			createInput.Name = fmt.Sprintf("%s [%s]", channelName, res.UpstreamKeyPrefix)
+			channel, err = s.channelService.Create(ctx, createInput)
+			if err != nil {
+				return 0, fmt.Errorf("create channel (dedup): %w", err)
+			}
+			return channel.ID, nil
+		}
 		return 0, fmt.Errorf("create channel: %w", err)
 	}
 	return channel.ID, nil
