@@ -870,6 +870,14 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 		SubscriptionType: SubscriptionTypeStandard,
 	}
 	if err := s.groupRepo.Create(ctx, group); err != nil {
+		if strings.Contains(err.Error(), "GROUP_EXISTS") || strings.Contains(err.Error(), "unique") {
+			// 同名分组已存在（上游多个 key 同名），加 key 前缀后缀去重
+			group.Name = fmt.Sprintf("%s [%s]", groupName, res.UpstreamKeyPrefix)
+			if err2 := s.groupRepo.Create(ctx, group); err2 != nil {
+				return 0, fmt.Errorf("create group (dedup): %w", err2)
+			}
+			return group.ID, nil
+		}
 		return 0, fmt.Errorf("create group: %w", err)
 	}
 	return group.ID, nil
