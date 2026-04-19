@@ -330,3 +330,13 @@ export function formatRelativeWithDateTime(date: string | Date | null | undefine
 
   return `${relativeTime} · ${dateTime}`
 }
+
+/**
+ * 清理分组名称（用户端显示）
+ * 去掉上游同步产生的平台标记后缀，如 "(gAI)"
+ * @param name 原始分组名称
+ * @returns 清理后的名称
+ */
+export function cleanGroupName(name: string): string {
+  return name.replace(/\s*\([^)]+\)\s*$/, '').trim()
+}

@@ -299,6 +299,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import Select from '@/components/common/Select.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import { modelsAPI, type GroupModels, type ModelInfo } from '@/api'
+import { cleanGroupName } from '@/utils/format'
 
 const { t } = useI18n()
 
@@ -330,7 +331,7 @@ const flatModels = computed<FlatModel[]>(() => {
       result.push({
         ...model,
         group_id: group.group_id,
-        group_name: group.group_name,
+        group_name: cleanGroupName(group.group_name),
         platform: group.platform,
         rate_multiplier: group.rate_multiplier,
       })
@@ -347,7 +348,7 @@ const groupFilterOptions = computed(() => {
   for (const group of groupsData.value) {
     options.push({
       value: group.group_id,
-      label: group.group_name,
+      label: cleanGroupName(group.group_name),
       rate: group.rate_multiplier,
       platform: group.platform
     })

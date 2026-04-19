@@ -107,7 +107,7 @@
                     </p>
                     <p v-else-if="redeemResult.type === 'subscription'" class="font-medium">
                       {{ t('redeem.subscriptionAssigned') }}
-                      <span v-if="redeemResult.group_name"> - {{ redeemResult.group_name }}</span>
+                      <span v-if="redeemResult.group_name"> - {{ cleanGroupName(redeemResult.group_name) }}</span>
                       <span v-if="redeemResult.validity_days">
                         ({{
                           t('redeem.subscriptionDays', { days: redeemResult.validity_days })
@@ -350,7 +350,7 @@ import { useSubscriptionStore } from '@/stores/subscriptions'
 import { redeemAPI, authAPI, type RedeemHistoryItem } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
-import { formatDateTime } from '@/utils/format'
+import { formatDateTime, cleanGroupName } from '@/utils/format'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -412,7 +412,7 @@ const formatHistoryValue = (item: RedeemHistoryItem) => {
   } else if (isSubscriptionType(item.type)) {
     // 订阅类型显示有效天数和分组名称
     const days = item.validity_days || Math.round(item.value)
-    const groupName = item.group?.name || ''
+    const groupName = cleanGroupName(item.group?.name || '')
     return groupName ? `${days}${t('redeem.days')} - ${groupName}` : `${days}${t('redeem.days')}`
   } else {
     const sign = item.value >= 0 ? '+' : ''

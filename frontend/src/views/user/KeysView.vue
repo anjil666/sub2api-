@@ -107,7 +107,7 @@
               >
                 <GroupBadge
                   v-if="row.group"
-                  :name="row.group.name"
+                  :name="cleanGroupName(row.group.name)"
                   :platform="row.group.platform"
                   :subscription-type="row.group.subscription_type"
                   :rate-multiplier="row.group.rate_multiplier"
@@ -1071,7 +1071,7 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import type { ApiKey, Group, PublicSettings, SubscriptionType, GroupPlatform } from '@/types'
 import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
-import { formatDateTime } from '@/utils/format'
+import { formatDateTime, cleanGroupName } from '@/utils/format'
 
 // Helper to format date for datetime-local input
 const formatDateTimeLocal = (isoDate: string): string => {
@@ -1210,7 +1210,7 @@ const statusOptions = computed(() => [
 const groupFilterOptions = computed(() => [
   { value: '', label: t('keys.allGroups') },
   { value: 0, label: t('keys.noGroup') },
-  ...groups.value.map((g) => ({ value: g.id, label: g.name }))
+  ...groups.value.map((g) => ({ value: g.id, label: cleanGroupName(g.name) }))
 ])
 
 const statusFilterOptions = computed(() => [
@@ -1240,7 +1240,7 @@ const onStatusFilterChange = (value: string | number | boolean | null) => {
 const groupOptions = computed(() =>
   groups.value.map((group) => ({
     value: group.id,
-    label: group.name,
+    label: cleanGroupName(group.name),
     description: group.description,
     rate: group.rate_multiplier,
     userRate: userGroupRates.value[group.id] ?? null,
@@ -1713,9 +1713,8 @@ const executeCcsImport = (row: ApiKey, clientType: 'claude' | 'gemini') => {
   let endpoint: string
 
   if (platform === 'antigravity') {
-    // Antigravity always uses /antigravity suffix
     app = clientType === 'gemini' ? 'gemini' : 'claude'
-    endpoint = `${baseUrl}/antigravity`
+    endpoint = baseUrl
   } else {
     switch (platform) {
       case 'openai':

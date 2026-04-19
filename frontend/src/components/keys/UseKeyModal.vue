@@ -285,6 +285,8 @@ const clientTabs = computed((): TabConfig[] => {
     case 'antigravity':
       return [
         { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
+        { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
+        { id: 'codex-ws', label: t('keys.useKeyModal.cliTabs.codexCliWs'), icon: TerminalIcon },
         { id: 'gemini', label: t('keys.useKeyModal.cliTabs.geminiCli'), icon: SparkleIcon },
         { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
       ]
@@ -347,6 +349,11 @@ const platformNote = computed(() => {
     case 'gemini':
       return t('keys.useKeyModal.gemini.note')
     case 'antigravity':
+      if (activeClientTab.value === 'codex' || activeClientTab.value === 'codex-ws') {
+        return activeTab.value === 'windows'
+          ? t('keys.useKeyModal.openai.noteWindows')
+          : t('keys.useKeyModal.openai.note')
+      }
       return activeClientTab.value === 'claude'
         ? t('keys.useKeyModal.antigravity.claudeNote')
         : t('keys.useKeyModal.antigravity.geminiNote')
@@ -384,11 +391,6 @@ const currentFiles = computed((): FileConfig[] => {
     return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`
   }
   const apiBase = ensureV1(baseRoot)
-  const antigravityBase = ensureV1(`${baseRoot}/antigravity`)
-  const antigravityGeminiBase = (() => {
-    const trimmed = `${baseRoot}/antigravity`.replace(/\/+$/, '')
-    return trimmed.endsWith('/v1beta') ? trimmed : `${trimmed}/v1beta`
-  })()
   const geminiBase = (() => {
     const trimmed = baseRoot.replace(/\/+$/, '')
     return trimmed.endsWith('/v1beta') ? trimmed : `${trimmed}/v1beta`
@@ -404,8 +406,8 @@ const currentFiles = computed((): FileConfig[] => {
         return [generateOpenCodeConfig('gemini', geminiBase, apiKey)]
       case 'antigravity':
         return [
-          generateOpenCodeConfig('antigravity-claude', antigravityBase, apiKey, 'opencode.json (Claude)'),
-          generateOpenCodeConfig('antigravity-gemini', antigravityGeminiBase, apiKey, 'opencode.json (Gemini)')
+          generateOpenCodeConfig('antigravity-claude', apiBase, apiKey, 'opencode.json (Claude)'),
+          generateOpenCodeConfig('antigravity-gemini', geminiBase, apiKey, 'opencode.json (Gemini)')
         ]
       default:
         return [generateOpenCodeConfig('openai', apiBase, apiKey)]
@@ -425,9 +427,15 @@ const currentFiles = computed((): FileConfig[] => {
       return [generateGeminiCliContent(baseUrl, apiKey)]
     case 'antigravity':
       if (activeClientTab.value === 'gemini') {
-        return [generateGeminiCliContent(`${baseUrl}/antigravity`, apiKey)]
+        return [generateGeminiCliContent(baseUrl, apiKey)]
       }
-      return generateAnthropicFiles(`${baseUrl}/antigravity`, apiKey)
+      if (activeClientTab.value === 'codex-ws') {
+        return generateOpenAIWsFiles(baseUrl, apiKey)
+      }
+      if (activeClientTab.value === 'codex') {
+        return generateOpenAIFiles(baseUrl, apiKey)
+      }
+      return generateAnthropicFiles(baseUrl, apiKey)
     default:
       return generateAnthropicFiles(baseUrl, apiKey)
   }
