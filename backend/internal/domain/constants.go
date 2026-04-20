@@ -79,6 +79,16 @@ var DefaultAntigravityModelMapping = map[string]string{
 	"claude-sonnet-4-6":          "claude-sonnet-4-6",
 	"claude-sonnet-4-5":          "claude-sonnet-4-5",
 	"claude-sonnet-4-5-thinking": "claude-sonnet-4-5-thinking",
+	// Claude 点号格式兜底（Claude Code 等客户端使用点号格式，正常由 mapAntigravityModel 规范化处理）
+	"claude-opus-4.7-thinking":   "claude-opus-4-7-thinking",
+	"claude-opus-4.7":            "claude-opus-4-7-thinking",
+	"claude-opus-4.6-thinking":   "claude-opus-4-7-thinking",
+	"claude-opus-4.6":            "claude-opus-4-7-thinking",
+	"claude-opus-4.5-thinking":   "claude-opus-4-7-thinking",
+	"claude-sonnet-4.6":          "claude-sonnet-4-6",
+	"claude-sonnet-4.5":          "claude-sonnet-4-5",
+	"claude-sonnet-4.5-thinking": "claude-sonnet-4-5-thinking",
+	"claude-haiku-4.5":           "claude-sonnet-4-6",
 	// Claude 详细版本 ID 映射
 	"claude-opus-4-5-20251101":   "claude-opus-4-7-thinking", // 迁移旧模型
 	"claude-sonnet-4-5-20250929": "claude-sonnet-4-5",

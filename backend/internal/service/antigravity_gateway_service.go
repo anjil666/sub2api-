@@ -964,6 +964,12 @@ func mapAntigravityModel(account *Account, requestedModel string) string {
 		return ""
 	}
 
+	// Claude 模型名规范化：Claude Code 等客户端发送点号格式（claude-sonnet-4.6），
+	// 统一转换为横线格式（claude-sonnet-4-6）以匹配映射表和保持计费/统计一致性
+	if strings.HasPrefix(requestedModel, "claude-") {
+		requestedModel = strings.ReplaceAll(requestedModel, ".", "-")
+	}
+
 	// 获取映射表（未配置时自动使用 DefaultAntigravityModelMapping）
 	mapping := account.GetModelMapping()
 	if len(mapping) == 0 {
@@ -1367,8 +1373,13 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 		return nil, s.writeClaudeError(c, http.StatusBadRequest, "invalid_request_error", "Missing model")
 	}
 
-	originalModel := claudeReq.Model
-	mappedModel := s.getMappedModel(account, claudeReq.Model)
+	// Claude 模型名规范化：点号→横线（与 mapAntigravityModel 内部一致）
+	normalizedModel := claudeReq.Model
+	if strings.HasPrefix(normalizedModel, "claude-") {
+		normalizedModel = strings.ReplaceAll(normalizedModel, ".", "-")
+	}
+	originalModel := normalizedModel
+	mappedModel := s.getMappedModel(account, normalizedModel)
 	if mappedModel == "" {
 		return nil, s.writeClaudeError(c, http.StatusForbidden, "permission_error", fmt.Sprintf("model %s not in whitelist", claudeReq.Model))
 	}
@@ -4229,6 +4240,10 @@ func (s *AntigravityGatewayService) ForwardUpstream(ctx context.Context, c *gin.
 		return nil, fmt.Errorf("missing model")
 	}
 	originalModel := claudeReq.Model
+	// Claude 模型名规范化：点号→横线
+	if strings.HasPrefix(originalModel, "claude-") {
+		originalModel = strings.ReplaceAll(originalModel, ".", "-")
+	}
 
 	// 构建上游请求 URL
 	upstreamURL := baseURL + "/v1/messages"
