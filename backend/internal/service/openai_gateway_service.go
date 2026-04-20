@@ -1769,6 +1769,13 @@ func (s *OpenAIGatewayService) GetAccessToken(ctx context.Context, account *Acco
 			return "", "", errors.New("api_key not found in credentials")
 		}
 		return apiKey, "apikey", nil
+	case AccountTypeUpstream:
+		// 上游透传账号：从 credentials 中读取 api_key
+		apiKey := account.GetCredential("api_key")
+		if apiKey == "" {
+			return "", "", errors.New("api_key not found in upstream account credentials")
+		}
+		return apiKey, "apikey", nil
 	default:
 		return "", "", fmt.Errorf("unsupported account type: %s", account.Type)
 	}
@@ -3165,6 +3172,19 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 		if baseURL == "" {
 			targetURL = openaiPlatformAPIURL
 		} else {
+			validatedURL, err := s.validateUpstreamBaseURL(baseURL)
+			if err != nil {
+				return nil, err
+			}
+			targetURL = buildOpenAIResponsesURL(validatedURL)
+		}
+	case AccountTypeUpstream:
+		// 上游透传账号：使用 credentials 中的 base_url
+		baseURL := strings.TrimSpace(account.GetCredential("base_url"))
+		if baseURL == "" {
+			targetURL = openaiPlatformAPIURL
+		} else {
+			baseURL = strings.TrimSuffix(baseURL, "/")
 			validatedURL, err := s.validateUpstreamBaseURL(baseURL)
 			if err != nil {
 				return nil, err
