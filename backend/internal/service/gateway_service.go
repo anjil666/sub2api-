@@ -1180,6 +1180,12 @@ func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context
 		platform = PlatformAnthropic
 	}
 
+	// Claude 模型名规范化：Claude Code 等客户端发送点号格式（claude-sonnet-4.6），
+	// 在路由/定价检查之前统一转换为横线格式（claude-sonnet-4-6）
+	if strings.HasPrefix(requestedModel, "claude-") {
+		requestedModel = strings.ReplaceAll(requestedModel, ".", "-")
+	}
+
 	// Claude Code 限制可能已将 groupID 解析为 fallback group，
 	// 渠道限制预检查必须使用解析后的分组。
 	if s.checkChannelPricingRestriction(ctx, groupID, requestedModel) {
