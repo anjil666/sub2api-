@@ -155,6 +155,11 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		return
 	}
 	reqModel := parsedReq.Model
+	// Claude 模型名规范化：Claude Code 等客户端发送点号格式（claude-sonnet-4.6），
+	// 在所有后续处理之前统一转换为横线格式（claude-sonnet-4-6）
+	if strings.HasPrefix(reqModel, "claude-") {
+		reqModel = strings.ReplaceAll(reqModel, ".", "-")
+	}
 	reqStream := parsedReq.Stream
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
 
