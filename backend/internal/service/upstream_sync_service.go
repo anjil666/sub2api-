@@ -908,6 +908,7 @@ func (s *UpstreamSyncService) ensureAccount(ctx context.Context, site *UpstreamS
 			}
 			updateInput := &UpdateAccountInput{
 				Name:        accountName,
+				Type:        AccountTypeUpstream, // 上游透传账号：使用 base_url + api_key 直接转发
 				Credentials: credentials,
 			}
 			if _, err := s.adminService.UpdateAccount(ctx, existingAccount.ID, updateInput); err != nil {
@@ -928,7 +929,7 @@ func (s *UpstreamSyncService) ensureAccount(ctx context.Context, site *UpstreamS
 	createInput := &CreateAccountInput{
 		Name:                  accountName,
 		Platform:              PlatformAntigravity,
-		Type:                  AccountTypeAPIKey,
+		Type:                  AccountTypeUpstream, // 上游透传账号：使用 base_url + api_key 直接转发
 		Credentials:           credentials,
 		Concurrency:           concurrency,
 		Priority:              0,
