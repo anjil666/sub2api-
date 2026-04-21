@@ -365,13 +365,19 @@ export default {
     paymentConfig: '支付配置',
     paymentPlans: '订阅套餐',
     healthProbe: '健康探测',
-    healthStatus: '服务状态'
+    healthStatus: '分组可用检测'
   },
 
   // Health Status (服务状态)
   healthStatus: {
-    title: '服务状态',
-    description: '查看各分组的实时可用性和历史趋势',
+    title: '分组可用检测',
+    description: '实时监控各服务分组的可用性与延迟',
+    searchPlaceholder: '搜索分组名称...',
+    refreshing: '刷新中...',
+    refresh: '刷新',
+    online: '在线',
+    offline: '离线',
+    unknown: '未知',
     empty: '暂无监控数据',
     emptyDesc: '管理员尚未启用健康探测',
     latency: '延迟',

@@ -20,27 +20,39 @@ func NewHealthStatusHandler(healthProbeSvc *service.HealthProbeService) *HealthS
 
 // GetLatest GET /health-status/latest
 func (h *HealthStatusHandler) GetLatest(c *gin.Context) {
-	results, err := h.healthProbeSvc.GetLatestResults(c.Request.Context())
+	ctx := c.Request.Context()
+	results, err := h.healthProbeSvc.GetLatestResults(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Enrich with group metadata
+	h.healthProbeSvc.EnrichResultsWithGroupInfo(ctx, results)
+
 	// Return a simplified view for users (no account IDs, no error details)
 	type userResult struct {
-		GroupID    int64  `json:"group_id"`
-		Status     int    `json:"status"`
-		LatencyMs  int    `json:"latency_ms"`
-		CheckedAt  string `json:"checked_at"`
+		GroupID        int64   `json:"group_id"`
+		GroupName      string  `json:"group_name"`
+		RateMultiplier float64 `json:"rate_multiplier"`
+		Platform       string  `json:"platform"`
+		ProbeModel     string  `json:"probe_model"`
+		Status         int     `json:"status"`
+		LatencyMs      int     `json:"latency_ms"`
+		CheckedAt      string  `json:"checked_at"`
 	}
 
 	var userResults []userResult
 	for _, r := range results {
 		userResults = append(userResults, userResult{
-			GroupID:   r.GroupID,
-			Status:    r.Status,
-			LatencyMs: r.LatencyMs,
-			CheckedAt: r.CheckedAt.Format("2006-01-02T15:04:05Z07:00"),
+			GroupID:        r.GroupID,
+			GroupName:      r.GroupName,
+			RateMultiplier: r.RateMultiplier,
+			Platform:       r.Platform,
+			ProbeModel:     r.ProbeModel,
+			Status:         r.Status,
+			LatencyMs:      r.LatencyMs,
+			CheckedAt:      r.CheckedAt.Format("2006-01-02T15:04:05Z07:00"),
 		})
 	}
 	c.JSON(http.StatusOK, userResults)

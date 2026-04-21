@@ -291,3 +291,84 @@ func scanProbeSummaries(rows *sql.Rows) ([]*service.HealthProbeSummary, error) {
 	}
 	return summaries, rows.Err()
 }
+
+// --- Group Config Repository ---
+
+type healthProbeGroupConfigRepository struct {
+	db *sql.DB
+}
+
+func NewHealthProbeGroupConfigRepository(db *sql.DB) service.HealthProbeGroupConfigRepository {
+	return &healthProbeGroupConfigRepository{db: db}
+}
+
+func (r *healthProbeGroupConfigRepository) EnsureTable(ctx context.Context) error {
+	_, err := r.db.ExecContext(ctx, `
+		CREATE TABLE IF NOT EXISTS health_probe_group_configs (
+			id BIGSERIAL PRIMARY KEY,
+			group_id BIGINT NOT NULL UNIQUE,
+			probe_model TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_health_probe_group_configs_group ON health_probe_group_configs(group_id)
+	`)
+	return err
+}
+
+func (r *healthProbeGroupConfigRepository) Get(ctx context.Context, groupID int64) (*service.HealthProbeGroupConfig, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, group_id, probe_model, created_at, updated_at
+		FROM health_probe_group_configs
+		WHERE group_id = $1
+	`, groupID)
+
+	cfg := &service.HealthProbeGroupConfig{}
+	err := row.Scan(&cfg.ID, &cfg.GroupID, &cfg.ProbeModel, &cfg.CreatedAt, &cfg.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func (r *healthProbeGroupConfigRepository) ListAll(ctx context.Context) ([]*service.HealthProbeGroupConfig, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, group_id, probe_model, created_at, updated_at
+		FROM health_probe_group_configs
+		ORDER BY group_id ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var configs []*service.HealthProbeGroupConfig
+	for rows.Next() {
+		cfg := &service.HealthProbeGroupConfig{}
+		if err := rows.Scan(&cfg.ID, &cfg.GroupID, &cfg.ProbeModel, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
+			return nil, err
+		}
+		configs = append(configs, cfg)
+	}
+	return configs, rows.Err()
+}
+
+func (r *healthProbeGroupConfigRepository) Upsert(ctx context.Context, cfg *service.HealthProbeGroupConfig) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO health_probe_group_configs (group_id, probe_model)
+		VALUES ($1, $2)
+		ON CONFLICT (group_id)
+		DO UPDATE SET probe_model = $2, updated_at = NOW()
+	`, cfg.GroupID, cfg.ProbeModel)
+	return err
+}
+
+func (r *healthProbeGroupConfigRepository) Delete(ctx context.Context, groupID int64) error {
+	_, err := r.db.ExecContext(ctx, `
+		DELETE FROM health_probe_group_configs WHERE group_id = $1
+	`, groupID)
+	return err
+}

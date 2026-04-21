@@ -51,6 +51,14 @@ export interface UpdateHealthProbeConfigRequest {
   webhook_cooldown_minutes?: number
 }
 
+export interface HealthProbeGroupConfig {
+  id: number
+  group_id: number
+  probe_model: string
+  created_at: string
+  updated_at: string
+}
+
 export async function getConfig(): Promise<HealthProbeConfig> {
   const { data } = await apiClient.get<HealthProbeConfig>('/admin/health-probe/config')
   return data
@@ -91,6 +99,19 @@ export async function getGroupSummaries(groupId: number, hours?: number): Promis
   return data ?? []
 }
 
+export async function listGroupConfigs(): Promise<HealthProbeGroupConfig[]> {
+  const { data } = await apiClient.get<HealthProbeGroupConfig[]>('/admin/health-probe/group-configs')
+  return data ?? []
+}
+
+export async function upsertGroupConfig(groupId: number, probeModel: string): Promise<void> {
+  await apiClient.put('/admin/health-probe/group-configs', { group_id: groupId, probe_model: probeModel })
+}
+
+export async function deleteGroupConfig(groupId: number): Promise<void> {
+  await apiClient.delete(`/admin/health-probe/group-configs/${groupId}`)
+}
+
 export const healthProbeAPI = {
   getConfig,
   updateConfig,
@@ -98,7 +119,10 @@ export const healthProbeAPI = {
   getLatestResults,
   getAllSummaries,
   getGroupResults,
-  getGroupSummaries
+  getGroupSummaries,
+  listGroupConfigs,
+  upsertGroupConfig,
+  deleteGroupConfig
 }
 
 export default healthProbeAPI

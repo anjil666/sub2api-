@@ -11,8 +11,33 @@
             {{ t('healthStatus.description') }}
           </p>
         </div>
-        <!-- Status Filter -->
         <div class="flex items-center gap-2">
+          <!-- Search -->
+          <input
+            v-model="searchQuery"
+            type="text"
+            :placeholder="t('healthStatus.searchPlaceholder')"
+            class="input text-sm w-48"
+          />
+          <!-- Refresh -->
+          <button
+            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300 dark:hover:bg-dark-700"
+            :disabled="refreshing"
+            @click="handleRefresh"
+          >
+            <svg
+              class="h-4 w-4"
+              :class="{ 'animate-spin': refreshing }"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {{ refreshing ? t('healthStatus.refreshing') : t('healthStatus.refresh') }}
+          </button>
+          <!-- Status Filter -->
           <select v-model="statusFilter" class="input text-sm">
             <option value="all">{{ t('healthStatus.filter.all') }}</option>
             <option value="available">{{ t('healthStatus.filter.available') }}</option>
@@ -25,6 +50,22 @@
             <option :value="24">24h</option>
           </select>
         </div>
+      </div>
+
+      <!-- Status Stats Bar -->
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+          <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+          {{ t('healthStatus.online') }} {{ onlineCount }}
+        </span>
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700 dark:bg-red-900/40 dark:text-red-300">
+          <span class="h-2 w-2 rounded-full bg-red-500"></span>
+          {{ t('healthStatus.offline') }} {{ offlineCount }}
+        </span>
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-600 dark:bg-dark-700 dark:text-gray-400">
+          <span class="h-2 w-2 rounded-full bg-gray-400"></span>
+          {{ t('healthStatus.unknown') }} {{ unknownCount }}
+        </span>
       </div>
 
       <!-- Loading -->
@@ -56,13 +97,26 @@
         >
           <!-- Header -->
           <div class="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-dark-700">
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div :class="['h-2.5 w-2.5 shrink-0 rounded-full', statusDotClass(group.status)]"></div>
-              <span class="truncate font-medium text-gray-900 dark:text-white">
-                {{ cleanGroupName(String(group.group_id)) }}
-              </span>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 min-w-0">
+                <div :class="['h-2.5 w-2.5 shrink-0 rounded-full', statusDotClass(group.status)]"></div>
+                <span class="truncate font-medium text-gray-900 dark:text-white">
+                  {{ cleanGroupName(group.group_name || String(group.group_id)) }}
+                </span>
+                <span
+                  v-if="group.rate_multiplier && group.rate_multiplier !== 1.0"
+                  class="shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                >
+                  ×{{ group.rate_multiplier }}
+                </span>
+              </div>
+              <div v-if="group.probe_model" class="mt-1 ml-5">
+                <span class="inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500 dark:bg-dark-600 dark:text-gray-400">
+                  {{ group.probe_model }}
+                </span>
+              </div>
             </div>
-            <span :class="statusBadgeClass(group.status)">
+            <span :class="statusBadgeClass(group.status)" class="shrink-0 ml-2">
               {{ statusLabel(group.status) }}
             </span>
           </div>
@@ -125,11 +179,18 @@ import type { HealthStatusResult, HealthStatusSummary } from '@/api/healthStatus
 const { t } = useI18n()
 
 const loading = ref(true)
+const refreshing = ref(false)
 const statusFilter = ref('all')
 const summaryHours = ref(24)
+const searchQuery = ref('')
 
 const latestResults = ref<HealthStatusResult[]>([])
 const allSummaries = ref<HealthStatusSummary[]>([])
+
+// Status counts
+const onlineCount = computed(() => latestResults.value.filter(g => g.status === 1).length)
+const offlineCount = computed(() => latestResults.value.filter(g => g.status === 0).length)
+const unknownCount = computed(() => latestResults.value.filter(g => g.status !== 0 && g.status !== 1).length)
 
 // Group summaries by group_id, sorted by bucket_time ascending
 const groupSummaryMap = computed<Record<number, HealthStatusSummary[]>>(() => {
@@ -156,9 +217,21 @@ function groupAvailabilityPct(groupId: number): number {
 
 const filteredGroups = computed(() => {
   let list = latestResults.value
+
+  // Search filter
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.trim().toLowerCase()
+    list = list.filter(g => {
+      const name = cleanGroupName(g.group_name || String(g.group_id)).toLowerCase()
+      return name.includes(query)
+    })
+  }
+
+  // Status filter
   if (statusFilter.value === 'available') list = list.filter(g => g.status === 1)
   else if (statusFilter.value === 'degraded') list = list.filter(g => g.status === 2 || g.status === 3)
   else if (statusFilter.value === 'unavailable') list = list.filter(g => g.status === 0)
+
   return list
 })
 
@@ -248,6 +321,12 @@ async function loadSummaries() {
   } catch {
     // silent
   }
+}
+
+async function handleRefresh() {
+  refreshing.value = true
+  await Promise.all([loadLatest(), loadSummaries()])
+  refreshing.value = false
 }
 
 onMounted(async () => {

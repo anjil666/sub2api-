@@ -33,6 +33,11 @@ type HealthProbeResult struct {
 	HttpStatusCode int       `json:"http_status_code"`
 	ErrorMessage   string    `json:"error_message"`
 	CheckedAt      time.Time `json:"checked_at"`
+
+	// Transient fields for API response enrichment (not stored in DB)
+	GroupName      string  `json:"group_name,omitempty"`
+	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
+	Platform       string  `json:"platform,omitempty"`
 }
 
 // HealthProbeSummary represents an aggregated summary per 30-min bucket.
@@ -45,6 +50,15 @@ type HealthProbeSummary struct {
 	AvgLatencyMs    int       `json:"avg_latency_ms"`
 	AvailabilityPct float32   `json:"availability_pct"`
 	CreatedAt       time.Time `json:"created_at"`
+}
+
+// HealthProbeGroupConfig stores per-group probe model override.
+type HealthProbeGroupConfig struct {
+	ID         int64     `json:"id"`
+	GroupID    int64     `json:"group_id"`
+	ProbeModel string    `json:"probe_model"` // empty means auto-select
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // HealthProbeConfigRepository defines the data access interface for health probe configuration.
@@ -69,4 +83,13 @@ type HealthProbeSummaryRepository interface {
 	Upsert(ctx context.Context, summary *HealthProbeSummary) error
 	ListByGroup(ctx context.Context, groupID int64, since time.Time) ([]*HealthProbeSummary, error)
 	ListAllGroups(ctx context.Context, since time.Time) ([]*HealthProbeSummary, error)
+}
+
+// HealthProbeGroupConfigRepository defines the data access interface for per-group probe config.
+type HealthProbeGroupConfigRepository interface {
+	EnsureTable(ctx context.Context) error
+	Get(ctx context.Context, groupID int64) (*HealthProbeGroupConfig, error)
+	ListAll(ctx context.Context) ([]*HealthProbeGroupConfig, error)
+	Upsert(ctx context.Context, cfg *HealthProbeGroupConfig) error
+	Delete(ctx context.Context, groupID int64) error
 }

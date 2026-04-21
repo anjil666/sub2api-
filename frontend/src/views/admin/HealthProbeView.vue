@@ -133,6 +133,88 @@
         </div>
       </div>
 
+      <!-- Per-Group Probe Model Config -->
+      <div class="card p-6">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+              分组探测模型配置
+            </h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              为每个分组指定探测使用的模型，留空表示自动选择
+            </p>
+          </div>
+        </div>
+
+        <div v-if="loadingGroupConfigs" class="flex justify-center py-6">
+          <div class="h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"></div>
+        </div>
+
+        <div v-else>
+          <!-- Existing group configs -->
+          <div v-if="groupConfigs.length > 0" class="mb-4 space-y-2">
+            <div
+              v-for="gc in groupConfigs"
+              :key="gc.group_id"
+              class="flex items-center gap-3 rounded-lg border border-gray-100 px-4 py-2.5 dark:border-dark-700"
+            >
+              <span class="min-w-[120px] font-medium text-gray-900 dark:text-white">
+                {{ getGroupName(gc.group_id) }}
+              </span>
+              <input
+                v-model="gc.probe_model"
+                class="input flex-1"
+                placeholder="自动选择"
+              />
+              <button
+                type="button"
+                class="btn btn-sm text-xs"
+                :class="gc._saving ? 'btn-secondary' : 'btn-primary'"
+                :disabled="gc._saving"
+                @click="saveGroupConfig(gc)"
+              >
+                {{ gc._saving ? '...' : '保存' }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-danger text-xs"
+                :disabled="gc._saving"
+                @click="removeGroupConfig(gc.group_id)"
+              >
+                删除
+              </button>
+            </div>
+          </div>
+
+          <!-- Add new group config -->
+          <div class="flex items-center gap-3">
+            <select v-model="newGroupConfigGroupId" class="input">
+              <option :value="0" disabled>选择分组...</option>
+              <option
+                v-for="g in availableGroupsForConfig"
+                :key="g.id"
+                :value="g.id"
+              >
+                {{ g.name }}
+              </option>
+            </select>
+            <input
+              v-model="newGroupConfigModel"
+              class="input flex-1"
+              placeholder="探测模型名称（如 claude-3-5-haiku-20241022）"
+            />
+            <button
+              type="button"
+              class="btn btn-primary btn-sm text-xs"
+              :disabled="!newGroupConfigGroupId"
+              @click="addGroupConfig"
+            >
+              添加
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Latest Results -->
       <div class="card p-6">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -175,7 +257,12 @@
                 :key="r.id"
                 class="border-b border-gray-100 dark:border-dark-700 hover:bg-gray-50 dark:hover:bg-dark-700/50"
               >
-                <td class="px-3 py-2 text-gray-900 dark:text-white">{{ r.group_id }}</td>
+                <td class="px-3 py-2 text-gray-900 dark:text-white">
+                  {{ r.group_name || r.group_id }}
+                  <span v-if="r.rate_multiplier && r.rate_multiplier !== 1" class="ml-1 text-xs text-gray-400">
+                    ×{{ r.rate_multiplier }}
+                  </span>
+                </td>
                 <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ r.probe_model || '-' }}</td>
                 <td class="px-3 py-2">
                   <span :class="statusBadgeClass(r.status)">{{ statusLabel(r.status) }}</span>
@@ -196,80 +283,16 @@
           </table>
         </div>
       </div>
-
-      <!-- Summaries -->
-      <div class="card p-6">
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 class="text-base font-semibold text-gray-900 dark:text-white">
-              {{ t('admin.healthProbe.summaries.title') }}
-            </h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {{ t('admin.healthProbe.summaries.description') }}
-            </p>
-          </div>
-          <div class="flex items-center gap-2">
-            <select v-model="summaryHours" class="input" @change="loadSummaries">
-              <option :value="6">6h</option>
-              <option :value="12">12h</option>
-              <option :value="24">24h</option>
-              <option :value="48">48h</option>
-              <option :value="72">72h</option>
-            </select>
-          </div>
-        </div>
-
-        <div v-if="loadingSummaries" class="flex justify-center py-8">
-          <div class="h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"></div>
-        </div>
-
-        <div v-else-if="summaries.length === 0" class="py-8 text-center text-gray-500 dark:text-gray-400">
-          {{ t('admin.healthProbe.summaries.empty') }}
-        </div>
-
-        <div v-else class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-gray-200 dark:border-dark-600">
-                <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">{{ t('admin.healthProbe.results.group') }}</th>
-                <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">{{ t('admin.healthProbe.summaries.bucket') }}</th>
-                <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">{{ t('admin.healthProbe.summaries.totalProbes') }}</th>
-                <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">{{ t('admin.healthProbe.summaries.successCount') }}</th>
-                <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">{{ t('admin.healthProbe.summaries.availability') }}</th>
-                <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">{{ t('admin.healthProbe.summaries.avgLatency') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="s in summaries"
-                :key="s.id"
-                class="border-b border-gray-100 dark:border-dark-700 hover:bg-gray-50 dark:hover:bg-dark-700/50"
-              >
-                <td class="px-3 py-2 text-gray-900 dark:text-white">{{ s.group_id }}</td>
-                <td class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ formatTime(s.bucket_time) }}</td>
-                <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ s.total_probes }}</td>
-                <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ s.success_count }}</td>
-                <td class="px-3 py-2">
-                  <span :class="availabilityBadgeClass(s.availability_pct)">
-                    {{ s.availability_pct.toFixed(1) }}%
-                  </span>
-                </td>
-                <td class="px-3 py-2 font-mono text-gray-700 dark:text-gray-300">{{ s.avg_latency_ms.toFixed(0) }} ms</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api'
 import { useAppStore } from '@/stores'
-import type { HealthProbeResult, HealthProbeSummary, UpdateHealthProbeConfigRequest } from '@/api/admin/healthProbe'
+import type { HealthProbeResult, HealthProbeGroupConfig, UpdateHealthProbeConfigRequest } from '@/api/admin/healthProbe'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -294,10 +317,28 @@ const configForm = ref<UpdateHealthProbeConfigRequest>({
 const loadingResults = ref(false)
 const results = ref<HealthProbeResult[]>([])
 
-// Summaries
-const loadingSummaries = ref(false)
-const summaries = ref<HealthProbeSummary[]>([])
-const summaryHours = ref(24)
+// Group configs
+const loadingGroupConfigs = ref(false)
+const groupConfigs = ref<(HealthProbeGroupConfig & { _saving?: boolean })[]>([])
+const newGroupConfigGroupId = ref<number>(0)
+const newGroupConfigModel = ref('')
+
+// Available groups (from results, for group config dropdown)
+const availableGroupsForConfig = computed(() => {
+  const configuredIds = new Set(groupConfigs.value.map(gc => gc.group_id))
+  const groups: { id: number; name: string }[] = []
+  for (const r of results.value) {
+    if (!configuredIds.has(r.group_id)) {
+      groups.push({ id: r.group_id, name: (r as any).group_name || `Group ${r.group_id}` })
+    }
+  }
+  return groups
+})
+
+function getGroupName(groupId: number): string {
+  const r = results.value.find(r => r.group_id === groupId)
+  return (r as any)?.group_name || `Group ${groupId}`
+}
 
 async function loadConfig() {
   loadingConfig.value = true
@@ -358,14 +399,49 @@ async function loadResults() {
   }
 }
 
-async function loadSummaries() {
-  loadingSummaries.value = true
+async function loadGroupConfigs() {
+  loadingGroupConfigs.value = true
   try {
-    summaries.value = await adminAPI.healthProbe.getAllSummaries(summaryHours.value)
+    groupConfigs.value = await adminAPI.healthProbe.listGroupConfigs()
   } catch (e: any) {
-    appStore.showToast('error', e.message || 'Failed to load summaries')
+    appStore.showToast('error', e.message || 'Failed to load group configs')
   } finally {
-    loadingSummaries.value = false
+    loadingGroupConfigs.value = false
+  }
+}
+
+async function saveGroupConfig(gc: HealthProbeGroupConfig & { _saving?: boolean }) {
+  gc._saving = true
+  try {
+    await adminAPI.healthProbe.upsertGroupConfig(gc.group_id, gc.probe_model)
+    appStore.showToast('success', '已保存')
+  } catch (e: any) {
+    appStore.showToast('error', e.message || 'Failed to save')
+  } finally {
+    gc._saving = false
+  }
+}
+
+async function removeGroupConfig(groupId: number) {
+  try {
+    await adminAPI.healthProbe.deleteGroupConfig(groupId)
+    groupConfigs.value = groupConfigs.value.filter(gc => gc.group_id !== groupId)
+    appStore.showToast('success', '已删除')
+  } catch (e: any) {
+    appStore.showToast('error', e.message || 'Failed to delete')
+  }
+}
+
+async function addGroupConfig() {
+  if (!newGroupConfigGroupId.value) return
+  try {
+    await adminAPI.healthProbe.upsertGroupConfig(newGroupConfigGroupId.value, newGroupConfigModel.value)
+    await loadGroupConfigs()
+    newGroupConfigGroupId.value = 0
+    newGroupConfigModel.value = ''
+    appStore.showToast('success', '已添加')
+  } catch (e: any) {
+    appStore.showToast('error', e.message || 'Failed to add')
   }
 }
 
@@ -390,13 +466,6 @@ function statusBadgeClass(status: number): string {
   }
 }
 
-function availabilityBadgeClass(pct: number): string {
-  const base = 'rounded-full px-2 py-0.5 text-xs font-medium'
-  if (pct >= 95) return `${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`
-  if (pct >= 80) return `${base} bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300`
-  return `${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`
-}
-
 function formatTime(ts: string): string {
   if (!ts) return '-'
   try {
@@ -409,6 +478,6 @@ function formatTime(ts: string): string {
 onMounted(async () => {
   await loadConfig()
   loadResults()
-  loadSummaries()
+  loadGroupConfigs()
 })
 </script>

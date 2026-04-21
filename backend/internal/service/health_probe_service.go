@@ -41,12 +41,13 @@ const (
 
 // HealthProbeService performs active health probes against upstream accounts.
 type HealthProbeService struct {
-	configRepo  HealthProbeConfigRepository
-	resultRepo  HealthProbeResultRepository
-	summaryRepo HealthProbeSummaryRepository
-	groupRepo   GroupRepository
-	accountRepo AccountRepository
-	cfg         *config.Config
+	configRepo      HealthProbeConfigRepository
+	resultRepo      HealthProbeResultRepository
+	summaryRepo     HealthProbeSummaryRepository
+	groupConfigRepo HealthProbeGroupConfigRepository
+	groupRepo       GroupRepository
+	accountRepo     AccountRepository
+	cfg             *config.Config
 
 	cron      *cron.Cron
 	cronID    cron.EntryID
@@ -76,6 +77,7 @@ func NewHealthProbeService(
 	configRepo HealthProbeConfigRepository,
 	resultRepo HealthProbeResultRepository,
 	summaryRepo HealthProbeSummaryRepository,
+	groupConfigRepo HealthProbeGroupConfigRepository,
 	groupRepo GroupRepository,
 	accountRepo AccountRepository,
 	cfg *config.Config,
@@ -84,6 +86,7 @@ func NewHealthProbeService(
 		configRepo:      configRepo,
 		resultRepo:      resultRepo,
 		summaryRepo:     summaryRepo,
+		groupConfigRepo: groupConfigRepo,
 		groupRepo:       groupRepo,
 		accountRepo:     accountRepo,
 		cfg:             cfg,
@@ -121,6 +124,9 @@ func (s *HealthProbeService) Start() {
 		}
 		if err := s.summaryRepo.EnsureTable(ctx); err != nil {
 			logger.LegacyPrintf("service.health_probe", "[HealthProbe] EnsureTable(summary) error: %v", err)
+		}
+		if err := s.groupConfigRepo.EnsureTable(ctx); err != nil {
+			logger.LegacyPrintf("service.health_probe", "[HealthProbe] EnsureTable(groupConfig) error: %v", err)
 		}
 
 		// Load config and start cron
@@ -350,7 +356,7 @@ func (s *HealthProbeService) probeGroup(ctx context.Context, group *Group, probe
 	}
 
 	// Select probe model from account's model_mapping
-	probeModel := s.selectProbeModel(probeAccount)
+	probeModel := s.selectProbeModel(probeAccount, group.ID)
 
 	// Execute the actual probe
 	result := s.executeProbe(ctx, probeAccount, group, probeModel, probeCfg)
@@ -365,7 +371,15 @@ func (s *HealthProbeService) probeGroup(ctx context.Context, group *Group, probe
 	s.handleStatusChange(ctx, group.ID, result.Status, probeCfg)
 }
 
-func (s *HealthProbeService) selectProbeModel(account *Account) string {
+func (s *HealthProbeService) selectProbeModel(account *Account, groupID int64) string {
+	// Check per-group config first
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	groupCfg, err := s.groupConfigRepo.Get(ctx, groupID)
+	if err == nil && groupCfg != nil && groupCfg.ProbeModel != "" {
+		return groupCfg.ProbeModel
+	}
+
 	mapping := account.GetModelMapping()
 	if mapping != nil {
 		// Prefer a small/cheap model for probing
@@ -415,7 +429,7 @@ func (s *HealthProbeService) executeProbe(ctx context.Context, account *Account,
 		model = mappedModel
 	}
 
-	// Build and execute request based on platform
+	// Build and execute request based on platform (with stream=true)
 	var req *http.Request
 	var err error
 
@@ -438,12 +452,12 @@ func (s *HealthProbeService) executeProbe(ctx context.Context, account *Account,
 		return result
 	}
 
+	// Use a custom transport that does NOT auto-decompress, to get raw streaming bytes
 	start := time.Now()
 	resp, err := s.httpClient.Do(req)
-	latency := time.Since(start)
-	result.LatencyMs = int(latency.Milliseconds())
 
 	if err != nil {
+		result.LatencyMs = int(time.Since(start).Milliseconds())
 		result.Status = ProbeStatusUnavailable
 		if ctx.Err() != nil || strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "timeout") {
 			result.ErrorType = ProbeErrorTimeout
@@ -456,35 +470,51 @@ func (s *HealthProbeService) executeProbe(ctx context.Context, account *Account,
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// Read a small portion of response body for error details
-	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-
 	result.HttpStatusCode = resp.StatusCode
 
-	switch {
-	case resp.StatusCode == 200:
-		result.Status = ProbeStatusAvailable
-		result.ErrorType = ProbeErrorNone
-		// Check for slow response (degraded)
-		if result.LatencyMs > probeCfg.SlowThresholdMs {
-			result.Status = ProbeStatusDegraded
+	if resp.StatusCode != 200 {
+		result.LatencyMs = int(time.Since(start).Milliseconds())
+		// Read error body
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		switch {
+		case resp.StatusCode == 429:
+			result.Status = ProbeStatusRateLimited
+			result.ErrorType = ProbeErrorRateLimit
+			result.ErrorMessage = "rate limited"
+		case resp.StatusCode == 401 || resp.StatusCode == 403:
+			result.Status = ProbeStatusUnavailable
+			result.ErrorType = ProbeErrorAuth
+			result.ErrorMessage = extractErrorMessage(bodyBytes)
+		case resp.StatusCode >= 500:
+			result.Status = ProbeStatusUnavailable
+			result.ErrorType = ProbeErrorServer
+			result.ErrorMessage = extractErrorMessage(bodyBytes)
+		default:
+			result.Status = ProbeStatusUnavailable
+			result.ErrorType = ProbeErrorServer
+			result.ErrorMessage = fmt.Sprintf("HTTP %d: %s", resp.StatusCode, extractErrorMessage(bodyBytes))
 		}
-	case resp.StatusCode == 429:
-		result.Status = ProbeStatusRateLimited
-		result.ErrorType = ProbeErrorRateLimit
-		result.ErrorMessage = "rate limited"
-	case resp.StatusCode == 401 || resp.StatusCode == 403:
+		return result
+	}
+
+	// Streaming TTFB: read until we get the first data chunk
+	buf := make([]byte, 256)
+	_, err = resp.Body.Read(buf)
+	ttfb := time.Since(start)
+	result.LatencyMs = int(ttfb.Milliseconds())
+
+	if err != nil && err != io.EOF {
 		result.Status = ProbeStatusUnavailable
-		result.ErrorType = ProbeErrorAuth
-		result.ErrorMessage = extractErrorMessage(bodyBytes)
-	case resp.StatusCode >= 500:
-		result.Status = ProbeStatusUnavailable
-		result.ErrorType = ProbeErrorServer
-		result.ErrorMessage = extractErrorMessage(bodyBytes)
-	default:
-		result.Status = ProbeStatusUnavailable
-		result.ErrorType = ProbeErrorServer
-		result.ErrorMessage = fmt.Sprintf("HTTP %d: %s", resp.StatusCode, extractErrorMessage(bodyBytes))
+		result.ErrorType = ProbeErrorNetwork
+		result.ErrorMessage = fmt.Sprintf("stream read failed: %v", err)
+		return result
+	}
+
+	// Success — check for slow response (degraded)
+	result.Status = ProbeStatusAvailable
+	result.ErrorType = ProbeErrorNone
+	if result.LatencyMs > probeCfg.SlowThresholdMs {
+		result.Status = ProbeStatusDegraded
 	}
 
 	return result
@@ -496,6 +526,7 @@ func (s *HealthProbeService) buildClaudeProbeRequest(ctx context.Context, accoun
 	body := map[string]any{
 		"model":      model,
 		"max_tokens": 1,
+		"stream":     true,
 		"messages": []map[string]string{
 			{"role": "user", "content": "hi"},
 		},
@@ -538,6 +569,7 @@ func (s *HealthProbeService) buildOpenAIProbeRequest(ctx context.Context, accoun
 	body := map[string]any{
 		"model":      model,
 		"max_tokens": 1,
+		"stream":     true,
 		"messages": []map[string]string{
 			{"role": "user", "content": "hi"},
 		},
@@ -594,7 +626,7 @@ func (s *HealthProbeService) buildGeminiProbeRequest(ctx context.Context, accoun
 
 	apiKey := account.GetCredential("api_key")
 	baseURL := "https://generativelanguage.googleapis.com"
-	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", baseURL, model, apiKey)
+	url := fmt.Sprintf("%s/v1beta/models/%s:streamGenerateContent?alt=sse&key=%s", baseURL, model, apiKey)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
@@ -603,6 +635,40 @@ func (s *HealthProbeService) buildGeminiProbeRequest(ctx context.Context, accoun
 	req.Header.Set("Content-Type", "application/json")
 
 	return req, nil
+}
+
+// --- group config CRUD ---
+
+// GetGroupConfig returns the probe config for a specific group.
+func (s *HealthProbeService) GetGroupConfig(ctx context.Context, groupID int64) (*HealthProbeGroupConfig, error) {
+	return s.groupConfigRepo.Get(ctx, groupID)
+}
+
+// ListGroupConfigs returns all per-group probe configs.
+func (s *HealthProbeService) ListGroupConfigs(ctx context.Context) ([]*HealthProbeGroupConfig, error) {
+	return s.groupConfigRepo.ListAll(ctx)
+}
+
+// UpsertGroupConfig creates or updates the probe config for a group.
+func (s *HealthProbeService) UpsertGroupConfig(ctx context.Context, cfg *HealthProbeGroupConfig) error {
+	return s.groupConfigRepo.Upsert(ctx, cfg)
+}
+
+// DeleteGroupConfig removes the probe config for a group.
+func (s *HealthProbeService) DeleteGroupConfig(ctx context.Context, groupID int64) error {
+	return s.groupConfigRepo.Delete(ctx, groupID)
+}
+
+// EnrichResultsWithGroupInfo adds group name, rate multiplier, and platform to results.
+func (s *HealthProbeService) EnrichResultsWithGroupInfo(ctx context.Context, results []*HealthProbeResult) {
+	for _, r := range results {
+		group, err := s.groupRepo.GetByIDLite(ctx, r.GroupID)
+		if err == nil && group != nil {
+			r.GroupName = group.Name
+			r.RateMultiplier = group.RateMultiplier
+			r.Platform = group.Platform
+		}
+	}
 }
 
 // --- webhook alerts ---

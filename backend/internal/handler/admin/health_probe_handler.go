@@ -101,11 +101,13 @@ func (h *HealthProbeHandler) TriggerProbe(c *gin.Context) {
 
 // GetLatestResults GET /admin/health-probe/latest
 func (h *HealthProbeHandler) GetLatestResults(c *gin.Context) {
-	results, err := h.healthProbeSvc.GetLatestResults(c.Request.Context())
+	ctx := c.Request.Context()
+	results, err := h.healthProbeSvc.GetLatestResults(ctx)
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
+	h.healthProbeSvc.EnrichResultsWithGroupInfo(ctx, results)
 	c.JSON(http.StatusOK, results)
 }
 
@@ -177,4 +179,56 @@ func (h *HealthProbeHandler) GetAllSummaries(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, summaries)
+}
+
+// --- Per-group probe config ---
+
+// ListGroupConfigs GET /admin/health-probe/group-configs
+func (h *HealthProbeHandler) ListGroupConfigs(c *gin.Context) {
+	configs, err := h.healthProbeSvc.ListGroupConfigs(c.Request.Context())
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, configs)
+}
+
+type upsertGroupConfigRequest struct {
+	GroupID    int64  `json:"group_id" binding:"required"`
+	ProbeModel string `json:"probe_model"`
+}
+
+// UpsertGroupConfig PUT /admin/health-probe/group-configs
+func (h *HealthProbeHandler) UpsertGroupConfig(c *gin.Context) {
+	var req upsertGroupConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	cfg := &service.HealthProbeGroupConfig{
+		GroupID:    req.GroupID,
+		ProbeModel: req.ProbeModel,
+	}
+
+	if err := h.healthProbeSvc.UpsertGroupConfig(c.Request.Context(), cfg); err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+}
+
+// DeleteGroupConfig DELETE /admin/health-probe/group-configs/:groupId
+func (h *HealthProbeHandler) DeleteGroupConfig(c *gin.Context) {
+	groupID, err := strconv.ParseInt(c.Param("groupId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "invalid group id")
+		return
+	}
+
+	if err := h.healthProbeSvc.DeleteGroupConfig(c.Request.Context(), groupID); err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }

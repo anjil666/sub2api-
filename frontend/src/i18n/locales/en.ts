@@ -365,13 +365,19 @@ export default {
     paymentConfig: 'Payment Config',
     paymentPlans: 'Plans',
     healthProbe: 'Health Probe',
-    healthStatus: 'Service Status'
+    healthStatus: 'Group Availability'
   },
 
   // Health Status
   healthStatus: {
-    title: 'Service Status',
-    description: 'View real-time availability and historical trends for each group',
+    title: 'Group Availability',
+    description: 'Real-time monitoring of service group availability and latency',
+    searchPlaceholder: 'Search group name...',
+    refreshing: 'Refreshing...',
+    refresh: 'Refresh',
+    online: 'Online',
+    offline: 'Offline',
+    unknown: 'Unknown',
     empty: 'No monitoring data',
     emptyDesc: 'Health probing has not been enabled by the administrator',
     latency: 'Latency',

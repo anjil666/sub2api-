@@ -2,6 +2,10 @@ import { apiClient } from './client'
 
 export interface HealthStatusResult {
   group_id: number
+  group_name: string
+  rate_multiplier: number
+  platform: string
+  probe_model: string
   status: number
   latency_ms: number
   checked_at: string
