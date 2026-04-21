@@ -356,7 +356,7 @@ func (s *HealthProbeService) probeGroup(ctx context.Context, group *Group, probe
 	}
 
 	// Select probe model from account's model_mapping
-	probeModel := s.selectProbeModel(probeAccount, group.ID)
+	probeModel := s.selectProbeModel(probeAccount, group)
 
 	// Execute the actual probe
 	result := s.executeProbe(ctx, probeAccount, group, probeModel, probeCfg)
@@ -371,19 +371,31 @@ func (s *HealthProbeService) probeGroup(ctx context.Context, group *Group, probe
 	s.handleStatusChange(ctx, group.ID, result.Status, probeCfg)
 }
 
-func (s *HealthProbeService) selectProbeModel(account *Account, groupID int64) string {
+func (s *HealthProbeService) selectProbeModel(account *Account, group *Group) string {
 	// Check per-group config first
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	groupCfg, err := s.groupConfigRepo.Get(ctx, groupID)
+	groupCfg, err := s.groupConfigRepo.Get(ctx, group.ID)
 	if err == nil && groupCfg != nil && groupCfg.ProbeModel != "" {
 		return groupCfg.ProbeModel
 	}
 
-	mapping := account.GetModelMapping()
-	if mapping != nil {
-		// Prefer a small/cheap model for probing
-		preferredModels := []string{
+	// Platform-aware preferred models
+	var preferredModels []string
+	switch group.Platform {
+	case PlatformGemini:
+		preferredModels = []string{
+			"gemini-2.0-flash",
+			"gemini-1.5-flash",
+		}
+	case PlatformOpenAI:
+		preferredModels = []string{
+			"gpt-4o-mini",
+			"gpt-3.5-turbo",
+		}
+	default:
+		// Claude / Antigravity / others
+		preferredModels = []string{
 			"claude-haiku-4-5-20250514",
 			"claude-3-5-haiku-20241022",
 			"claude-3-haiku-20240307",
@@ -392,6 +404,10 @@ func (s *HealthProbeService) selectProbeModel(account *Account, groupID int64) s
 			"gemini-2.0-flash",
 			"gemini-1.5-flash",
 		}
+	}
+
+	mapping := account.GetModelMapping()
+	if mapping != nil {
 		for _, m := range preferredModels {
 			if _, ok := mapping[m]; ok {
 				return m
@@ -404,7 +420,7 @@ func (s *HealthProbeService) selectProbeModel(account *Account, groupID int64) s
 	}
 
 	// Default by platform
-	switch account.Platform {
+	switch group.Platform {
 	case PlatformOpenAI:
 		return "gpt-4o-mini"
 	case PlatformGemini:

@@ -161,11 +161,25 @@
               <span class="min-w-[120px] font-medium text-gray-900 dark:text-white">
                 {{ getGroupName(gc.group_id) }}
               </span>
-              <input
+              <select
                 v-model="gc.probe_model"
                 class="input flex-1"
-                placeholder="自动选择"
-              />
+              >
+                <option value="">自动选择</option>
+                <optgroup label="Claude">
+                  <option value="claude-haiku-4-5-20250514">claude-haiku-4-5-20250514</option>
+                  <option value="claude-3-5-haiku-20241022">claude-3-5-haiku-20241022</option>
+                  <option value="claude-3-haiku-20240307">claude-3-haiku-20240307</option>
+                </optgroup>
+                <optgroup label="OpenAI">
+                  <option value="gpt-4o-mini">gpt-4o-mini</option>
+                  <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                </optgroup>
+                <optgroup label="Gemini">
+                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                </optgroup>
+              </select>
               <button
                 type="button"
                 class="btn btn-sm text-xs"
@@ -198,11 +212,25 @@
                 {{ g.name }}
               </option>
             </select>
-            <input
+            <select
               v-model="newGroupConfigModel"
               class="input flex-1"
-              placeholder="探测模型名称（如 claude-3-5-haiku-20241022）"
-            />
+            >
+              <option value="">自动选择</option>
+              <optgroup label="Claude">
+                <option value="claude-haiku-4-5-20250514">claude-haiku-4-5-20250514</option>
+                <option value="claude-3-5-haiku-20241022">claude-3-5-haiku-20241022</option>
+                <option value="claude-3-haiku-20240307">claude-3-haiku-20240307</option>
+              </optgroup>
+              <optgroup label="OpenAI">
+                <option value="gpt-4o-mini">gpt-4o-mini</option>
+                <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+              </optgroup>
+              <optgroup label="Gemini">
+                <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+              </optgroup>
+            </select>
             <button
               type="button"
               class="btn btn-primary btn-sm text-xs"

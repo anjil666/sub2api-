@@ -37,23 +37,11 @@
             </svg>
             {{ refreshing ? t('healthStatus.refreshing') : t('healthStatus.refresh') }}
           </button>
-          <!-- Status Filter -->
-          <select v-model="statusFilter" class="input text-sm">
-            <option value="all">{{ t('healthStatus.filter.all') }}</option>
-            <option value="available">{{ t('healthStatus.filter.available') }}</option>
-            <option value="degraded">{{ t('healthStatus.filter.degraded') }}</option>
-            <option value="unavailable">{{ t('healthStatus.filter.unavailable') }}</option>
-          </select>
-          <select v-model="summaryHours" class="input text-sm" @change="loadSummaries">
-            <option :value="6">6h</option>
-            <option :value="12">12h</option>
-            <option :value="24">24h</option>
-          </select>
         </div>
       </div>
 
       <!-- Status Stats Bar -->
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="flex flex-wrap items-center justify-center gap-3">
         <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
           <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
           {{ t('healthStatus.online') }} {{ onlineCount }}
@@ -158,7 +146,7 @@
                 ></div>
               </div>
               <div class="mt-1 flex justify-between text-[10px] text-gray-400 dark:text-gray-500">
-                <span>{{ summaryHours }}h {{ t('healthStatus.ago') }}</span>
+                <span>30min {{ t('healthStatus.ago') }}</span>
                 <span>{{ t('healthStatus.now') }}</span>
               </div>
             </div>
@@ -180,17 +168,16 @@ const { t } = useI18n()
 
 const loading = ref(true)
 const refreshing = ref(false)
-const statusFilter = ref('all')
-const summaryHours = ref(24)
+const summaryHours = ref(1)
 const searchQuery = ref('')
 
 const latestResults = ref<HealthStatusResult[]>([])
 const allSummaries = ref<HealthStatusSummary[]>([])
 
-// Status counts
-const onlineCount = computed(() => latestResults.value.filter(g => g.status === 1).length)
-const offlineCount = computed(() => latestResults.value.filter(g => g.status === 0).length)
-const unknownCount = computed(() => latestResults.value.filter(g => g.status !== 0 && g.status !== 1).length)
+// Status counts — rate_limited (3) counts as online for users
+const onlineCount = computed(() => latestResults.value.filter(g => g.status === 1 || g.status === 3).length)
+const offlineCount = computed(() => latestResults.value.filter(g => g.status === 0 || g.status === 2).length)
+const unknownCount = computed(() => latestResults.value.filter(g => g.status !== 0 && g.status !== 1 && g.status !== 2 && g.status !== 3).length)
 
 // Group summaries by group_id, sorted by bucket_time ascending
 const groupSummaryMap = computed<Record<number, HealthStatusSummary[]>>(() => {
@@ -227,11 +214,6 @@ const filteredGroups = computed(() => {
     })
   }
 
-  // Status filter
-  if (statusFilter.value === 'available') list = list.filter(g => g.status === 1)
-  else if (statusFilter.value === 'degraded') list = list.filter(g => g.status === 2 || g.status === 3)
-  else if (statusFilter.value === 'unavailable') list = list.filter(g => g.status === 0)
-
   return list
 })
 
@@ -239,8 +221,8 @@ function statusLabel(status: number): string {
   switch (status) {
     case 0: return t('healthStatus.statusLabels.unavailable')
     case 1: return t('healthStatus.statusLabels.available')
-    case 2: return t('healthStatus.statusLabels.degraded')
-    case 3: return t('healthStatus.statusLabels.rateLimited')
+    case 2: return t('healthStatus.statusLabels.unavailable')
+    case 3: return t('healthStatus.statusLabels.available')
     default: return t('healthStatus.statusLabels.unknown')
   }
 }
@@ -249,8 +231,8 @@ function statusDotClass(status: number): string {
   switch (status) {
     case 0: return 'bg-red-500'
     case 1: return 'bg-emerald-500'
-    case 2: return 'bg-amber-500'
-    case 3: return 'bg-orange-500'
+    case 2: return 'bg-red-500'
+    case 3: return 'bg-emerald-500'
     default: return 'bg-gray-400'
   }
 }
@@ -260,8 +242,8 @@ function statusBadgeClass(status: number): string {
   switch (status) {
     case 0: return `${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`
     case 1: return `${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`
-    case 2: return `${base} bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300`
-    case 3: return `${base} bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300`
+    case 2: return `${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`
+    case 3: return `${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`
     default: return `${base} bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-gray-400`
   }
 }
