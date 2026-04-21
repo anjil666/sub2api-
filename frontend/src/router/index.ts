@@ -305,6 +305,18 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'referral.description'
     }
   },
+  {
+    path: '/health-status',
+    name: 'HealthStatus',
+    component: () => import('@/views/user/HealthStatusView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Service Status',
+      titleKey: 'healthStatus.title',
+      descriptionKey: 'healthStatus.description'
+    }
+  },
 
   // ==================== Admin Routes ====================
   {
@@ -465,6 +477,18 @@ const routes: RouteRecordRaw[] = [
       title: 'Upstream Sync',
       titleKey: 'admin.upstream.title',
       descriptionKey: 'admin.upstream.description'
+    }
+  },
+  {
+    path: '/admin/health-probe',
+    name: 'AdminHealthProbe',
+    component: () => import('@/views/admin/HealthProbeView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Health Probe',
+      titleKey: 'admin.healthProbe.title',
+      descriptionKey: 'admin.healthProbe.description'
     }
   },
   {

@@ -34,6 +34,7 @@ type AdminHandlers struct {
 	Payment               *admin.PaymentHandler
 	Referral              *admin.ReferralHandler
 	UpstreamSync          *admin.UpstreamHandler
+	HealthProbe           *admin.HealthProbeHandler
 }
 
 // Handlers contains all HTTP handlers
@@ -54,6 +55,7 @@ type Handlers struct {
 	PaymentWebhook *PaymentWebhookHandler
 	Referral       *ReferralHandler
 	ModelSquare    *ModelSquareHandler
+	HealthStatus   *HealthStatusHandler
 }
 
 // BuildInfo contains build-time information

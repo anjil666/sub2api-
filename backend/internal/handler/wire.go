@@ -37,6 +37,7 @@ func ProvideAdminHandlers(
 	paymentHandler *admin.PaymentHandler,
 	referralHandler *admin.ReferralHandler,
 	upstreamHandler *admin.UpstreamHandler,
+	healthProbeHandler *admin.HealthProbeHandler,
 ) *AdminHandlers {
 	return &AdminHandlers{
 		Dashboard:             dashboardHandler,
@@ -67,6 +68,7 @@ func ProvideAdminHandlers(
 		Payment:               paymentHandler,
 		Referral:              referralHandler,
 		UpstreamSync:          upstreamHandler,
+		HealthProbe:           healthProbeHandler,
 	}
 }
 
@@ -98,6 +100,7 @@ func ProvideHandlers(
 	paymentWebhookHandler *PaymentWebhookHandler,
 	referralHandler *ReferralHandler,
 	modelSquareHandler *ModelSquareHandler,
+	healthStatusHandler *HealthStatusHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
@@ -118,6 +121,7 @@ func ProvideHandlers(
 		PaymentWebhook: paymentWebhookHandler,
 		Referral:       referralHandler,
 		ModelSquare:    modelSquareHandler,
+		HealthStatus:   healthStatusHandler,
 	}
 }
 
@@ -136,6 +140,7 @@ var ProviderSet = wire.NewSet(
 	NewTotpHandler,
 	NewModelSquareHandler,
 	NewReferralHandler,
+	NewHealthStatusHandler,
 	ProvideSettingHandler,
 	NewPaymentHandler,
 	NewPaymentWebhookHandler,
@@ -169,6 +174,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewPaymentHandler,
 	admin.NewReferralHandler,
 	admin.NewUpstreamHandler,
+	admin.NewHealthProbeHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

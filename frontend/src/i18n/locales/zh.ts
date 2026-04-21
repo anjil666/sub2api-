@@ -363,7 +363,39 @@ export default {
     orderManagement: '订单管理',
     paymentDashboard: '支付概览',
     paymentConfig: '支付配置',
-    paymentPlans: '订阅套餐'
+    paymentPlans: '订阅套餐',
+    healthProbe: '健康探测',
+    healthStatus: '服务状态'
+  },
+
+  // Health Status (服务状态)
+  healthStatus: {
+    title: '服务状态',
+    description: '查看各分组的实时可用性和历史趋势',
+    empty: '暂无监控数据',
+    emptyDesc: '管理员尚未启用健康探测',
+    latency: '延迟',
+    lastCheck: '最近检测',
+    availability: '可用率',
+    timelineHint: '可用性时间线',
+    ago: '前',
+    now: '现在',
+    justNow: '刚刚',
+    minutesAgo: '{n} 分钟前',
+    hoursAgo: '{n} 小时前',
+    filter: {
+      all: '全部',
+      available: '可用',
+      degraded: '异常',
+      unavailable: '不可用'
+    },
+    statusLabels: {
+      unavailable: '不可用',
+      available: '可用',
+      degraded: '降级',
+      rateLimited: '限流',
+      unknown: '未知'
+    }
   },
 
   // Model Square (模型广场)
@@ -4525,6 +4557,61 @@ export default {
       defaultRate: '默认',
       zeroMeansDefault: '(0=站点默认)',
       confirmDelete: '确定要删除上游站点「{name}」吗？已创建的分组、账号和渠道不会被删除。'
+    },
+
+    // Health Probe
+    healthProbe: {
+      title: '健康探测',
+      description: '配置主动健康探测，监控各分组的可用性',
+      config: {
+        title: '探测配置',
+        description: '设置探测间隔、超时和数据保留策略',
+        enabled: '启用健康探测',
+        intervalMinutes: '探测间隔（分钟）',
+        timeoutSeconds: '请求超时（秒）',
+        retentionHours: '数据保留（小时）',
+        slowThresholdMs: '慢响应阈值（毫秒）',
+        saveSuccess: '配置已保存',
+        webhook: {
+          title: 'Webhook 告警',
+          enabled: '启用 Webhook 通知',
+          url: 'Webhook URL',
+          debounceCount: '去抖次数',
+          debounceHint: '连续 N 次相同状态后才发送通知',
+          cooldownMinutes: '冷却时间（分钟）',
+          cooldownHint: '同一分组两次告警之间的最小间隔'
+        }
+      },
+      triggerNow: '手动探测',
+      triggerSuccess: '已触发探测，结果将在数秒后更新',
+      results: {
+        title: '最新探测结果',
+        description: '各分组最近一次探测的详细结果',
+        empty: '暂无探测结果',
+        group: '分组',
+        model: '探测模型',
+        status: '状态',
+        latency: '延迟',
+        error: '错误信息',
+        time: '探测时间'
+      },
+      summaries: {
+        title: '汇总统计',
+        description: '按 30 分钟时间窗口聚合的可用性统计',
+        empty: '暂无汇总数据',
+        bucket: '时间窗口',
+        totalProbes: '总探测数',
+        successCount: '成功数',
+        availability: '可用率',
+        avgLatency: '平均延迟'
+      },
+      status: {
+        unavailable: '不可用',
+        available: '可用',
+        degraded: '降级',
+        rateLimited: '限流',
+        unknown: '未知'
+      }
     },
 
     // Settings

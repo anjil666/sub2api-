@@ -363,7 +363,39 @@ export default {
     orderManagement: 'Orders',
     paymentDashboard: 'Payment Dashboard',
     paymentConfig: 'Payment Config',
-    paymentPlans: 'Plans'
+    paymentPlans: 'Plans',
+    healthProbe: 'Health Probe',
+    healthStatus: 'Service Status'
+  },
+
+  // Health Status
+  healthStatus: {
+    title: 'Service Status',
+    description: 'View real-time availability and historical trends for each group',
+    empty: 'No monitoring data',
+    emptyDesc: 'Health probing has not been enabled by the administrator',
+    latency: 'Latency',
+    lastCheck: 'Last Check',
+    availability: 'Availability',
+    timelineHint: 'Availability timeline',
+    ago: 'ago',
+    now: 'Now',
+    justNow: 'Just now',
+    minutesAgo: '{n} min ago',
+    hoursAgo: '{n}h ago',
+    filter: {
+      all: 'All',
+      available: 'Available',
+      degraded: 'Degraded',
+      unavailable: 'Unavailable'
+    },
+    statusLabels: {
+      unavailable: 'Unavailable',
+      available: 'Available',
+      degraded: 'Degraded',
+      rateLimited: 'Rate Limited',
+      unknown: 'Unknown'
+    }
   },
 
   // Model Square
@@ -4360,6 +4392,61 @@ export default {
       defaultRate: 'Default',
       zeroMeansDefault: '(0=site default)',
       confirmDelete: 'Delete upstream site "{name}"? Existing groups, accounts, and channels will not be removed.'
+    },
+
+    // Health Probe
+    healthProbe: {
+      title: 'Health Probe',
+      description: 'Configure active health probing to monitor group availability',
+      config: {
+        title: 'Probe Configuration',
+        description: 'Set probe interval, timeout, and data retention policy',
+        enabled: 'Enable health probing',
+        intervalMinutes: 'Probe interval (minutes)',
+        timeoutSeconds: 'Request timeout (seconds)',
+        retentionHours: 'Data retention (hours)',
+        slowThresholdMs: 'Slow response threshold (ms)',
+        saveSuccess: 'Configuration saved',
+        webhook: {
+          title: 'Webhook Alerts',
+          enabled: 'Enable webhook notifications',
+          url: 'Webhook URL',
+          debounceCount: 'Debounce count',
+          debounceHint: 'Send notification only after N consecutive same-status checks',
+          cooldownMinutes: 'Cooldown (minutes)',
+          cooldownHint: 'Minimum interval between alerts for the same group'
+        }
+      },
+      triggerNow: 'Trigger Probe',
+      triggerSuccess: 'Probe triggered, results will update in a few seconds',
+      results: {
+        title: 'Latest Probe Results',
+        description: 'Detailed results from the most recent probe for each group',
+        empty: 'No probe results yet',
+        group: 'Group',
+        model: 'Probe Model',
+        status: 'Status',
+        latency: 'Latency',
+        error: 'Error',
+        time: 'Probed At'
+      },
+      summaries: {
+        title: 'Summary Statistics',
+        description: 'Availability statistics aggregated in 30-minute windows',
+        empty: 'No summary data yet',
+        bucket: 'Time Window',
+        totalProbes: 'Total Probes',
+        successCount: 'Successes',
+        availability: 'Availability',
+        avgLatency: 'Avg Latency'
+      },
+      status: {
+        unavailable: 'Unavailable',
+        available: 'Available',
+        degraded: 'Degraded',
+        rateLimited: 'Rate Limited',
+        unknown: 'Unknown'
+      }
     },
 
     // Settings

@@ -94,6 +94,9 @@ func RegisterAdminRoutes(
 
 		// 上游同步
 		registerUpstreamSyncRoutes(admin, h)
+
+		// 健康探测
+		registerHealthProbeRoutes(admin, h)
 	}
 }
 
@@ -589,5 +592,18 @@ func registerUpstreamSyncRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		upstream.POST("/:id/resources/:resourceId/toggle", h.Admin.UpstreamSync.ToggleResource)
 		upstream.DELETE("/:id/resources/:resourceId", h.Admin.UpstreamSync.DeleteResource)
 		upstream.POST("/:id/toggle", h.Admin.UpstreamSync.Toggle)
+	}
+}
+
+func registerHealthProbeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	probe := admin.Group("/health-probe")
+	{
+		probe.GET("/config", h.Admin.HealthProbe.GetConfig)
+		probe.PUT("/config", h.Admin.HealthProbe.UpdateConfig)
+		probe.POST("/trigger", h.Admin.HealthProbe.TriggerProbe)
+		probe.GET("/latest", h.Admin.HealthProbe.GetLatestResults)
+		probe.GET("/summaries", h.Admin.HealthProbe.GetAllSummaries)
+		probe.GET("/groups/:id/results", h.Admin.HealthProbe.GetGroupResults)
+		probe.GET("/groups/:id/summaries", h.Admin.HealthProbe.GetGroupSummaries)
 	}
 }

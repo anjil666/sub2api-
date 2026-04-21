@@ -29,6 +29,7 @@ import channelsAPI from './channels'
 import adminPaymentAPI from './payment'
 import upstreamAPI from './upstream'
 import referralAPI from './referral'
+import healthProbeAPI from './healthProbe'
 
 /**
  * Unified admin API object for convenient access
@@ -59,7 +60,8 @@ export const adminAPI = {
   channels: channelsAPI,
   payment: adminPaymentAPI,
   upstream: upstreamAPI,
-  referral: referralAPI
+  referral: referralAPI,
+  healthProbe: healthProbeAPI
 }
 
 export {
@@ -88,7 +90,8 @@ export {
   channelsAPI,
   adminPaymentAPI,
   upstreamAPI,
-  referralAPI
+  referralAPI,
+  healthProbeAPI
 }
 
 export default adminAPI
@@ -99,3 +102,4 @@ export type { ErrorPassthroughRule, CreateRuleRequest, UpdateRuleRequest } from 
 export type { BackupAgentHealth, DataManagementConfig } from './dataManagement'
 export type { TLSFingerprintProfile, CreateProfileRequest, UpdateProfileRequest } from './tlsFingerprintProfile'
 export type { UpstreamSite, UpstreamBalanceInfo, UpstreamModelInfo, SyncResult } from './upstream'
+export type { HealthProbeConfig, HealthProbeResult, HealthProbeSummary, UpdateHealthProbeConfigRequest } from './healthProbe'

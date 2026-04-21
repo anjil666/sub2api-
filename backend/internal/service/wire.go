@@ -353,6 +353,20 @@ func ProvideScheduledTestRunnerService(
 	return svc
 }
 
+// ProvideHealthProbeService creates and starts HealthProbeService.
+func ProvideHealthProbeService(
+	configRepo HealthProbeConfigRepository,
+	resultRepo HealthProbeResultRepository,
+	summaryRepo HealthProbeSummaryRepository,
+	groupRepo GroupRepository,
+	accountRepo AccountRepository,
+	cfg *config.Config,
+) *HealthProbeService {
+	svc := NewHealthProbeService(configRepo, resultRepo, summaryRepo, groupRepo, accountRepo, cfg)
+	svc.Start()
+	return svc
+}
+
 // ProvideOpsScheduledReportService creates and starts OpsScheduledReportService.
 func ProvideOpsScheduledReportService(
 	opsService *OpsService,
@@ -472,6 +486,7 @@ var ProviderSet = wire.NewSet(
 	ProvideIdempotencyCleanupService,
 	ProvideScheduledTestService,
 	ProvideScheduledTestRunnerService,
+	ProvideHealthProbeService,
 	NewGroupCapacityService,
 	NewChannelService,
 	NewModelPricingResolver,
