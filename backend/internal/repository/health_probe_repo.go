@@ -157,10 +157,12 @@ func (r *healthProbeResultRepository) ListByGroup(ctx context.Context, groupID i
 
 func (r *healthProbeResultRepository) ListLatestByGroups(ctx context.Context) ([]*service.HealthProbeResult, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT DISTINCT ON (group_id)
-		       id, account_id, group_id, probe_model, status, latency_ms, error_type, http_status_code, error_message, checked_at
-		FROM health_probe_results
-		ORDER BY group_id, checked_at DESC
+		SELECT DISTINCT ON (hpr.group_id)
+		       hpr.id, hpr.account_id, hpr.group_id, hpr.probe_model, hpr.status, hpr.latency_ms, hpr.error_type, hpr.http_status_code, hpr.error_message, hpr.checked_at
+		FROM health_probe_results hpr
+		JOIN groups g ON g.id = hpr.group_id
+		WHERE g.deleted_at IS NULL AND g.status = 'active'
+		ORDER BY hpr.group_id, hpr.checked_at DESC
 	`)
 	if err != nil {
 		return nil, err
@@ -232,10 +234,11 @@ func (r *healthProbeSummaryRepository) ListByGroup(ctx context.Context, groupID 
 
 func (r *healthProbeSummaryRepository) ListAllGroups(ctx context.Context, since time.Time) ([]*service.HealthProbeSummary, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, group_id, bucket_time, total_probes, success_count, avg_latency_ms, availability_pct, created_at
-		FROM health_probe_summaries
-		WHERE bucket_time >= $1
-		ORDER BY group_id ASC, bucket_time ASC
+		SELECT hps.id, hps.group_id, hps.bucket_time, hps.total_probes, hps.success_count, hps.avg_latency_ms, hps.availability_pct, hps.created_at
+		FROM health_probe_summaries hps
+		JOIN groups g ON g.id = hps.group_id
+		WHERE hps.bucket_time >= $1 AND g.deleted_at IS NULL AND g.status = 'active'
+		ORDER BY hps.group_id ASC, hps.bucket_time ASC
 	`, since)
 	if err != nil {
 		return nil, err
@@ -336,9 +339,11 @@ func (r *healthProbeGroupConfigRepository) Get(ctx context.Context, groupID int6
 
 func (r *healthProbeGroupConfigRepository) ListAll(ctx context.Context) ([]*service.HealthProbeGroupConfig, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, group_id, probe_model, created_at, updated_at
-		FROM health_probe_group_configs
-		ORDER BY group_id ASC
+		SELECT hpc.id, hpc.group_id, hpc.probe_model, hpc.created_at, hpc.updated_at
+		FROM health_probe_group_configs hpc
+		JOIN groups g ON g.id = hpc.group_id
+		WHERE g.deleted_at IS NULL AND g.status = 'active'
+		ORDER BY hpc.group_id ASC
 	`)
 	if err != nil {
 		return nil, err

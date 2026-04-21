@@ -232,3 +232,13 @@ func (h *HealthProbeHandler) DeleteGroupConfig(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }
+
+// GetGroupModels GET /admin/health-probe/group-models
+func (h *HealthProbeHandler) GetGroupModels(c *gin.Context) {
+	models, err := h.healthProbeSvc.GetGroupModels(c.Request.Context())
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, models)
+}

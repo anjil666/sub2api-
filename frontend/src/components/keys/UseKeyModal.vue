@@ -286,7 +286,7 @@ const clientTabs = computed((): TabConfig[] => {
     case 'antigravity': {
       const name = (props.groupName || '').toLowerCase()
       const isCodex = name.includes('codex')
-      const isGemini = name.includes('gemini')
+      const isGemini = name.includes('gemini') || name.includes('gemma')
       const tabs: TabConfig[] = []
       if (isCodex) {
         tabs.push({ id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon })

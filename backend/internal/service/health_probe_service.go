@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -685,6 +686,35 @@ func (s *HealthProbeService) EnrichResultsWithGroupInfo(ctx context.Context, res
 			r.Platform = group.Platform
 		}
 	}
+}
+
+// GetGroupModels returns available models for each active group.
+func (s *HealthProbeService) GetGroupModels(ctx context.Context) (map[int64][]string, error) {
+	groups, err := s.groupRepo.ListActive(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[int64][]string, len(groups))
+	for _, g := range groups {
+		accounts, err := s.accountRepo.ListByGroup(ctx, g.ID)
+		if err != nil {
+			continue
+		}
+		modelSet := make(map[string]struct{})
+		for i := range accounts {
+			for model := range accounts[i].GetModelMapping() {
+				modelSet[model] = struct{}{}
+			}
+		}
+		models := make([]string, 0, len(modelSet))
+		for m := range modelSet {
+			models = append(models, m)
+		}
+		sort.Strings(models)
+		result[g.ID] = models
+	}
+	return result, nil
 }
 
 // --- webhook alerts ---

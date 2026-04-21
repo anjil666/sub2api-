@@ -613,16 +613,13 @@ func (a *Account) GetBaseURL() string {
 }
 
 // GetGeminiBaseURL 返回 Gemini 兼容端点的 base URL。
-// Antigravity 平台的 APIKey 账号自动拼接 /antigravity。
+// 上游 Gemini 路由是 /v1beta，不拼接 /antigravity 前缀。
 func (a *Account) GetGeminiBaseURL(defaultBaseURL string) string {
 	baseURL := strings.TrimSpace(a.GetCredential("base_url"))
 	if baseURL == "" {
 		return defaultBaseURL
 	}
-	if a.Platform == PlatformAntigravity && a.Type == AccountTypeAPIKey {
-		return strings.TrimRight(baseURL, "/") + "/antigravity"
-	}
-	return baseURL
+	return strings.TrimRight(baseURL, "/")
 }
 
 func (a *Account) GetExtraString(key string) string {

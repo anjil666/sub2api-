@@ -608,5 +608,6 @@ func registerHealthProbeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		probe.GET("/group-configs", h.Admin.HealthProbe.ListGroupConfigs)
 		probe.PUT("/group-configs", h.Admin.HealthProbe.UpsertGroupConfig)
 		probe.DELETE("/group-configs/:groupId", h.Admin.HealthProbe.DeleteGroupConfig)
+		probe.GET("/group-models", h.Admin.HealthProbe.GetGroupModels)
 	}
 }

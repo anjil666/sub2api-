@@ -40,20 +40,44 @@
         </div>
       </div>
 
-      <!-- Status Stats Bar -->
+      <!-- Status Stats Bar (clickable filters) -->
       <div class="flex flex-wrap items-center justify-center gap-3">
-        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-          <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+        <button
+          @click="statusFilter = statusFilter === 'online' ? 'all' : 'online'"
+          :class="[
+            'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-all cursor-pointer',
+            statusFilter === 'online'
+              ? 'bg-emerald-500 text-white ring-2 ring-emerald-300 dark:ring-emerald-700'
+              : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60'
+          ]"
+        >
+          <span class="h-2 w-2 rounded-full" :class="statusFilter === 'online' ? 'bg-white' : 'bg-emerald-500'"></span>
           {{ t('healthStatus.online') }} {{ onlineCount }}
-        </span>
-        <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700 dark:bg-red-900/40 dark:text-red-300">
-          <span class="h-2 w-2 rounded-full bg-red-500"></span>
+        </button>
+        <button
+          @click="statusFilter = statusFilter === 'offline' ? 'all' : 'offline'"
+          :class="[
+            'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-all cursor-pointer',
+            statusFilter === 'offline'
+              ? 'bg-red-500 text-white ring-2 ring-red-300 dark:ring-red-700'
+              : 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-900/60'
+          ]"
+        >
+          <span class="h-2 w-2 rounded-full" :class="statusFilter === 'offline' ? 'bg-white' : 'bg-red-500'"></span>
           {{ t('healthStatus.offline') }} {{ offlineCount }}
-        </span>
-        <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-600 dark:bg-dark-700 dark:text-gray-400">
-          <span class="h-2 w-2 rounded-full bg-gray-400"></span>
-          {{ t('healthStatus.unknown') }} {{ unknownCount }}
-        </span>
+        </button>
+        <button
+          @click="statusFilter = 'all'"
+          :class="[
+            'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-all cursor-pointer',
+            statusFilter === 'all'
+              ? 'bg-gray-500 text-white ring-2 ring-gray-300 dark:ring-gray-600'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600'
+          ]"
+        >
+          <span class="h-2 w-2 rounded-full" :class="statusFilter === 'all' ? 'bg-white' : 'bg-gray-400'"></span>
+          {{ t('healthStatus.filter.all') }} {{ latestResults.length }}
+        </button>
       </div>
 
       <!-- Loading -->
@@ -100,7 +124,7 @@
               </div>
               <div v-if="group.probe_model" class="mt-1 ml-5">
                 <span class="inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500 dark:bg-dark-600 dark:text-gray-400">
-                  {{ group.probe_model }}
+                  {{ platformLabel(group.probe_model) }}
                 </span>
               </div>
             </div>
@@ -170,6 +194,7 @@ const loading = ref(true)
 const refreshing = ref(false)
 const summaryHours = ref(1)
 const searchQuery = ref('')
+const statusFilter = ref<'all' | 'online' | 'offline'>('all')
 
 const latestResults = ref<HealthStatusResult[]>([])
 const allSummaries = ref<HealthStatusSummary[]>([])
@@ -177,7 +202,6 @@ const allSummaries = ref<HealthStatusSummary[]>([])
 // Status counts — rate_limited (3) counts as online for users
 const onlineCount = computed(() => latestResults.value.filter(g => g.status === 1 || g.status === 3).length)
 const offlineCount = computed(() => latestResults.value.filter(g => g.status === 0 || g.status === 2).length)
-const unknownCount = computed(() => latestResults.value.filter(g => g.status !== 0 && g.status !== 1 && g.status !== 2 && g.status !== 3).length)
 
 // Group summaries by group_id, sorted by bucket_time ascending
 const groupSummaryMap = computed<Record<number, HealthStatusSummary[]>>(() => {
@@ -204,6 +228,13 @@ function groupAvailabilityPct(groupId: number): number {
 
 const filteredGroups = computed(() => {
   let list = latestResults.value
+
+  // Status filter
+  if (statusFilter.value === 'online') {
+    list = list.filter(g => g.status === 1 || g.status === 3)
+  } else if (statusFilter.value === 'offline') {
+    list = list.filter(g => g.status === 0 || g.status === 2)
+  }
 
   // Search filter
   if (searchQuery.value.trim()) {
@@ -287,6 +318,19 @@ function formatTime(ts: string): string {
 
 function cleanGroupName(name: string): string {
   return name.replace(/\s*\(gAI\)\s*$/, '')
+}
+
+function platformLabel(model: string): string {
+  const m = model.toLowerCase()
+  if (m.includes('claude')) return 'Claude'
+  if (m.startsWith('gpt') || m.startsWith('o1') || m.startsWith('o3') || m.startsWith('o4') || m.startsWith('chatgpt')) return 'GPT'
+  if (m.includes('gemini') || m.includes('gemma')) return 'Gemini'
+  if (m.includes('deepseek')) return 'DeepSeek'
+  if (m.includes('qwen')) return 'Qwen'
+  if (m.includes('llama')) return 'Llama'
+  if (m.includes('mistral')) return 'Mistral'
+  if (m.includes('grok')) return 'Grok'
+  return model
 }
 
 async function loadLatest() {

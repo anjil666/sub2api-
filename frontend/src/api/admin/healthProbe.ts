@@ -115,6 +115,11 @@ export async function deleteGroupConfig(groupId: number): Promise<void> {
   await apiClient.delete(`/admin/health-probe/group-configs/${groupId}`)
 }
 
+export async function getGroupModels(): Promise<Record<number, string[]>> {
+  const { data } = await apiClient.get<Record<number, string[]>>('/admin/health-probe/group-models')
+  return data ?? {}
+}
+
 export const healthProbeAPI = {
   getConfig,
   updateConfig,
@@ -125,7 +130,8 @@ export const healthProbeAPI = {
   getGroupSummaries,
   listGroupConfigs,
   upsertGroupConfig,
-  deleteGroupConfig
+  deleteGroupConfig,
+  getGroupModels
 }
 
 export default healthProbeAPI

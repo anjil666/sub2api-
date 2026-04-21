@@ -166,19 +166,13 @@
                 class="input flex-1"
               >
                 <option value="">自动选择</option>
-                <optgroup label="Claude">
-                  <option value="claude-haiku-4-5-20250514">claude-haiku-4-5-20250514</option>
-                  <option value="claude-3-5-haiku-20241022">claude-3-5-haiku-20241022</option>
-                  <option value="claude-3-haiku-20240307">claude-3-haiku-20240307</option>
-                </optgroup>
-                <optgroup label="OpenAI">
-                  <option value="gpt-4o-mini">gpt-4o-mini</option>
-                  <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-                </optgroup>
-                <optgroup label="Gemini">
-                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-                </optgroup>
+                <option
+                  v-for="model in getModelsForGroup(gc.group_id)"
+                  :key="model"
+                  :value="model"
+                >
+                  {{ model }}
+                </option>
               </select>
               <button
                 type="button"
@@ -217,19 +211,13 @@
               class="input flex-1"
             >
               <option value="">自动选择</option>
-              <optgroup label="Claude">
-                <option value="claude-haiku-4-5-20250514">claude-haiku-4-5-20250514</option>
-                <option value="claude-3-5-haiku-20241022">claude-3-5-haiku-20241022</option>
-                <option value="claude-3-haiku-20240307">claude-3-haiku-20240307</option>
-              </optgroup>
-              <optgroup label="OpenAI">
-                <option value="gpt-4o-mini">gpt-4o-mini</option>
-                <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-              </optgroup>
-              <optgroup label="Gemini">
-                <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-                <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-              </optgroup>
+              <option
+                v-for="model in getModelsForGroup(newGroupConfigGroupId)"
+                :key="model"
+                :value="model"
+              >
+                {{ model }}
+              </option>
             </select>
             <button
               type="button"
@@ -350,6 +338,7 @@ const loadingGroupConfigs = ref(false)
 const groupConfigs = ref<(HealthProbeGroupConfig & { _saving?: boolean })[]>([])
 const newGroupConfigGroupId = ref<number>(0)
 const newGroupConfigModel = ref('')
+const groupModels = ref<Record<number, string[]>>({})
 
 // Available groups (from results, for group config dropdown)
 const availableGroupsForConfig = computed(() => {
@@ -366,6 +355,18 @@ const availableGroupsForConfig = computed(() => {
 function getGroupName(groupId: number): string {
   const r = results.value.find(r => r.group_id === groupId)
   return r?.group_name || `Group ${groupId}`
+}
+
+function getModelsForGroup(groupId: number): string[] {
+  return groupModels.value[groupId] || []
+}
+
+async function loadGroupModels() {
+  try {
+    groupModels.value = await adminAPI.healthProbe.getGroupModels()
+  } catch {
+    // silent
+  }
 }
 
 async function loadConfig() {
@@ -507,5 +508,6 @@ onMounted(async () => {
   await loadConfig()
   loadResults()
   loadGroupConfigs()
+  loadGroupModels()
 })
 </script>
