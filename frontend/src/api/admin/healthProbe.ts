@@ -26,6 +26,9 @@ export interface HealthProbeResult {
   http_status_code: number
   error_message: string
   checked_at: string
+  group_name?: string
+  rate_multiplier?: number
+  platform?: string
 }
 
 export interface HealthProbeSummary {

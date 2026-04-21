@@ -329,7 +329,7 @@ const availableGroupsForConfig = computed(() => {
   const groups: { id: number; name: string }[] = []
   for (const r of results.value) {
     if (!configuredIds.has(r.group_id)) {
-      groups.push({ id: r.group_id, name: (r as any).group_name || `Group ${r.group_id}` })
+      groups.push({ id: r.group_id, name: r.group_name || `Group ${r.group_id}` })
     }
   }
   return groups
@@ -337,7 +337,7 @@ const availableGroupsForConfig = computed(() => {
 
 function getGroupName(groupId: number): string {
   const r = results.value.find(r => r.group_id === groupId)
-  return (r as any)?.group_name || `Group ${groupId}`
+  return r?.group_name || `Group ${groupId}`
 }
 
 async function loadConfig() {
