@@ -269,7 +269,7 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api'
 import { useAppStore } from '@/stores'
-import type { HealthProbeConfig, HealthProbeResult, HealthProbeSummary, UpdateHealthProbeConfigRequest } from '@/api/admin/healthProbe'
+import type { HealthProbeResult, HealthProbeSummary, UpdateHealthProbeConfigRequest } from '@/api/admin/healthProbe'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -315,7 +315,7 @@ async function loadConfig() {
       webhook_cooldown_minutes: cfg.webhook_cooldown_minutes,
     }
   } catch (e: any) {
-    appStore.showToast(e.message || 'Failed to load config', 'error')
+    appStore.showToast('error', e.message || 'Failed to load config')
   } finally {
     loadingConfig.value = false
   }
@@ -325,9 +325,9 @@ async function saveConfig() {
   savingConfig.value = true
   try {
     await adminAPI.healthProbe.updateConfig(configForm.value)
-    appStore.showToast(t('admin.healthProbe.config.saveSuccess'), 'success')
+    appStore.showToast('success', t('admin.healthProbe.config.saveSuccess'))
   } catch (e: any) {
-    appStore.showToast(e.message || 'Failed to save config', 'error')
+    appStore.showToast('error', e.message || 'Failed to save config')
   } finally {
     savingConfig.value = false
   }
@@ -337,11 +337,11 @@ async function handleTrigger() {
   triggering.value = true
   try {
     await adminAPI.healthProbe.triggerProbe()
-    appStore.showToast(t('admin.healthProbe.triggerSuccess'), 'success')
+    appStore.showToast('success', t('admin.healthProbe.triggerSuccess'))
     // Reload results after a short delay
     setTimeout(() => loadResults(), 3000)
   } catch (e: any) {
-    appStore.showToast(e.message || 'Failed to trigger probe', 'error')
+    appStore.showToast('error', e.message || 'Failed to trigger probe')
   } finally {
     triggering.value = false
   }
@@ -352,7 +352,7 @@ async function loadResults() {
   try {
     results.value = await adminAPI.healthProbe.getLatestResults()
   } catch (e: any) {
-    appStore.showToast(e.message || 'Failed to load results', 'error')
+    appStore.showToast('error', e.message || 'Failed to load results')
   } finally {
     loadingResults.value = false
   }
@@ -363,7 +363,7 @@ async function loadSummaries() {
   try {
     summaries.value = await adminAPI.healthProbe.getAllSummaries(summaryHours.value)
   } catch (e: any) {
-    appStore.showToast(e.message || 'Failed to load summaries', 'error')
+    appStore.showToast('error', e.message || 'Failed to load summaries')
   } finally {
     loadingSummaries.value = false
   }
