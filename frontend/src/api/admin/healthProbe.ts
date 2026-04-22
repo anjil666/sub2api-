@@ -111,6 +111,10 @@ export async function upsertGroupConfig(groupId: number, probeModel: string): Pr
   await apiClient.put('/admin/health-probe/group-configs', { group_id: groupId, probe_model: probeModel })
 }
 
+export async function batchUpsertGroupConfigs(configs: { group_id: number; probe_model: string }[]): Promise<void> {
+  await apiClient.put('/admin/health-probe/group-configs/batch', { configs })
+}
+
 export async function deleteGroupConfig(groupId: number): Promise<void> {
   await apiClient.delete(`/admin/health-probe/group-configs/${groupId}`)
 }
@@ -130,6 +134,7 @@ export const healthProbeAPI = {
   getGroupSummaries,
   listGroupConfigs,
   upsertGroupConfig,
+  batchUpsertGroupConfigs,
   deleteGroupConfig,
   getGroupModels
 }

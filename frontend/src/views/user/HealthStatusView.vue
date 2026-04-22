@@ -19,29 +19,13 @@
             :placeholder="t('healthStatus.searchPlaceholder')"
             class="input text-sm w-48"
           />
-          <!-- Refresh -->
-          <button
-            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300 dark:hover:bg-dark-700"
-            :disabled="refreshing"
-            @click="handleRefresh"
-          >
-            <svg
-              class="h-4 w-4"
-              :class="{ 'animate-spin': refreshing }"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {{ refreshing ? t('healthStatus.refreshing') : t('healthStatus.refresh') }}
-          </button>
         </div>
       </div>
 
       <!-- Status Stats Bar (clickable filters) -->
-      <div class="flex flex-wrap items-center justify-center gap-3">
+      <div class="flex flex-col items-center gap-1.5">
+        <span class="text-xs text-gray-400 dark:text-gray-500">{{ t('healthStatus.filterHint') }}</span>
+        <div class="flex flex-wrap items-center justify-center gap-3">
         <button
           @click="statusFilter = statusFilter === 'online' ? 'all' : 'online'"
           :class="[
@@ -78,6 +62,25 @@
           <span class="h-2 w-2 rounded-full" :class="statusFilter === 'all' ? 'bg-white' : 'bg-gray-400'"></span>
           {{ t('healthStatus.filter.all') }} {{ latestResults.length }}
         </button>
+        <!-- Refresh -->
+        <button
+          class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium text-gray-600 transition-all cursor-pointer bg-gray-100 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600"
+          :disabled="refreshing"
+          @click="handleRefresh"
+        >
+          <svg
+            class="h-3.5 w-3.5"
+            :class="{ 'animate-spin': refreshing }"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          {{ refreshing ? t('healthStatus.refreshing') : t('healthStatus.refresh') }}
+        </button>
+        </div>
       </div>
 
       <!-- Loading -->
@@ -139,7 +142,7 @@
             <div class="flex items-center justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">{{ t('healthStatus.latency') }}</span>
               <span class="font-mono text-gray-900 dark:text-white">
-                {{ group.latency_ms > 0 ? group.latency_ms + ' ms' : '-' }}
+                {{ formatLatency(group) }}
               </span>
             </div>
 
@@ -195,6 +198,7 @@ const refreshing = ref(false)
 const summaryHours = ref(1)
 const searchQuery = ref('')
 const statusFilter = ref<'all' | 'online' | 'offline'>('all')
+const timeoutSeconds = ref(15)
 
 const latestResults = ref<HealthStatusResult[]>([])
 const allSummaries = ref<HealthStatusSummary[]>([])
@@ -320,6 +324,26 @@ function cleanGroupName(name: string): string {
   return name.replace(/\s*\(gAI\)\s*$/, '')
 }
 
+function isOffline(status: number): boolean {
+  return status === 0 || status === 2
+}
+
+function formatLatency(group: HealthStatusResult): string {
+  if (isOffline(group.status)) {
+    // Offline: if latency_ms is 0 (timeout), show >Xs; otherwise hide
+    if (group.latency_ms === 0) {
+      return `>${timeoutSeconds.value}s`
+    }
+    return '-'
+  }
+  // Online: format nicely
+  if (group.latency_ms <= 0) return '-'
+  if (group.latency_ms >= 1000) {
+    return (group.latency_ms / 1000).toFixed(1) + 's'
+  }
+  return group.latency_ms + ' ms'
+}
+
 function platformLabel(model: string): string {
   const m = model.toLowerCase()
   if (m.includes('claude')) return 'Claude'
@@ -331,6 +355,15 @@ function platformLabel(model: string): string {
   if (m.includes('mistral')) return 'Mistral'
   if (m.includes('grok')) return 'Grok'
   return model
+}
+
+async function loadConfig() {
+  try {
+    const cfg = await healthStatusAPI.getConfig()
+    timeoutSeconds.value = cfg.timeout_seconds
+  } catch {
+    // silent, keep default 15
+  }
 }
 
 async function loadLatest() {
@@ -357,7 +390,7 @@ async function handleRefresh() {
 
 onMounted(async () => {
   loading.value = true
-  await Promise.all([loadLatest(), loadSummaries()])
+  await Promise.all([loadConfig(), loadLatest(), loadSummaries()])
   loading.value = false
 })
 </script>

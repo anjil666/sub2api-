@@ -18,6 +18,19 @@ func NewHealthStatusHandler(healthProbeSvc *service.HealthProbeService) *HealthS
 	return &HealthStatusHandler{healthProbeSvc: healthProbeSvc}
 }
 
+// GetConfig GET /health-status/config — exposes non-sensitive probe config to users
+func (h *HealthStatusHandler) GetConfig(c *gin.Context) {
+	ctx := c.Request.Context()
+	cfg, err := h.healthProbeSvc.GetConfig(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"timeout_seconds": cfg.TimeoutSeconds,
+	})
+}
+
 // GetLatest GET /health-status/latest
 func (h *HealthStatusHandler) GetLatest(c *gin.Context) {
 	ctx := c.Request.Context()

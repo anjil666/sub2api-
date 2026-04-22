@@ -218,6 +218,30 @@ func (h *HealthProbeHandler) UpsertGroupConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }
 
+// BatchUpsertGroupConfigs PUT /admin/health-probe/group-configs/batch
+func (h *HealthProbeHandler) BatchUpsertGroupConfigs(c *gin.Context) {
+	var req struct {
+		Configs []upsertGroupConfigRequest `json:"configs" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	ctx := c.Request.Context()
+	for _, item := range req.Configs {
+		cfg := &service.HealthProbeGroupConfig{
+			GroupID:    item.GroupID,
+			ProbeModel: item.ProbeModel,
+		}
+		if err := h.healthProbeSvc.UpsertGroupConfig(ctx, cfg); err != nil {
+			response.InternalError(c, err.Error())
+			return
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+}
+
 // DeleteGroupConfig DELETE /admin/health-probe/group-configs/:groupId
 func (h *HealthProbeHandler) DeleteGroupConfig(c *gin.Context) {
 	groupID, err := strconv.ParseInt(c.Param("groupId"), 10, 64)

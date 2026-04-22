@@ -1,5 +1,9 @@
 import { apiClient } from './client'
 
+export interface HealthStatusConfig {
+  timeout_seconds: number
+}
+
 export interface HealthStatusResult {
   group_id: number
   group_name: string
@@ -22,6 +26,11 @@ export interface HealthStatusSummary {
   created_at: string
 }
 
+export async function getConfig(): Promise<HealthStatusConfig> {
+  const { data } = await apiClient.get<HealthStatusConfig>('/health-status/config')
+  return data
+}
+
 export async function getLatest(): Promise<HealthStatusResult[]> {
   const { data } = await apiClient.get<HealthStatusResult[]>('/health-status/latest')
   return data ?? []
@@ -42,6 +51,7 @@ export async function getGroupSummaries(groupId: number, hours?: number): Promis
 }
 
 export const healthStatusAPI = {
+  getConfig,
   getLatest,
   getAllSummaries,
   getGroupSummaries

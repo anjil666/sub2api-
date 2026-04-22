@@ -109,6 +109,7 @@ func RegisterUserRoutes(
 		// 健康状态（用户可见）
 		healthStatus := authenticated.Group("/health-status")
 		{
+			healthStatus.GET("/config", h.HealthStatus.GetConfig)
 			healthStatus.GET("/latest", h.HealthStatus.GetLatest)
 			healthStatus.GET("/summaries", h.HealthStatus.GetAllSummaries)
 			healthStatus.GET("/groups/:id/summaries", h.HealthStatus.GetGroupSummaries)

@@ -395,6 +395,7 @@ export default {
       degraded: '异常',
       unavailable: '不可用'
     },
+    filterHint: '点击按钮筛选状态',
     statusLabels: {
       unavailable: '不可用',
       available: '可用',

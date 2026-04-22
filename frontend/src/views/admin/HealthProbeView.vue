@@ -144,90 +144,56 @@
               为每个分组指定探测使用的模型，留空表示自动选择
             </p>
           </div>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            :disabled="savingAllGroupConfigs"
+            @click="saveAllGroupConfigs"
+          >
+            {{ savingAllGroupConfigs ? '保存中...' : '全部保存' }}
+          </button>
         </div>
 
         <div v-if="loadingGroupConfigs" class="flex justify-center py-6">
           <div class="h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"></div>
         </div>
 
-        <div v-else>
-          <!-- Existing group configs -->
-          <div v-if="groupConfigs.length > 0" class="mb-4 space-y-2">
-            <div
-              v-for="gc in groupConfigs"
-              :key="gc.group_id"
-              class="flex items-center gap-3 rounded-lg border border-gray-100 px-4 py-2.5 dark:border-dark-700"
-            >
-              <span class="min-w-[120px] font-medium text-gray-900 dark:text-white">
-                {{ getGroupName(gc.group_id) }}
-              </span>
-              <select
-                v-model="gc.probe_model"
-                class="input flex-1"
-              >
-                <option value="">自动选择</option>
-                <option
-                  v-for="model in getModelsForGroup(gc.group_id)"
-                  :key="model"
-                  :value="model"
-                >
-                  {{ model }}
-                </option>
-              </select>
-              <button
-                type="button"
-                class="btn btn-sm text-xs"
-                :class="gc._saving ? 'btn-secondary' : 'btn-primary'"
-                :disabled="gc._saving"
-                @click="saveGroupConfig(gc)"
-              >
-                {{ gc._saving ? '...' : '保存' }}
-              </button>
-              <button
-                type="button"
-                class="btn btn-sm btn-danger text-xs"
-                :disabled="gc._saving"
-                @click="removeGroupConfig(gc.group_id)"
-              >
-                删除
-              </button>
-            </div>
-          </div>
+        <div v-else-if="allGroupRows.length === 0" class="py-6 text-center text-gray-500 dark:text-gray-400">
+          暂无活跃分组
+        </div>
 
-          <!-- Add new group config -->
-          <div class="flex items-center gap-3">
-            <select v-model="newGroupConfigGroupId" class="input">
-              <option :value="0" disabled>选择分组...</option>
-              <option
-                v-for="g in availableGroupsForConfig"
-                :key="g.id"
-                :value="g.id"
+        <div v-else class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-200 dark:border-dark-600">
+                <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">分组</th>
+                <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">探测模型</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="row in allGroupRows"
+                :key="row.group_id"
+                class="border-b border-gray-100 dark:border-dark-700 hover:bg-gray-50 dark:hover:bg-dark-700/50"
               >
-                {{ g.name }}
-              </option>
-            </select>
-            <select
-              v-model="newGroupConfigModel"
-              class="input flex-1"
-            >
-              <option value="">自动选择</option>
-              <option
-                v-for="model in getModelsForGroup(newGroupConfigGroupId)"
-                :key="model"
-                :value="model"
-              >
-                {{ model }}
-              </option>
-            </select>
-            <button
-              type="button"
-              class="btn btn-primary btn-sm text-xs"
-              :disabled="!newGroupConfigGroupId"
-              @click="addGroupConfig"
-            >
-              添加
-            </button>
-          </div>
+                <td class="px-3 py-2 font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                  {{ row.group_name }}
+                </td>
+                <td class="px-3 py-2">
+                  <select v-model="row.probe_model" class="input w-full">
+                    <option value="">自动选择</option>
+                    <option
+                      v-for="model in getModelsForGroup(row.group_id)"
+                      :key="model"
+                      :value="model"
+                    >
+                      {{ model }}
+                    </option>
+                  </select>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -304,7 +270,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api'
 import { useAppStore } from '@/stores'
@@ -335,26 +301,23 @@ const results = ref<HealthProbeResult[]>([])
 
 // Group configs
 const loadingGroupConfigs = ref(false)
-const groupConfigs = ref<(HealthProbeGroupConfig & { _saving?: boolean })[]>([])
-const newGroupConfigGroupId = ref<number>(0)
-const newGroupConfigModel = ref('')
+const savingAllGroupConfigs = ref(false)
+const groupConfigs = ref<HealthProbeGroupConfig[]>([])
 const groupModels = ref<Record<number, string[]>>({})
 
-// Available groups (from results, for group config dropdown)
-const availableGroupsForConfig = computed(() => {
-  const configuredIds = new Set(groupConfigs.value.map(gc => gc.group_id))
-  const groups: { id: number; name: string }[] = []
-  for (const r of results.value) {
-    if (!configuredIds.has(r.group_id)) {
-      groups.push({ id: r.group_id, name: r.group_name || `Group ${r.group_id}` })
-    }
-  }
-  return groups
-})
+// All groups name map (loaded from groups API)
+const allGroupsMap = ref<Record<number, string>>({})
+
+// Combined table rows: all groups that have models, with current config
+interface GroupRow {
+  group_id: number
+  group_name: string
+  probe_model: string
+}
+const allGroupRows = ref<GroupRow[]>([])
 
 function getGroupName(groupId: number): string {
-  const r = results.value.find(r => r.group_id === groupId)
-  return r?.group_name || `Group ${groupId}`
+  return allGroupsMap.value[groupId] || `Group ${groupId}`
 }
 
 function getModelsForGroup(groupId: number): string[] {
@@ -439,38 +402,62 @@ async function loadGroupConfigs() {
   }
 }
 
-async function saveGroupConfig(gc: HealthProbeGroupConfig & { _saving?: boolean }) {
-  gc._saving = true
+async function loadAllGroups() {
   try {
-    await adminAPI.healthProbe.upsertGroupConfig(gc.group_id, gc.probe_model)
-    appStore.showToast('success', '已保存')
+    const groups = await adminAPI.groups.getAll()
+    const map: Record<number, string> = {}
+    for (const g of groups) {
+      map[g.id] = g.name
+    }
+    allGroupsMap.value = map
+  } catch {
+    // silent
+  }
+}
+
+function buildGroupRows() {
+  const configMap = new Map<number, string>()
+  for (const gc of groupConfigs.value) {
+    configMap.set(Number(gc.group_id), gc.probe_model)
+  }
+  const rows: GroupRow[] = []
+  const groupIds = Object.keys(groupModels.value).map(Number).sort((a, b) => a - b)
+  for (const gid of groupIds) {
+    rows.push({
+      group_id: gid,
+      group_name: getGroupName(gid),
+      probe_model: configMap.get(gid) || '',
+    })
+  }
+  allGroupRows.value = rows
+}
+
+async function saveAllGroupConfigs() {
+  savingAllGroupConfigs.value = true
+  try {
+    const configs = allGroupRows.value
+      .filter(row => row.probe_model !== '')
+      .map(row => ({ group_id: row.group_id, probe_model: row.probe_model }))
+
+    // Delete configs for groups that were cleared (had config but now empty)
+    const configuredIds = new Set(groupConfigs.value.map(gc => Number(gc.group_id)))
+    const newConfigIds = new Set(configs.map(c => c.group_id))
+    const toDelete = [...configuredIds].filter(id => !newConfigIds.has(id))
+
+    if (configs.length > 0) {
+      await adminAPI.healthProbe.batchUpsertGroupConfigs(configs)
+    }
+    for (const gid of toDelete) {
+      await adminAPI.healthProbe.deleteGroupConfig(gid)
+    }
+
+    await loadGroupConfigs()
+    buildGroupRows()
+    appStore.showToast('success', '已保存全部分组配置')
   } catch (e: any) {
     appStore.showToast('error', e.message || 'Failed to save')
   } finally {
-    gc._saving = false
-  }
-}
-
-async function removeGroupConfig(groupId: number) {
-  try {
-    await adminAPI.healthProbe.deleteGroupConfig(groupId)
-    groupConfigs.value = groupConfigs.value.filter(gc => gc.group_id !== groupId)
-    appStore.showToast('success', '已删除')
-  } catch (e: any) {
-    appStore.showToast('error', e.message || 'Failed to delete')
-  }
-}
-
-async function addGroupConfig() {
-  if (!newGroupConfigGroupId.value) return
-  try {
-    await adminAPI.healthProbe.upsertGroupConfig(newGroupConfigGroupId.value, newGroupConfigModel.value)
-    await loadGroupConfigs()
-    newGroupConfigGroupId.value = 0
-    newGroupConfigModel.value = ''
-    appStore.showToast('success', '已添加')
-  } catch (e: any) {
-    appStore.showToast('error', e.message || 'Failed to add')
+    savingAllGroupConfigs.value = false
   }
 }
 
@@ -506,8 +493,7 @@ function formatTime(ts: string): string {
 
 onMounted(async () => {
   await loadConfig()
-  loadResults()
-  loadGroupConfigs()
-  loadGroupModels()
+  await Promise.all([loadResults(), loadGroupConfigs(), loadGroupModels(), loadAllGroups()])
+  buildGroupRows()
 })
 </script>

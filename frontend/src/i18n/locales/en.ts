@@ -395,6 +395,7 @@ export default {
       degraded: 'Degraded',
       unavailable: 'Unavailable'
     },
+    filterHint: 'Click to filter by status',
     statusLabels: {
       unavailable: 'Unavailable',
       available: 'Available',
