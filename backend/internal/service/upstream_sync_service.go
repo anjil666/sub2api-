@@ -1244,6 +1244,9 @@ func (s *UpstreamSyncService) buildModelPricing(models []UpstreamModelInfo, mult
 		if price, ok := lookupImageModelPrice(m.ID); ok {
 			p := price * multiplier
 			pricing.PerRequestPrice = &p
+		} else {
+			p := defaultImageFallbackPrice * multiplier
+			pricing.PerRequestPrice = &p
 		}
 		pricingList = append(pricingList, pricing)
 	}
@@ -1300,9 +1303,12 @@ var defaultModelPrices = map[string]modelDefaultPrice{
 // defaultImageModelPrices 图片模型默认按次计费价格（USD per request）
 var defaultImageModelPrices = map[string]float64{
 	"gpt-image-1":  0.080,
+	"gpt-image-2":  0.080,
 	"dall-e-3":     0.040,
 	"dall-e-2":     0.020,
 }
+
+const defaultImageFallbackPrice = 0.080
 
 // isImageModel 判断模型是否为图片生成模型
 func isImageModel(modelID string) bool {
