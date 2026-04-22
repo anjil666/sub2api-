@@ -2,7 +2,10 @@
 package handler
 
 import (
+	"fmt"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -11,6 +14,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+var msPerRequestTagRe = regexp.MustCompile(`\[per_request:([\d.]+)\]`)
 
 // ModelSquareHandler handles model square (模型广场) requests
 type ModelSquareHandler struct {
@@ -34,15 +39,17 @@ func NewModelSquareHandler(
 
 // modelSquareItem represents a single model's information
 type modelSquareItem struct {
-	ModelName                 string  `json:"model_name"`
-	Provider                  string  `json:"provider"`
-	Mode                      string  `json:"mode"`
-	InputPricePerMillion      float64 `json:"input_price_per_million"`
-	OutputPricePerMillion     float64 `json:"output_price_per_million"`
-	CacheWritePricePerMillion float64 `json:"cache_write_price_per_million"`
-	CacheReadPricePerMillion  float64 `json:"cache_read_price_per_million"`
-	SupportsPromptCaching     bool    `json:"supports_prompt_caching"`
-	HasPricing                bool    `json:"has_pricing"`
+	ModelName                 string   `json:"model_name"`
+	Provider                  string   `json:"provider"`
+	Mode                      string   `json:"mode"`
+	InputPricePerMillion      float64  `json:"input_price_per_million"`
+	OutputPricePerMillion     float64  `json:"output_price_per_million"`
+	CacheWritePricePerMillion float64  `json:"cache_write_price_per_million"`
+	CacheReadPricePerMillion  float64  `json:"cache_read_price_per_million"`
+	SupportsPromptCaching     bool     `json:"supports_prompt_caching"`
+	HasPricing                bool     `json:"has_pricing"`
+	BillingMode               string   `json:"billing_mode,omitempty"`
+	PerRequestPrice           *float64 `json:"per_request_price,omitempty"`
 }
 
 // modelSquareGroup represents models available in a specific group
@@ -51,6 +58,7 @@ type modelSquareGroup struct {
 	GroupName      string            `json:"group_name"`
 	Platform       string            `json:"platform"`
 	RateMultiplier float64           `json:"rate_multiplier"`
+	BillingDisplay string            `json:"billing_display,omitempty"`
 	Models         []modelSquareItem `json:"models"`
 }
 
@@ -79,12 +87,20 @@ func (h *ModelSquareHandler) List(c *gin.Context) {
 		groupID := group.ID
 		models := h.gatewayService.GetAvailableModels(ctx, &groupID, group.Platform)
 
+		var billingDisplay string
+		if m := msPerRequestTagRe.FindStringSubmatch(group.Description); len(m) == 2 {
+			if price, err := strconv.ParseFloat(m[1], 64); err == nil && price > 0 {
+				billingDisplay = fmt.Sprintf("$%.3g/次", price)
+			}
+		}
+
 		if len(models) == 0 {
 			result = append(result, modelSquareGroup{
 				GroupID:        group.ID,
 				GroupName:      group.Name,
 				Platform:       group.Platform,
 				RateMultiplier: group.RateMultiplier,
+				BillingDisplay: billingDisplay,
 				Models:         []modelSquareItem{},
 			})
 			continue
@@ -94,24 +110,38 @@ func (h *ModelSquareHandler) List(c *gin.Context) {
 
 		modelInfos := make([]modelSquareItem, 0, len(models))
 		for _, modelName := range models {
-			pricing := h.pricingService.GetModelPricing(modelName)
-
 			info := modelSquareItem{
-				ModelName:  modelName,
-				HasPricing: pricing != nil,
+				ModelName: modelName,
 			}
 
-			if pricing != nil {
-				info.Provider = pricing.LiteLLMProvider
-				info.Mode = pricing.Mode
-				info.SupportsPromptCaching = pricing.SupportsPromptCaching
-				info.InputPricePerMillion = pricing.InputCostPerToken * 1_000_000 * group.RateMultiplier
-				info.OutputPricePerMillion = pricing.OutputCostPerToken * 1_000_000 * group.RateMultiplier
-				info.CacheWritePricePerMillion = pricing.CacheCreationInputTokenCost * 1_000_000 * group.RateMultiplier
-				info.CacheReadPricePerMillion = pricing.CacheReadInputTokenCost * 1_000_000 * group.RateMultiplier
-			} else {
+			if service.IsImageModel(modelName) {
+				info.HasPricing = true
+				info.BillingMode = string(service.BillingModeImage)
+				info.Mode = "image"
 				info.Provider = inferProviderFromModelName(modelName)
-				info.Mode = "chat"
+				if price, ok := service.LookupImageModelPrice(modelName); ok {
+					p := price * group.RateMultiplier
+					info.PerRequestPrice = &p
+				} else {
+					p := 0.080 * group.RateMultiplier
+					info.PerRequestPrice = &p
+				}
+			} else {
+				pricing := h.pricingService.GetModelPricing(modelName)
+				info.HasPricing = pricing != nil
+
+				if pricing != nil {
+					info.Provider = pricing.LiteLLMProvider
+					info.Mode = pricing.Mode
+					info.SupportsPromptCaching = pricing.SupportsPromptCaching
+					info.InputPricePerMillion = pricing.InputCostPerToken * 1_000_000 * group.RateMultiplier
+					info.OutputPricePerMillion = pricing.OutputCostPerToken * 1_000_000 * group.RateMultiplier
+					info.CacheWritePricePerMillion = pricing.CacheCreationInputTokenCost * 1_000_000 * group.RateMultiplier
+					info.CacheReadPricePerMillion = pricing.CacheReadInputTokenCost * 1_000_000 * group.RateMultiplier
+				} else {
+					info.Provider = inferProviderFromModelName(modelName)
+					info.Mode = "chat"
+				}
 			}
 
 			modelInfos = append(modelInfos, info)
@@ -122,6 +152,7 @@ func (h *ModelSquareHandler) List(c *gin.Context) {
 			GroupName:      group.Name,
 			Platform:       group.Platform,
 			RateMultiplier: group.RateMultiplier,
+			BillingDisplay: billingDisplay,
 			Models:         modelInfos,
 		})
 	}

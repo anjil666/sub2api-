@@ -859,11 +859,11 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 		allImage := true
 		var maxPrice float64
 		for _, m := range models {
-			if !isImageModel(m.ID) {
+			if !IsImageModel(m.ID) {
 				allImage = false
 				break
 			}
-			if p, ok := lookupImageModelPrice(m.ID); ok && p > maxPrice {
+			if p, ok := LookupImageModelPrice(m.ID); ok && p > maxPrice {
 				maxPrice = p
 			}
 		}
@@ -1190,7 +1190,7 @@ func (s *UpstreamSyncService) buildModelPricing(models []UpstreamModelInfo, mult
 	var imageModels []UpstreamModelInfo
 	var textModels []UpstreamModelInfo
 	for _, m := range models {
-		if isImageModel(m.ID) {
+		if IsImageModel(m.ID) {
 			imageModels = append(imageModels, m)
 		} else {
 			textModels = append(textModels, m)
@@ -1241,7 +1241,7 @@ func (s *UpstreamSyncService) buildModelPricing(models []UpstreamModelInfo, mult
 			Models:      []string{m.ID},
 			BillingMode: BillingModeImage,
 		}
-		if price, ok := lookupImageModelPrice(m.ID); ok {
+		if price, ok := LookupImageModelPrice(m.ID); ok {
 			p := price * multiplier
 			pricing.PerRequestPrice = &p
 		} else {
@@ -1310,8 +1310,8 @@ var defaultImageModelPrices = map[string]float64{
 
 const defaultImageFallbackPrice = 0.080
 
-// isImageModel 判断模型是否为图片生成模型
-func isImageModel(modelID string) bool {
+// IsImageModel 判断模型是否为图片生成模型
+func IsImageModel(modelID string) bool {
 	lower := strings.ToLower(modelID)
 	if strings.HasPrefix(lower, "gpt-image") || strings.HasPrefix(lower, "dall-e") {
 		return true
@@ -1319,8 +1319,8 @@ func isImageModel(modelID string) bool {
 	return false
 }
 
-// lookupImageModelPrice 查找图片模型按次价格（精确匹配 → 前缀匹配）
-func lookupImageModelPrice(model string) (float64, bool) {
+// LookupImageModelPrice 查找图片模型按次价格（精确匹配 → 前缀匹配）
+func LookupImageModelPrice(model string) (float64, bool) {
 	lower := strings.ToLower(model)
 	if p, ok := defaultImageModelPrices[lower]; ok {
 		return p, true

@@ -165,7 +165,14 @@
           </div>
 
           <!-- Pricing -->
-          <div v-if="model.has_pricing" class="space-y-3">
+          <div v-if="model.has_pricing && model.billing_mode === 'image'" class="space-y-3">
+            <div class="rounded-lg bg-blue-50 px-3 py-3 dark:bg-blue-900/20">
+              <div class="text-xs text-blue-600 dark:text-blue-400">{{ t('modelSquare.perRequest') || '按次计费' }}</div>
+              <div class="mt-1 font-mono text-xl font-bold text-blue-700 dark:text-blue-300">${{ model.per_request_price != null ? formatPrice(model.per_request_price) : '—' }}</div>
+              <div class="text-[10px] text-blue-500 dark:text-blue-400">{{ t('modelSquare.perImage') || '每次请求' }}</div>
+            </div>
+          </div>
+          <div v-else-if="model.has_pricing" class="space-y-3">
             <!-- Input / Output side by side -->
             <div class="grid grid-cols-2 gap-3">
               <div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-dark-700">
@@ -201,7 +208,7 @@
               {{ translateMode(model.mode) }}
             </span>
             <span :class="ratePillClass(model.platform)" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-              {{ model.group_name }}<template v-if="model.rate_multiplier !== 1"> {{ model.rate_multiplier }}x</template>
+              {{ model.group_name }}<template v-if="model.billing_display"> {{ model.billing_display }}</template><template v-else-if="model.rate_multiplier !== 1"> {{ model.rate_multiplier }}x</template>
             </span>
           </div>
         </div>
@@ -322,6 +329,7 @@ interface FlatModel extends ModelInfo {
   group_name: string
   platform: string
   rate_multiplier: number
+  billing_display?: string
 }
 
 const flatModels = computed<FlatModel[]>(() => {
@@ -334,6 +342,7 @@ const flatModels = computed<FlatModel[]>(() => {
         group_name: cleanGroupName(group.group_name),
         platform: group.platform,
         rate_multiplier: group.rate_multiplier,
+        billing_display: group.billing_display,
       })
     }
   }

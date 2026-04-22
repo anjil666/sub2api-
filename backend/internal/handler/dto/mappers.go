@@ -2,11 +2,16 @@
 package dto
 
 import (
+	"fmt"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
+
+var perRequestTagRe = regexp.MustCompile(`\[per_request:([\d.]+)\]`)
 
 func UserFromServiceShallow(u *service.User) *User {
 	if u == nil {
@@ -158,10 +163,18 @@ func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
 }
 
 func groupFromServiceBase(g *service.Group) Group {
+	desc := g.Description
+	var billingDisplay string
+	if m := perRequestTagRe.FindStringSubmatch(desc); len(m) == 2 {
+		if price, err := strconv.ParseFloat(m[1], 64); err == nil && price > 0 {
+			billingDisplay = fmt.Sprintf("$%.3g/次", price)
+		}
+		desc = strings.TrimSpace(perRequestTagRe.ReplaceAllString(desc, ""))
+	}
 	return Group{
 		ID:                              g.ID,
 		Name:                            g.Name,
-		Description:                     g.Description,
+		Description:                     desc,
 		Platform:                        g.Platform,
 		RateMultiplier:                  g.RateMultiplier,
 		IsExclusive:                     g.IsExclusive,
@@ -181,6 +194,7 @@ func groupFromServiceBase(g *service.Group) Group {
 		RequirePrivacySet:               g.RequirePrivacySet,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
+		BillingDisplay:                  billingDisplay,
 	}
 }
 

@@ -180,8 +180,8 @@
           </template>
 
           <template #cell-rate_multiplier="{ value, row }">
-            <span v-if="getPerRequestPrice(row)" class="text-sm font-medium text-blue-600 dark:text-blue-400"
-              >${{ getPerRequestPrice(row) }}/次</span
+            <span v-if="row.billing_display" class="text-sm font-medium text-blue-600 dark:text-blue-400"
+              >{{ row.billing_display }}</span
             >
             <span v-else class="text-sm text-gray-700 dark:text-gray-300"
               >{{ value }}x</span
@@ -3463,17 +3463,6 @@ const normalizeOptionalLimit = (
   }
 
   return Number.isFinite(value) && value > 0 ? value : null;
-};
-
-// 从分组描述中解析按次计费价格标记 [per_request:X.XXXX]
-const getPerRequestPrice = (row: AdminGroup): string | null => {
-  if (!row.description) return null;
-  const match = row.description.match(/\[per_request:([\d.]+)\]/);
-  if (!match) return null;
-  const price = parseFloat(match[1]);
-  if (!Number.isFinite(price) || price <= 0) return null;
-  // 格式化：去除尾部多余的 0
-  return price < 0.01 ? price.toFixed(4).replace(/0+$/, '').replace(/\.$/, '') : price.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
 };
 
 const handleCreateGroup = async () => {

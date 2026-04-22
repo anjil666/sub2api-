@@ -15,6 +15,8 @@ export interface ModelInfo {
   cache_read_price_per_million: number
   supports_prompt_caching: boolean
   has_pricing: boolean
+  billing_mode?: string
+  per_request_price?: number
 }
 
 export interface GroupModels {
@@ -22,6 +24,7 @@ export interface GroupModels {
   group_name: string
   platform: string
   rate_multiplier: number
+  billing_display?: string
   models: ModelInfo[]
 }
 
