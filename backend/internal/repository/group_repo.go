@@ -436,6 +436,16 @@ func (r *groupRepository) ExistsByName(ctx context.Context, name string) (bool, 
 	return r.client.Group.Query().Where(group.NameEQ(name)).Exist(ctx)
 }
 
+func (r *groupRepository) GetActiveByName(ctx context.Context, name string) (*service.Group, error) {
+	m, err := r.client.Group.Query().
+		Where(group.NameEQ(name), group.StatusEQ("active")).
+		First(ctx)
+	if err != nil {
+		return nil, translatePersistenceError(err, service.ErrGroupNotFound, nil)
+	}
+	return groupEntityToService(m), nil
+}
+
 // ExistsByIDs 批量检查分组是否存在（仅检查未软删除记录）。
 // 返回结构：map[groupID]exists。
 func (r *groupRepository) ExistsByIDs(ctx context.Context, ids []int64) (map[int64]bool, error) {

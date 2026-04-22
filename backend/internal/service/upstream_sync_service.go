@@ -822,7 +822,7 @@ func (s *UpstreamSyncService) ensureLocalResources(
 	existing, _ := s.resourceRepo.GetBySiteAndKeyID(ctx, site.ID, res.UpstreamKeyID)
 
 	// 1. 确保分组
-	groupID, err = s.ensureGroup(ctx, site, res, existing, effectiveMultiplier)
+	groupID, err = s.ensureGroup(ctx, site, res, existing, effectiveMultiplier, models)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("ensure group: %v", err)
 	}
@@ -843,7 +843,7 @@ func (s *UpstreamSyncService) ensureLocalResources(
 }
 
 // ensureGroup 确保分组存在（幂等）
-func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSite, res *UpstreamManagedResource, existing *UpstreamManagedResource, effectiveMultiplier float64) (int64, error) {
+func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSite, res *UpstreamManagedResource, existing *UpstreamManagedResource, effectiveMultiplier float64, models []UpstreamModelInfo) (int64, error) {
 	// 计算期望的名称
 	groupName := fmt.Sprintf("上游: %s", site.Name)
 	if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
@@ -852,6 +852,36 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 	groupDesc := ""
 	if res.UpstreamGroupDescription != "" {
 		groupDesc = res.UpstreamGroupDescription
+	}
+
+	// 检测是否为纯图片模型分组，如果是则在描述中嵌入按次计费标记
+	if len(models) > 0 {
+		allImage := true
+		var maxPrice float64
+		for _, m := range models {
+			if !isImageModel(m.ID) {
+				allImage = false
+				break
+			}
+			if p, ok := lookupImageModelPrice(m.ID); ok && p > maxPrice {
+				maxPrice = p
+			}
+		}
+		if allImage && maxPrice > 0 {
+			priceTag := fmt.Sprintf("[per_request:%.4f]", maxPrice*effectiveMultiplier)
+			// 移除旧标记（如果有）再追加
+			if idx := strings.Index(groupDesc, "[per_request:"); idx >= 0 {
+				end := strings.Index(groupDesc[idx:], "]")
+				if end >= 0 {
+					groupDesc = strings.TrimSpace(groupDesc[:idx] + groupDesc[idx+end+1:])
+				}
+			}
+			if groupDesc != "" {
+				groupDesc = groupDesc + " " + priceTag
+			} else {
+				groupDesc = priceTag
+			}
+		}
 	}
 
 	// 如果已有 managed_group_id，先检查是否还存在
@@ -892,9 +922,26 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 	}
 	if err := s.groupRepo.Create(ctx, group); err != nil {
 		if strings.Contains(err.Error(), "GROUP_EXISTS") || strings.Contains(err.Error(), "unique") {
-			// 同名分组已存在（上游多个 key 同名），加 key 前缀后缀去重
-			group.Name = fmt.Sprintf("%s [%s]", groupName, res.UpstreamKeyPrefix)
+			// 同名分组已存在，先尝试查找并复用
+			if existing, lookupErr := s.groupRepo.GetActiveByName(ctx, groupName); lookupErr == nil && existing != nil {
+				if existing.RateMultiplier != effectiveMultiplier {
+					existing.RateMultiplier = effectiveMultiplier
+					_ = s.groupRepo.Update(ctx, existing)
+				}
+				return existing.ID, nil
+			}
+			// 查找失败，尝试加 key 前缀去重
+			dedupName := fmt.Sprintf("%s [%s]", groupName, res.UpstreamKeyPrefix)
+			group.Name = dedupName
 			if err2 := s.groupRepo.Create(ctx, group); err2 != nil {
+				// 去重名也存在，查找并复用
+				if existing, lookupErr := s.groupRepo.GetActiveByName(ctx, dedupName); lookupErr == nil && existing != nil {
+					if existing.RateMultiplier != effectiveMultiplier {
+						existing.RateMultiplier = effectiveMultiplier
+						_ = s.groupRepo.Update(ctx, existing)
+					}
+					return existing.ID, nil
+				}
 				return 0, fmt.Errorf("create group (dedup): %w", err2)
 			}
 			return group.ID, nil
@@ -1139,14 +1186,25 @@ func maskAPIKey(key string) string {
 
 // buildModelPricing 根据上游模型列表和倍率构建定价
 func (s *UpstreamSyncService) buildModelPricing(models []UpstreamModelInfo, multiplier float64) []ChannelModelPricing {
-	// 按平台分组模型
-	platformModels := make(map[string][]string)
+	// 分离图片模型和文本模型
+	var imageModels []UpstreamModelInfo
+	var textModels []UpstreamModelInfo
 	for _, m := range models {
-		platform := detectPlatform(m.ID)
-		platformModels[platform] = append(platformModels[platform], m.ID)
+		if isImageModel(m.ID) {
+			imageModels = append(imageModels, m)
+		} else {
+			textModels = append(textModels, m)
+		}
 	}
 
 	var pricingList []ChannelModelPricing
+
+	// 处理文本模型：按平台分组，按 token 计费
+	platformModels := make(map[string][]string)
+	for _, m := range textModels {
+		platform := detectPlatform(m.ID)
+		platformModels[platform] = append(platformModels[platform], m.ID)
+	}
 	for platform, modelNames := range platformModels {
 		pricingGroups := groupModelsByPricing(modelNames, multiplier)
 		for _, pg := range pricingGroups {
@@ -1174,6 +1232,22 @@ func (s *UpstreamSyncService) buildModelPricing(models []UpstreamModelInfo, mult
 			pricingList = append(pricingList, pricing)
 		}
 	}
+
+	// 处理图片模型：按次计费 (BillingModeImage)
+	for _, m := range imageModels {
+		platform := detectPlatform(m.ID)
+		pricing := ChannelModelPricing{
+			Platform:    platform,
+			Models:      []string{m.ID},
+			BillingMode: BillingModeImage,
+		}
+		if price, ok := lookupImageModelPrice(m.ID); ok {
+			p := price * multiplier
+			pricing.PerRequestPrice = &p
+		}
+		pricingList = append(pricingList, pricing)
+	}
+
 	return pricingList
 }
 
@@ -1221,6 +1295,40 @@ var defaultModelPrices = map[string]modelDefaultPrice{
 	"gemini-3-pro-low":    {InputPerToken: 0.625e-6, OutputPerToken: 5e-6},
 	"gemini-3.1-pro-high": {InputPerToken: 1.25e-6, OutputPerToken: 10e-6},
 	"gemini-3.1-pro-low":  {InputPerToken: 0.625e-6, OutputPerToken: 5e-6},
+}
+
+// defaultImageModelPrices 图片模型默认按次计费价格（USD per request）
+var defaultImageModelPrices = map[string]float64{
+	"gpt-image-1":  0.080,
+	"dall-e-3":     0.040,
+	"dall-e-2":     0.020,
+}
+
+// isImageModel 判断模型是否为图片生成模型
+func isImageModel(modelID string) bool {
+	lower := strings.ToLower(modelID)
+	if strings.HasPrefix(lower, "gpt-image") || strings.HasPrefix(lower, "dall-e") {
+		return true
+	}
+	return false
+}
+
+// lookupImageModelPrice 查找图片模型按次价格（精确匹配 → 前缀匹配）
+func lookupImageModelPrice(model string) (float64, bool) {
+	lower := strings.ToLower(model)
+	if p, ok := defaultImageModelPrices[lower]; ok {
+		return p, true
+	}
+	bestMatch := ""
+	for key := range defaultImageModelPrices {
+		if strings.HasPrefix(lower, key) && len(key) > len(bestMatch) {
+			bestMatch = key
+		}
+	}
+	if bestMatch != "" {
+		return defaultImageModelPrices[bestMatch], true
+	}
+	return 0, false
 }
 
 // pricingGroup 用于定价分组
@@ -1325,7 +1433,7 @@ func detectPlatform(modelID string) string {
 	case strings.HasPrefix(lower, "claude"):
 		return PlatformAnthropic
 	case strings.HasPrefix(lower, "gpt"), strings.HasPrefix(lower, "o1"), strings.HasPrefix(lower, "o3"),
-		strings.HasPrefix(lower, "o4"), strings.HasPrefix(lower, "chatgpt"):
+		strings.HasPrefix(lower, "o4"), strings.HasPrefix(lower, "chatgpt"), strings.HasPrefix(lower, "dall-e"):
 		return PlatformOpenAI
 	case strings.HasPrefix(lower, "gemini"), strings.HasPrefix(lower, "tab_"):
 		return PlatformGemini

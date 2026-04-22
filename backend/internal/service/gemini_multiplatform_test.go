@@ -230,6 +230,9 @@ func (m *mockGroupRepoForGemini) ListActiveByPlatform(ctx context.Context, platf
 func (m *mockGroupRepoForGemini) ExistsByName(ctx context.Context, name string) (bool, error) {
 	return false, nil
 }
+func (m *mockGroupRepoForGemini) GetActiveByName(_ context.Context, _ string) (*Group, error) {
+	return nil, nil
+}
 func (m *mockGroupRepoForGemini) GetAccountCount(ctx context.Context, groupID int64) (int64, int64, error) {
 	return 0, 0, nil
 }

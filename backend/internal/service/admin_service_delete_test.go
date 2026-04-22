@@ -164,6 +164,10 @@ func (s *groupRepoStub) ExistsByName(ctx context.Context, name string) (bool, er
 	panic("unexpected ExistsByName call")
 }
 
+func (s *groupRepoStub) GetActiveByName(_ context.Context, _ string) (*Group, error) {
+	return nil, nil
+}
+
 func (s *groupRepoStub) GetAccountCount(ctx context.Context, groupID int64) (int64, int64, error) {
 	panic("unexpected GetAccountCount call")
 }
