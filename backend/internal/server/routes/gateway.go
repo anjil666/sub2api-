@@ -88,6 +88,8 @@ func RegisterGatewayRoutes(
 			}
 			h.Gateway.ChatCompletions(c)
 		})
+		// OpenAI Images API
+		gateway.POST("/images/generations", h.Gateway.ImageGenerations)
 	}
 
 	// Gemini 原生 API 兼容层（Gemini SDK/CLI 直连）
