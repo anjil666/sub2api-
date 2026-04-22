@@ -288,6 +288,11 @@ func (s *UpstreamSyncService) UpdateResourceMultiplier(ctx context.Context, reso
 	return res, nil
 }
 
+// UpdateResourceModelFilter 更新托管资源的模型过滤规则
+func (s *UpstreamSyncService) UpdateResourceModelFilter(ctx context.Context, resourceID int64, modelFilter string) error {
+	return s.resourceRepo.UpdateModelFilter(ctx, resourceID, modelFilter)
+}
+
 // ToggleResource 切换资源状态 (active ↔ disabled)，同步更新本地分组/账号/渠道状态
 func (s *UpstreamSyncService) ToggleResource(ctx context.Context, resourceID int64) (*UpstreamManagedResource, error) {
 	res, err := s.resourceRepo.GetByID(ctx, resourceID)
@@ -371,6 +376,16 @@ func (s *UpstreamSyncService) syncSiteAPIKeyMode(ctx context.Context, site *Upst
 	}
 	if err := s.resourceRepo.Upsert(ctx, res); err != nil {
 		return SyncResult{Error: fmt.Sprintf("upsert resource: %v", err)}
+	}
+
+	// Apply model filter if configured (re-read from DB to get persisted model_filter)
+	existing, _ := s.resourceRepo.GetBySiteAndKeyID(ctx, site.ID, res.UpstreamKeyID)
+	if existing != nil && existing.ModelFilter != "" {
+		res.ModelFilter = existing.ModelFilter
+		models = res.FilterModels(models)
+		if len(models) == 0 {
+			log.Printf("[UpstreamSync] Site %q: model_filter %q filtered out all %d models", site.Name, existing.ModelFilter, len(models))
+		}
 	}
 
 	// 3. 确保分组/账号/渠道存在
@@ -495,6 +510,12 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 					continue
 				}
 			}
+		}
+
+		// Apply model filter if configured
+		if existing != nil && existing.ModelFilter != "" {
+			res.ModelFilter = existing.ModelFilter
+			models = res.FilterModels(models)
 		}
 
 		// 确定加价百分比：资源自定义 > 站点默认

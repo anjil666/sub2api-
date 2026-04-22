@@ -295,6 +295,18 @@
                 <span class="text-gray-400 text-xs">{{ t('admin.upstream.zeroMeansDefault') }}</span>
               </div>
             </div>
+            <!-- 模型过滤 -->
+            <div class="flex items-center gap-2 mb-2 bg-gray-50 dark:bg-gray-800 rounded p-2">
+              <span class="text-xs text-gray-500 whitespace-nowrap">模型过滤:</span>
+              <input
+                v-model="resourceModelFilters[res.id]"
+                type="text"
+                class="input input-xs flex-1"
+                placeholder="留空=不过滤, 例: gpt-image-*,dall-e-*"
+                @blur="handleUpdateResourceModelFilter(res)"
+                @keyup.enter="handleUpdateResourceModelFilter(res)"
+              />
+            </div>
             <div class="flex flex-wrap gap-2 text-xs">
               <span v-if="res.managed_group_id" class="text-blue-600 dark:text-blue-400">
                 {{ t('admin.upstream.group') }}#{{ res.managed_group_id }}
@@ -385,6 +397,7 @@ const resourcesDialogVisible = ref(false)
 const resourcesLoading = ref(false)
 const resourcesList = ref<UpstreamManagedResource[]>([])
 const resourceMultipliers = reactive<Record<number, number>>({})
+const resourceModelFilters = reactive<Record<number, string>>({})
 const currentResourceSiteId = ref<number | null>(null)
 // ── 数据加载 ──
 const loadItems = async () => {
@@ -563,6 +576,7 @@ async function handleViewResources(site: UpstreamSite) {
     // 初始化每个资源的倍率输入值
     for (const res of resourcesList.value) {
       resourceMultipliers[res.id] = res.price_multiplier
+      resourceModelFilters[res.id] = res.model_filter || ''
     }
   } catch (err: any) {
     alert(err?.message || 'Failed to fetch resources')
@@ -590,6 +604,26 @@ async function handleUpdateResourceMultiplier(res: UpstreamManagedResource) {
     alert(err?.message || 'Failed to update multiplier')
     // 恢复原值
     resourceMultipliers[res.id] = res.price_multiplier
+  }
+}
+
+async function handleUpdateResourceModelFilter(res: UpstreamManagedResource) {
+  if (currentResourceSiteId.value == null) return
+  const newVal = (resourceModelFilters[res.id] || '').trim()
+  if (newVal === (res.model_filter || '')) return
+  try {
+    const updated = await adminAPI.upstream.updateResource(currentResourceSiteId.value, res.id, {
+      price_multiplier: res.price_multiplier,
+      model_filter: newVal
+    })
+    const idx = resourcesList.value.findIndex(r => r.id === res.id)
+    if (idx >= 0) {
+      resourcesList.value[idx] = updated
+      resourceModelFilters[res.id] = updated.model_filter || ''
+    }
+  } catch (err: any) {
+    alert(err?.message || 'Failed to update model filter')
+    resourceModelFilters[res.id] = res.model_filter || ''
   }
 }
 

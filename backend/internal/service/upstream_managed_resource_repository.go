@@ -11,6 +11,7 @@ type UpstreamManagedResourceRepository interface {
 	UpdateManagedIDs(ctx context.Context, id int64, groupID, accountID, channelID *int64) error
 	UpdateModelCount(ctx context.Context, id int64, count int) error
 	UpdatePriceMultiplier(ctx context.Context, id int64, multiplier float64) error
+	UpdateModelFilter(ctx context.Context, id int64, modelFilter string) error
 	UpdateUpstreamRateMultiplier(ctx context.Context, id int64, multiplier float64) error
 	UpdateStatus(ctx context.Context, id int64, status string) error
 	UpdateDisabledBy(ctx context.Context, id int64, disabledBy string) error

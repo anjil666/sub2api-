@@ -167,6 +167,7 @@
             <thead>
               <tr class="border-b border-gray-200 dark:border-dark-600">
                 <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">分组</th>
+                <th class="px-3 py-2 text-center font-medium text-gray-600 dark:text-gray-400">启用探测</th>
                 <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">探测模型</th>
               </tr>
             </thead>
@@ -179,8 +180,14 @@
                 <td class="px-3 py-2 font-medium text-gray-900 dark:text-white whitespace-nowrap">
                   {{ row.group_name }}
                 </td>
+                <td class="px-3 py-2 text-center">
+                  <label class="relative inline-flex cursor-pointer items-center">
+                    <input v-model="row.probe_enabled" type="checkbox" class="peer sr-only" />
+                    <div class="h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary-500 peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-dark-600 dark:peer-checked:bg-primary-600"></div>
+                  </label>
+                </td>
                 <td class="px-3 py-2">
-                  <select v-model="row.probe_model" class="input w-full">
+                  <select v-model="row.probe_model" class="input w-full" :disabled="!row.probe_enabled">
                     <option value="">自动选择</option>
                     <option
                       v-for="model in getModelsForGroup(row.group_id)"
@@ -313,6 +320,7 @@ interface GroupRow {
   group_id: number
   group_name: string
   probe_model: string
+  probe_enabled: boolean
 }
 const allGroupRows = ref<GroupRow[]>([])
 
@@ -416,17 +424,22 @@ async function loadAllGroups() {
 }
 
 function buildGroupRows() {
-  const configMap = new Map<number, string>()
+  const configMap = new Map<number, { probe_model: string; probe_enabled: boolean }>()
   for (const gc of groupConfigs.value) {
-    configMap.set(Number(gc.group_id), gc.probe_model)
+    configMap.set(Number(gc.group_id), {
+      probe_model: gc.probe_model,
+      probe_enabled: gc.probe_enabled !== false,
+    })
   }
   const rows: GroupRow[] = []
   const groupIds = Object.keys(groupModels.value).map(Number).sort((a, b) => a - b)
   for (const gid of groupIds) {
+    const cfg = configMap.get(gid)
     rows.push({
       group_id: gid,
       group_name: getGroupName(gid),
-      probe_model: configMap.get(gid) || '',
+      probe_model: cfg?.probe_model || '',
+      probe_enabled: cfg?.probe_enabled !== false,
     })
   }
   allGroupRows.value = rows
@@ -436,19 +449,10 @@ async function saveAllGroupConfigs() {
   savingAllGroupConfigs.value = true
   try {
     const configs = allGroupRows.value
-      .filter(row => row.probe_model !== '')
-      .map(row => ({ group_id: row.group_id, probe_model: row.probe_model }))
-
-    // Delete configs for groups that were cleared (had config but now empty)
-    const configuredIds = new Set(groupConfigs.value.map(gc => Number(gc.group_id)))
-    const newConfigIds = new Set(configs.map(c => c.group_id))
-    const toDelete = [...configuredIds].filter(id => !newConfigIds.has(id))
+      .map(row => ({ group_id: row.group_id, probe_model: row.probe_model, probe_enabled: row.probe_enabled }))
 
     if (configs.length > 0) {
       await adminAPI.healthProbe.batchUpsertGroupConfigs(configs)
-    }
-    for (const gid of toDelete) {
-      await adminAPI.healthProbe.deleteGroupConfig(gid)
     }
 
     await loadGroupConfigs()

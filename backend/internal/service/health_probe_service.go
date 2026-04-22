@@ -48,6 +48,7 @@ type HealthProbeService struct {
 	groupConfigRepo HealthProbeGroupConfigRepository
 	groupRepo       GroupRepository
 	accountRepo     AccountRepository
+	channelService  *ChannelService
 	cfg             *config.Config
 
 	cron      *cron.Cron
@@ -81,6 +82,7 @@ func NewHealthProbeService(
 	groupConfigRepo HealthProbeGroupConfigRepository,
 	groupRepo GroupRepository,
 	accountRepo AccountRepository,
+	channelService *ChannelService,
 	cfg *config.Config,
 ) *HealthProbeService {
 	return &HealthProbeService{
@@ -90,6 +92,7 @@ func NewHealthProbeService(
 		groupConfigRepo: groupConfigRepo,
 		groupRepo:       groupRepo,
 		accountRepo:     accountRepo,
+		channelService:  channelService,
 		cfg:             cfg,
 		failureCounts:   make(map[int64]int),
 		webhookCooldown: make(map[int64]time.Time),
@@ -250,6 +253,51 @@ func (s *HealthProbeService) GetLatestResults(ctx context.Context) ([]*HealthPro
 	return s.resultRepo.ListLatestByGroups(ctx)
 }
 
+// GetLatestResultsForUsers returns the latest probe results for users.
+// Groups with probing disabled (probe_enabled=false) are shown as "available" with synthetic results.
+func (s *HealthProbeService) GetLatestResultsForUsers(ctx context.Context) ([]*HealthProbeResult, error) {
+	results, err := s.resultRepo.ListLatestByGroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load group configs to find disabled groups
+	allGroupCfgs, _ := s.groupConfigRepo.ListAll(ctx)
+	disabledGroups := make(map[int64]bool)
+	for _, gc := range allGroupCfgs {
+		if !gc.IsProbeEnabled() {
+			disabledGroups[gc.GroupID] = true
+		}
+	}
+
+	// Build set of groups already in results
+	probedGroupIDs := make(map[int64]bool, len(results))
+	for _, r := range results {
+		probedGroupIDs[r.GroupID] = true
+	}
+
+	// Get all active groups to add synthetic results for disabled ones
+	groups, err := s.groupRepo.ListActive(ctx)
+	if err != nil {
+		return results, nil // return what we have
+	}
+
+	for _, g := range groups {
+		if disabledGroups[g.ID] && !probedGroupIDs[g.ID] {
+			// Add synthetic "available" result for unprobed group
+			results = append(results, &HealthProbeResult{
+				GroupID:    g.ID,
+				Status:     ProbeStatusAvailable,
+				LatencyMs:  0,
+				ProbeModel: "",
+				CheckedAt:  time.Now(),
+			})
+		}
+	}
+
+	return results, nil
+}
+
 // GetGroupSummaries returns aggregated summaries for a group.
 func (s *HealthProbeService) GetGroupSummaries(ctx context.Context, groupID int64, hours int) ([]*HealthProbeSummary, error) {
 	since := time.Now().Add(-time.Duration(hours) * time.Hour)
@@ -296,8 +344,20 @@ func (s *HealthProbeService) runProbeRound() {
 	sem := make(chan struct{}, healthProbeDefaultMaxWorkers)
 	var wg sync.WaitGroup
 
+	// Load per-group configs to check probe_enabled
+	allGroupCfgs, _ := s.groupConfigRepo.ListAll(ctx)
+	disabledGroups := make(map[int64]bool)
+	for _, gc := range allGroupCfgs {
+		if !gc.IsProbeEnabled() {
+			disabledGroups[gc.GroupID] = true
+		}
+	}
+
 	for i := range groups {
 		group := &groups[i]
+		if disabledGroups[group.ID] {
+			continue // skip probing for disabled groups
+		}
 		sem <- struct{}{}
 		wg.Add(1)
 		go func(g *Group) {
@@ -707,6 +767,19 @@ func (s *HealthProbeService) GetGroupModels(ctx context.Context) (map[int64][]st
 				modelSet[model] = struct{}{}
 			}
 		}
+
+		// Apply channel RestrictModels filter (same logic as GetAvailableModels)
+		if s.channelService != nil {
+			ch, err := s.channelService.GetChannelForGroup(ctx, g.ID)
+			if err == nil && ch != nil && ch.RestrictModels && len(ch.ModelPricing) > 0 {
+				for model := range modelSet {
+					if ch.GetModelPricing(model) == nil {
+						delete(modelSet, model)
+					}
+				}
+			}
+		}
+
 		models := make([]string, 0, len(modelSet))
 		for m := range modelSet {
 			models = append(models, m)

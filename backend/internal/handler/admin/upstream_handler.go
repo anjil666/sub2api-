@@ -131,6 +131,7 @@ type managedResourceResponse struct {
 	PriceMultiplier        float64 `json:"price_multiplier"`
 	UpstreamRateMultiplier float64 `json:"upstream_rate_multiplier"`
 	ModelCount             int     `json:"model_count"`
+	ModelFilter            string  `json:"model_filter"`
 	Status                 string  `json:"status"`
 	LastSyncedAt           *string `json:"last_synced_at"`
 	CreatedAt              string  `json:"created_at"`
@@ -182,6 +183,7 @@ func resourceToResponse(r *service.UpstreamManagedResource) *managedResourceResp
 		PriceMultiplier:        r.PriceMultiplier,
 		UpstreamRateMultiplier: r.UpstreamRateMultiplier,
 		ModelCount:             r.ModelCount,
+		ModelFilter:            r.ModelFilter,
 		Status:                 r.Status,
 		CreatedAt:              r.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:              r.UpdatedAt.Format("2006-01-02T15:04:05Z"),
@@ -532,6 +534,7 @@ func (h *UpstreamHandler) UpdateResource(c *gin.Context) {
 
 	var req struct {
 		PriceMultiplier flexFloat64 `json:"price_multiplier"`
+		ModelFilter     *string     `json:"model_filter"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.ErrorFrom(c, infraerrors.BadRequest("VALIDATION_ERROR", err.Error()))
@@ -542,6 +545,14 @@ func (h *UpstreamHandler) UpdateResource(c *gin.Context) {
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
+	}
+	// Update model filter if provided
+	if req.ModelFilter != nil {
+		if err := h.syncService.UpdateResourceModelFilter(c.Request.Context(), resourceID, *req.ModelFilter); err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		updated.ModelFilter = *req.ModelFilter
 	}
 	response.Success(c, resourceToResponse(updated))
 }

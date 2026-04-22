@@ -311,35 +311,43 @@ func (r *healthProbeGroupConfigRepository) EnsureTable(ctx context.Context) erro
 			id BIGSERIAL PRIMARY KEY,
 			group_id BIGINT NOT NULL UNIQUE,
 			probe_model TEXT NOT NULL DEFAULT '',
+			probe_enabled BOOLEAN NOT NULL DEFAULT true,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_health_probe_group_configs_group ON health_probe_group_configs(group_id)
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	// Migration: add probe_enabled column if it doesn't exist
+	_, _ = r.db.ExecContext(ctx, `ALTER TABLE health_probe_group_configs ADD COLUMN IF NOT EXISTS probe_enabled BOOLEAN NOT NULL DEFAULT true`)
+	return nil
 }
 
 func (r *healthProbeGroupConfigRepository) Get(ctx context.Context, groupID int64) (*service.HealthProbeGroupConfig, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, group_id, probe_model, created_at, updated_at
+		SELECT id, group_id, probe_model, probe_enabled, created_at, updated_at
 		FROM health_probe_group_configs
 		WHERE group_id = $1
 	`, groupID)
 
 	cfg := &service.HealthProbeGroupConfig{}
-	err := row.Scan(&cfg.ID, &cfg.GroupID, &cfg.ProbeModel, &cfg.CreatedAt, &cfg.UpdatedAt)
+	var probeEnabled bool
+	err := row.Scan(&cfg.ID, &cfg.GroupID, &cfg.ProbeModel, &probeEnabled, &cfg.CreatedAt, &cfg.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	cfg.ProbeEnabled = &probeEnabled
 	return cfg, nil
 }
 
 func (r *healthProbeGroupConfigRepository) ListAll(ctx context.Context) ([]*service.HealthProbeGroupConfig, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT hpc.id, hpc.group_id, hpc.probe_model, hpc.created_at, hpc.updated_at
+		SELECT hpc.id, hpc.group_id, hpc.probe_model, hpc.probe_enabled, hpc.created_at, hpc.updated_at
 		FROM health_probe_group_configs hpc
 		JOIN groups g ON g.id = hpc.group_id
 		WHERE g.deleted_at IS NULL AND g.status = 'active'
@@ -353,21 +361,24 @@ func (r *healthProbeGroupConfigRepository) ListAll(ctx context.Context) ([]*serv
 	var configs []*service.HealthProbeGroupConfig
 	for rows.Next() {
 		cfg := &service.HealthProbeGroupConfig{}
-		if err := rows.Scan(&cfg.ID, &cfg.GroupID, &cfg.ProbeModel, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
+		var probeEnabled bool
+		if err := rows.Scan(&cfg.ID, &cfg.GroupID, &cfg.ProbeModel, &probeEnabled, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
 			return nil, err
 		}
+		cfg.ProbeEnabled = &probeEnabled
 		configs = append(configs, cfg)
 	}
 	return configs, rows.Err()
 }
 
 func (r *healthProbeGroupConfigRepository) Upsert(ctx context.Context, cfg *service.HealthProbeGroupConfig) error {
+	probeEnabled := cfg.IsProbeEnabled()
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO health_probe_group_configs (group_id, probe_model)
-		VALUES ($1, $2)
+		INSERT INTO health_probe_group_configs (group_id, probe_model, probe_enabled)
+		VALUES ($1, $2, $3)
 		ON CONFLICT (group_id)
-		DO UPDATE SET probe_model = $2, updated_at = NOW()
-	`, cfg.GroupID, cfg.ProbeModel)
+		DO UPDATE SET probe_model = $2, probe_enabled = $3, updated_at = NOW()
+	`, cfg.GroupID, cfg.ProbeModel, probeEnabled)
 	return err
 }
 

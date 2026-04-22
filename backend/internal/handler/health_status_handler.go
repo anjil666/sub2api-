@@ -34,7 +34,7 @@ func (h *HealthStatusHandler) GetConfig(c *gin.Context) {
 // GetLatest GET /health-status/latest
 func (h *HealthStatusHandler) GetLatest(c *gin.Context) {
 	ctx := c.Request.Context()
-	results, err := h.healthProbeSvc.GetLatestResults(ctx)
+	results, err := h.healthProbeSvc.GetLatestResultsForUsers(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -73,6 +73,7 @@ export interface UpstreamManagedResource {
   price_multiplier: number
   upstream_rate_multiplier: number
   model_count: number
+  model_filter: string
   status: string
   last_synced_at: string | null
   created_at: string
@@ -142,7 +143,7 @@ async function listResources(id: number): Promise<UpstreamManagedResource[]> {
   return data
 }
 
-async function updateResource(siteId: number, resourceId: number, req: { price_multiplier: number }): Promise<UpstreamManagedResource> {
+async function updateResource(siteId: number, resourceId: number, req: { price_multiplier: number; model_filter?: string }): Promise<UpstreamManagedResource> {
   const { data } = await apiClient.put(`/admin/upstream-sites/${siteId}/resources/${resourceId}`, req)
   return data
 }

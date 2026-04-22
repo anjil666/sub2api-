@@ -52,13 +52,23 @@ type HealthProbeSummary struct {
 	CreatedAt       time.Time `json:"created_at"`
 }
 
-// HealthProbeGroupConfig stores per-group probe model override.
+// HealthProbeGroupConfig stores per-group probe model override and probe toggle.
 type HealthProbeGroupConfig struct {
-	ID         int64     `json:"id"`
-	GroupID    int64     `json:"group_id"`
-	ProbeModel string    `json:"probe_model"` // empty means auto-select
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID           int64     `json:"id"`
+	GroupID      int64     `json:"group_id"`
+	ProbeModel   string    `json:"probe_model"`   // empty means auto-select
+	ProbeEnabled *bool     `json:"probe_enabled"` // nil or true = enabled, false = skip probing (show as available)
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// IsProbeEnabled returns whether probing is enabled for this group config.
+// Default is true (enabled) when ProbeEnabled is nil.
+func (c *HealthProbeGroupConfig) IsProbeEnabled() bool {
+	if c == nil || c.ProbeEnabled == nil {
+		return true
+	}
+	return *c.ProbeEnabled
 }
 
 // HealthProbeConfigRepository defines the data access interface for health probe configuration.

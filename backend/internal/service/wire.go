@@ -361,9 +361,10 @@ func ProvideHealthProbeService(
 	groupConfigRepo HealthProbeGroupConfigRepository,
 	groupRepo GroupRepository,
 	accountRepo AccountRepository,
+	channelService *ChannelService,
 	cfg *config.Config,
 ) *HealthProbeService {
-	svc := NewHealthProbeService(configRepo, resultRepo, summaryRepo, groupConfigRepo, groupRepo, accountRepo, cfg)
+	svc := NewHealthProbeService(configRepo, resultRepo, summaryRepo, groupConfigRepo, groupRepo, accountRepo, channelService, cfg)
 	svc.Start()
 	return svc
 }

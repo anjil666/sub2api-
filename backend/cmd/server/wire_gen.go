@@ -234,7 +234,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	healthProbeResultRepository := repository.NewHealthProbeResultRepository(db)
 	healthProbeSummaryRepository := repository.NewHealthProbeSummaryRepository(db)
 	healthProbeGroupConfigRepository := repository.NewHealthProbeGroupConfigRepository(db)
-	healthProbeService := service.ProvideHealthProbeService(healthProbeConfigRepository, healthProbeResultRepository, healthProbeSummaryRepository, healthProbeGroupConfigRepository, groupRepository, accountRepository, configConfig)
+	healthProbeService := service.ProvideHealthProbeService(healthProbeConfigRepository, healthProbeResultRepository, healthProbeSummaryRepository, healthProbeGroupConfigRepository, groupRepository, accountRepository, channelService, configConfig)
 	healthProbeHandler := admin.NewHealthProbeHandler(healthProbeService)
 	adminHandlers := handler.ProvideAdminHandlers(dashboardHandler, adminUserHandler, groupHandler, accountHandler, adminAnnouncementHandler, dataManagementHandler, backupHandler, oAuthHandler, openAIOAuthHandler, geminiOAuthHandler, antigravityOAuthHandler, proxyHandler, adminRedeemHandler, promoHandler, settingHandler, opsHandler, systemHandler, adminSubscriptionHandler, adminUsageHandler, userAttributeHandler, errorPassthroughHandler, tlsFingerprintProfileHandler, adminAPIKeyHandler, scheduledTestHandler, channelHandler, adminPaymentHandler, adminReferralHandler, upstreamHandler, healthProbeHandler)
 	usageRecordWorkerPool := service.NewUsageRecordWorkerPool(configConfig)

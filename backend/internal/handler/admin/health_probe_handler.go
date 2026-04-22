@@ -194,8 +194,9 @@ func (h *HealthProbeHandler) ListGroupConfigs(c *gin.Context) {
 }
 
 type upsertGroupConfigRequest struct {
-	GroupID    int64  `json:"group_id" binding:"required"`
-	ProbeModel string `json:"probe_model"`
+	GroupID      int64  `json:"group_id" binding:"required"`
+	ProbeModel   string `json:"probe_model"`
+	ProbeEnabled *bool  `json:"probe_enabled"`
 }
 
 // UpsertGroupConfig PUT /admin/health-probe/group-configs
@@ -207,8 +208,9 @@ func (h *HealthProbeHandler) UpsertGroupConfig(c *gin.Context) {
 	}
 
 	cfg := &service.HealthProbeGroupConfig{
-		GroupID:    req.GroupID,
-		ProbeModel: req.ProbeModel,
+		GroupID:      req.GroupID,
+		ProbeModel:   req.ProbeModel,
+		ProbeEnabled: req.ProbeEnabled,
 	}
 
 	if err := h.healthProbeSvc.UpsertGroupConfig(c.Request.Context(), cfg); err != nil {
@@ -231,8 +233,9 @@ func (h *HealthProbeHandler) BatchUpsertGroupConfigs(c *gin.Context) {
 	ctx := c.Request.Context()
 	for _, item := range req.Configs {
 		cfg := &service.HealthProbeGroupConfig{
-			GroupID:    item.GroupID,
-			ProbeModel: item.ProbeModel,
+			GroupID:      item.GroupID,
+			ProbeModel:   item.ProbeModel,
+			ProbeEnabled: item.ProbeEnabled,
 		}
 		if err := h.healthProbeSvc.UpsertGroupConfig(ctx, cfg); err != nil {
 			response.InternalError(c, err.Error())

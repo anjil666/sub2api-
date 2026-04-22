@@ -53,7 +53,7 @@ func (r *upstreamManagedResourceRepo) ListBySiteID(ctx context.Context, siteID i
 			upstream_group_id, api_key_encrypted,
 			managed_group_id, managed_account_id, managed_channel_id,
 			price_multiplier, upstream_rate_multiplier,
-			model_count, status, disabled_by, last_synced_at, created_at, updated_at
+			model_count, model_filter, status, disabled_by, last_synced_at, created_at, updated_at
 		 FROM upstream_managed_resources
 		 WHERE upstream_site_id = $1 ORDER BY id`, siteID,
 	)
@@ -74,7 +74,7 @@ func (r *upstreamManagedResourceRepo) ListBySiteID(ctx context.Context, siteID i
 			&upstreamGroupID, &apiKeyEnc,
 			&managedGroupID, &managedAccountID, &managedChannelID,
 			&res.PriceMultiplier, &res.UpstreamRateMultiplier,
-			&res.ModelCount, &res.Status, &res.DisabledBy, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
+			&res.ModelCount, &res.ModelFilter, &res.Status, &res.DisabledBy, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan managed resource: %w", err)
 		}
@@ -117,7 +117,7 @@ func (r *upstreamManagedResourceRepo) GetBySiteAndKeyID(ctx context.Context, sit
 			upstream_group_id, api_key_encrypted,
 			managed_group_id, managed_account_id, managed_channel_id,
 			price_multiplier, upstream_rate_multiplier,
-			model_count, status, disabled_by, last_synced_at, created_at, updated_at
+			model_count, model_filter, status, disabled_by, last_synced_at, created_at, updated_at
 		 FROM upstream_managed_resources
 		 WHERE upstream_site_id = $1 AND upstream_key_id = $2`, siteID, upstreamKeyID,
 	).Scan(
@@ -125,7 +125,7 @@ func (r *upstreamManagedResourceRepo) GetBySiteAndKeyID(ctx context.Context, sit
 		&upstreamGroupID, &apiKeyEnc,
 		&managedGroupID, &managedAccountID, &managedChannelID,
 		&res.PriceMultiplier, &res.UpstreamRateMultiplier,
-		&res.ModelCount, &res.Status, &res.DisabledBy, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
+		&res.ModelCount, &res.ModelFilter, &res.Status, &res.DisabledBy, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -192,14 +192,14 @@ func (r *upstreamManagedResourceRepo) GetByID(ctx context.Context, id int64) (*s
 			upstream_group_id, api_key_encrypted,
 			managed_group_id, managed_account_id, managed_channel_id,
 			price_multiplier, upstream_rate_multiplier,
-			model_count, status, disabled_by, last_synced_at, created_at, updated_at
+			model_count, model_filter, status, disabled_by, last_synced_at, created_at, updated_at
 		 FROM upstream_managed_resources WHERE id = $1`, id,
 	).Scan(
 		&res.ID, &res.UpstreamSiteID, &res.UpstreamKeyID, &res.UpstreamKeyPrefix, &res.UpstreamKeyName,
 		&upstreamGroupID, &apiKeyEnc,
 		&managedGroupID, &managedAccountID, &managedChannelID,
 		&res.PriceMultiplier, &res.UpstreamRateMultiplier,
-		&res.ModelCount, &res.Status, &res.DisabledBy, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
+		&res.ModelCount, &res.ModelFilter, &res.Status, &res.DisabledBy, &lastSyncedAt, &res.CreatedAt, &res.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -238,6 +238,17 @@ func (r *upstreamManagedResourceRepo) UpdatePriceMultiplier(ctx context.Context,
 	)
 	if err != nil {
 		return fmt.Errorf("update price multiplier: %w", err)
+	}
+	return nil
+}
+
+func (r *upstreamManagedResourceRepo) UpdateModelFilter(ctx context.Context, id int64, modelFilter string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE upstream_managed_resources SET model_filter=$1, updated_at=NOW() WHERE id=$2`,
+		modelFilter, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update model filter: %w", err)
 	}
 	return nil
 }

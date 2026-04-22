@@ -58,6 +58,7 @@ export interface HealthProbeGroupConfig {
   id: number
   group_id: number
   probe_model: string
+  probe_enabled: boolean
   created_at: string
   updated_at: string
 }
@@ -107,11 +108,11 @@ export async function listGroupConfigs(): Promise<HealthProbeGroupConfig[]> {
   return data ?? []
 }
 
-export async function upsertGroupConfig(groupId: number, probeModel: string): Promise<void> {
-  await apiClient.put('/admin/health-probe/group-configs', { group_id: groupId, probe_model: probeModel })
+export async function upsertGroupConfig(groupId: number, probeModel: string, probeEnabled?: boolean): Promise<void> {
+  await apiClient.put('/admin/health-probe/group-configs', { group_id: groupId, probe_model: probeModel, probe_enabled: probeEnabled })
 }
 
-export async function batchUpsertGroupConfigs(configs: { group_id: number; probe_model: string }[]): Promise<void> {
+export async function batchUpsertGroupConfigs(configs: { group_id: number; probe_model: string; probe_enabled?: boolean }[]): Promise<void> {
   await apiClient.put('/admin/health-probe/group-configs/batch', { configs })
 }
 
