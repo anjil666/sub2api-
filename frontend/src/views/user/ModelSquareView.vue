@@ -32,7 +32,10 @@
           <template #selected="{ option }">
             <span class="flex items-center gap-1.5">
               <span class="truncate">{{ option?.label ?? t('modelSquare.allGroups') }}</span>
-              <span v-if="option?.rate && option.rate !== 1" :class="['inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold', ratePillClass(option.platform as string)]">
+              <span v-if="option?.billingDisplay" :class="['inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold', ratePillClass(option.platform as string)]">
+                {{ option.billingDisplay }}
+              </span>
+              <span v-else-if="option?.rate && option.rate !== 1" :class="['inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold', ratePillClass(option.platform as string)]">
                 {{ option.rate }}x
               </span>
             </span>
@@ -40,7 +43,10 @@
           <template #option="{ option }">
             <span class="flex w-full items-center justify-between gap-2">
               <span class="select-option-label truncate">{{ option.label }}</span>
-              <span v-if="option.rate && option.rate !== 1" :class="['inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold', ratePillClass(option.platform as string)]">
+              <span v-if="option.billingDisplay" :class="['inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold', ratePillClass(option.platform as string)]">
+                {{ option.billingDisplay }}
+              </span>
+              <span v-else-if="option.rate && option.rate !== 1" :class="['inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold', ratePillClass(option.platform as string)]">
                 {{ option.rate }}x
               </span>
             </span>
@@ -267,7 +273,8 @@
               </td>
               <td class="table-cell text-sm text-gray-500 dark:text-gray-400">
                 {{ model.group_name }}
-                <span v-if="model.rate_multiplier !== 1" class="ml-1 text-xs text-gray-400">({{ model.rate_multiplier }}x)</span>
+                <span v-if="model.billing_display" class="ml-1 text-xs text-blue-500">{{ model.billing_display }}</span>
+                <span v-else-if="model.rate_multiplier !== 1" class="ml-1 text-xs text-gray-400">({{ model.rate_multiplier }}x)</span>
               </td>
             </tr>
           </tbody>
@@ -351,7 +358,7 @@ const flatModels = computed<FlatModel[]>(() => {
 
 // --- Filter Options ---
 const groupFilterOptions = computed(() => {
-  const options: { value: string | number; label: string; rate?: number; platform?: string }[] = [
+  const options: { value: string | number; label: string; rate?: number; platform?: string; billingDisplay?: string }[] = [
     { value: 'all', label: t('modelSquare.allGroups') }
   ]
   for (const group of groupsData.value) {
@@ -359,7 +366,8 @@ const groupFilterOptions = computed(() => {
       value: group.group_id,
       label: cleanGroupName(group.group_name),
       rate: group.rate_multiplier,
-      platform: group.platform
+      platform: group.platform,
+      billingDisplay: group.billing_display
     })
   }
   return options

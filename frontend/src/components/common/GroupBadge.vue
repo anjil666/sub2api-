@@ -11,7 +11,10 @@
     <span class="truncate">{{ name }}</span>
     <!-- Right side label -->
     <span v-if="showLabel" :class="labelClass">
-      <template v-if="hasCustomRate">
+      <template v-if="billingDisplay">
+        {{ billingDisplay }}
+      </template>
+      <template v-else-if="hasCustomRate">
         <!-- 原倍率删除线 + 专属倍率高亮 -->
         <span class="line-through opacity-50 mr-0.5">{{ rateMultiplier }}x</span>
         <span class="font-bold">{{ userRateMultiplier }}x</span>
@@ -35,6 +38,7 @@ interface Props {
   subscriptionType?: SubscriptionType
   rateMultiplier?: number
   userRateMultiplier?: number | null // 用户专属倍率
+  billingDisplay?: string | null
   showRate?: boolean
   daysRemaining?: number | null // 剩余天数（订阅类型时使用）
 }
@@ -43,7 +47,8 @@ const props = withDefaults(defineProps<Props>(), {
   subscriptionType: 'standard',
   showRate: true,
   daysRemaining: null,
-  userRateMultiplier: null
+  userRateMultiplier: null,
+  billingDisplay: null
 })
 
 const { t } = useI18n()
@@ -63,9 +68,8 @@ const hasCustomRate = computed(() => {
 // 是否显示右侧标签
 const showLabel = computed(() => {
   if (!props.showRate) return false
-  // 订阅类型：显示天数或"订阅"
+  if (props.billingDisplay) return true
   if (isSubscription.value) return true
-  // 标准类型：显示倍率（包括专属倍率）
   return props.rateMultiplier !== undefined || hasCustomRate.value
 })
 
@@ -82,7 +86,7 @@ const labelText = computed(() => {
     // 否则显示"订阅"
     return t('groups.subscription')
   }
-  return props.rateMultiplier !== undefined ? `${props.rateMultiplier}x` : ''
+  return props.billingDisplay || (props.rateMultiplier !== undefined ? `${props.rateMultiplier}x` : '')
 })
 
 // Label style based on type and days remaining

@@ -26,7 +26,10 @@
     <div class="flex shrink-0 items-center gap-2 pt-0.5">
       <!-- Rate pill (platform color) -->
       <span v-if="rateMultiplier !== undefined" :class="['inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
-        <template v-if="hasCustomRate">
+        <template v-if="billingDisplay">
+          {{ billingDisplay }}
+        </template>
+        <template v-else-if="hasCustomRate">
           <span class="mr-1 line-through opacity-50">{{ rateMultiplier }}x</span>
           <span class="font-bold">{{ userRateMultiplier }}x</span>
         </template>
@@ -60,6 +63,7 @@ interface Props {
   subscriptionType?: SubscriptionType
   rateMultiplier?: number
   userRateMultiplier?: number | null
+  billingDisplay?: string | null
   description?: string | null
   selected?: boolean
   showCheckmark?: boolean
@@ -69,7 +73,8 @@ const props = withDefaults(defineProps<Props>(), {
   subscriptionType: 'standard',
   selected: false,
   showCheckmark: true,
-  userRateMultiplier: null
+  userRateMultiplier: null,
+  billingDisplay: null
 })
 
 // Whether user has a custom rate different from default

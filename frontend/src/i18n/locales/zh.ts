@@ -444,6 +444,8 @@ export default {
     sortByName: '名称',
     sortByInputPrice: '输入价格',
     sortByOutputPrice: '输出价格',
+    perRequest: '按次计费',
+    perImage: '每次请求',
   },
 
   // Auth

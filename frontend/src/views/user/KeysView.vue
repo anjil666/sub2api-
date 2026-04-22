@@ -422,6 +422,7 @@
                 :subscription-type="(option as unknown as GroupOption).subscriptionType"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
+                :billing-display="(option as unknown as GroupOption).billingDisplay"
               />
               <span v-else class="text-gray-400">{{ t('keys.selectGroup') }}</span>
             </template>
@@ -432,6 +433,7 @@
                 :subscription-type="(option as unknown as GroupOption).subscriptionType"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
+                :billing-display="(option as unknown as GroupOption).billingDisplay"
                 :description="(option as unknown as GroupOption).description"
                 :selected="selected"
               />
@@ -1028,6 +1030,7 @@
               :subscription-type="option.subscriptionType"
               :rate-multiplier="option.rate"
               :user-rate-multiplier="option.userRate"
+              :billing-display="option.billingDisplay"
               :description="option.description"
               :selected="
                 selectedKeyForGroup?.group_id === option.value ||
@@ -1087,6 +1090,7 @@ interface GroupOption {
   description: string | null
   rate: number
   userRate: number | null
+  billingDisplay: string | null
   subscriptionType: SubscriptionType
   platform: GroupPlatform
 }
@@ -1245,6 +1249,7 @@ const groupOptions = computed(() =>
     description: group.description,
     rate: group.rate_multiplier,
     userRate: userGroupRates.value[group.id] ?? null,
+    billingDisplay: group.billing_display ?? null,
     subscriptionType: group.subscription_type,
     platform: group.platform
   }))
