@@ -13,6 +13,7 @@ export interface HealthStatusResult {
   status: number
   latency_ms: number
   checked_at: string
+  billing_display?: string
 }
 
 export interface HealthStatusSummary {
