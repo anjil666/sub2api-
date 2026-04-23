@@ -1001,6 +1001,22 @@ func (s *BackupService) getOrCreateStore(ctx context.Context, cfg *BackupS3Confi
 	return store, nil
 }
 
+// GetObjectStoreForTempUpload 提供给外部（如 grsai 适配器）使用的 S3 存储访问
+func (s *BackupService) GetObjectStoreForTempUpload(ctx context.Context) (BackupObjectStore, *BackupS3Config, error) {
+	cfg, err := s.loadS3Config(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if cfg == nil || !cfg.IsConfigured() {
+		return nil, nil, ErrBackupS3NotConfigured
+	}
+	store, err := s.getOrCreateStore(ctx, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	return store, cfg, nil
+}
+
 func (s *BackupService) buildS3Key(cfg *BackupS3Config, fileName string) string {
 	prefix := strings.TrimRight(cfg.Prefix, "/")
 	if prefix == "" {

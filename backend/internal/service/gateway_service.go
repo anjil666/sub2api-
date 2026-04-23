@@ -570,6 +570,7 @@ type GatewayService struct {
 	resolver              *ModelPricingResolver
 	debugGatewayBodyFile  atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
 	tlsFPProfileService   *TLSFingerprintProfileService
+	backupService         *BackupService
 }
 
 // NewGatewayService creates a new GatewayService
@@ -647,6 +648,10 @@ func NewGatewayService(
 		svc.initDebugGatewayBodyFile(path)
 	}
 	return svc
+}
+
+func (s *GatewayService) SetBackupService(bs *BackupService) {
+	s.backupService = bs
 }
 
 // GenerateSessionHash 从预解析请求计算粘性会话 hash

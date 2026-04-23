@@ -3,6 +3,9 @@ package service
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -60,35 +63,98 @@ func sizeToAspectRatio(size string) string {
 	}
 }
 
-func extractImageURLs(body []byte) []string {
+// extractImageURLsWithR2 从请求体提取参考图 URL。
+// base64 图片会上传到 R2 中转，返回公开 URL；纯 URL 直接透传。
+// 返回 urls 列表和需要清理的 R2 key 列表。
+func (s *GatewayService) extractImageURLsWithR2(ctx context.Context, body []byte) (urls []string, r2Keys []string) {
 	imageField := gjson.GetBytes(body, "image")
 	if !imageField.Exists() {
-		return nil
+		return nil, nil
 	}
-	var urls []string
+
+	var items []gjson.Result
 	if imageField.IsArray() {
-		for _, item := range imageField.Array() {
-			u := extractSingleImageURL(item)
-			if u != "" {
-				urls = append(urls, u)
-			}
-		}
+		items = imageField.Array()
 	} else {
-		u := extractSingleImageURL(imageField)
+		items = []gjson.Result{imageField}
+	}
+
+	for _, item := range items {
+		val := item.String()
+		if strings.HasPrefix(val, "http://") || strings.HasPrefix(val, "https://") {
+			urls = append(urls, val)
+			continue
+		}
+		// 尝试作为 base64 上传到 R2
+		u, key := s.uploadBase64ToR2(ctx, val)
 		if u != "" {
 			urls = append(urls, u)
+			r2Keys = append(r2Keys, key)
 		}
 	}
-	return urls
+	return urls, r2Keys
 }
 
-func extractSingleImageURL(val gjson.Result) string {
-	s := val.String()
-	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
-		return s
+func (s *GatewayService) uploadBase64ToR2(ctx context.Context, raw string) (publicURL, r2Key string) {
+	if s.backupService == nil {
+		return "", ""
 	}
-	// base64 data URI — grsai 不支持，跳过
-	return ""
+	// 去掉 data URI 前缀
+	b64 := raw
+	contentType := "image/png"
+	if idx := strings.Index(raw, ";base64,"); idx >= 0 {
+		prefix := raw[:idx]
+		contentType = strings.TrimPrefix(prefix, "data:")
+		b64 = raw[idx+8:]
+	}
+
+	data, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		// 尝试 RawStdEncoding
+		data, err = base64.RawStdEncoding.DecodeString(b64)
+		if err != nil {
+			return "", ""
+		}
+	}
+
+	store, cfg, err := s.backupService.GetObjectStoreForTempUpload(ctx)
+	if err != nil {
+		logger.L().Warn("grsai: R2 not configured, skipping base64 image", zap.Error(err))
+		return "", ""
+	}
+
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	ext := ".png"
+	if strings.Contains(contentType, "jpeg") || strings.Contains(contentType, "jpg") {
+		ext = ".jpg"
+	} else if strings.Contains(contentType, "webp") {
+		ext = ".webp"
+	}
+	key := "temp/" + hex.EncodeToString(b) + ext
+
+	if _, err := store.Upload(ctx, key, bytes.NewReader(data), contentType); err != nil {
+		logger.L().Warn("grsai: failed to upload to R2", zap.Error(err))
+		return "", ""
+	}
+
+	// 构建公开 URL：用 R2 公共开发 URL
+	_ = cfg // cfg.Bucket 用于构建 URL
+	publicURL = "https://pub-687ca1e489e540c7beeb44d9e7ca281d.r2.dev/" + key
+	return publicURL, key
+}
+
+func (s *GatewayService) cleanupR2Keys(ctx context.Context, keys []string) {
+	if len(keys) == 0 || s.backupService == nil {
+		return
+	}
+	store, _, err := s.backupService.GetObjectStoreForTempUpload(ctx)
+	if err != nil {
+		return
+	}
+	for _, key := range keys {
+		_ = store.Delete(ctx, key)
+	}
 }
 
 // ForwardAsGrsaiDraw 将 OpenAI /v1/images/generations 请求转换为 grsai 异步做图 API。
@@ -113,12 +179,18 @@ func (s *GatewayService) ForwardAsGrsaiDraw(
 		return nil, fmt.Errorf("api_key not found in credentials")
 	}
 
+	// 提取参考图 URL（base64 自动上传到 R2 中转）
+	imageURLs, r2Keys := s.extractImageURLsWithR2(ctx, body)
+	if len(r2Keys) > 0 {
+		defer s.cleanupR2Keys(ctx, r2Keys)
+	}
+
 	// 构建 grsai 请求体
 	grsaiReq := grsaiDrawRequest{
 		Model:        mappedModel,
 		Prompt:       gjson.GetBytes(body, "prompt").String(),
 		AspectRatio:  sizeToAspectRatio(gjson.GetBytes(body, "size").String()),
-		URLs:         extractImageURLs(body),
+		URLs:         imageURLs,
 		ShutProgress: true,
 	}
 	reqBody, _ := json.Marshal(grsaiReq)
