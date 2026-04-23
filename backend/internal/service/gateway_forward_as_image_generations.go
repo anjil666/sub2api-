@@ -111,6 +111,8 @@ func (s *GatewayService) ForwardAsImageGenerations(
 		imageCount = 1
 	}
 
+	imageSize := parseOpenAIImageSize(gjson.GetBytes(body, "size").String())
+
 	upstreamModel := ""
 	if mappedModel != originalModel {
 		upstreamModel = mappedModel
@@ -122,5 +124,23 @@ func (s *GatewayService) ForwardAsImageGenerations(
 		Stream:        false,
 		Duration:      time.Since(startTime),
 		ImageCount:    imageCount,
+		ImageSize:     imageSize,
 	}, nil
+}
+
+// parseOpenAIImageSize maps OpenAI size strings to billing tiers.
+func parseOpenAIImageSize(size string) string {
+	switch strings.ToLower(size) {
+	case "1024x1024", "512x512", "256x256":
+		return "1K"
+	case "1024x1536", "1536x1024", "2048x2048":
+		return "2K"
+	case "3840x2160", "2160x3840":
+		return "4K"
+	default:
+		if size == "" {
+			return "1K"
+		}
+		return "1K"
+	}
 }

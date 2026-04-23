@@ -171,6 +171,9 @@ func groupFromServiceBase(g *service.Group) Group {
 		}
 		desc = strings.TrimSpace(perRequestTagRe.ReplaceAllString(desc, ""))
 	}
+	if billingDisplay == "" && g.ImagePrice1K != nil && *g.ImagePrice1K > 0 {
+		billingDisplay = fmt.Sprintf("$%.3g/次", *g.ImagePrice1K)
+	}
 	return Group{
 		ID:                              g.ID,
 		Name:                            g.Name,

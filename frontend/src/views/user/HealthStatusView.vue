@@ -119,15 +119,21 @@
                   {{ cleanGroupName(group.group_name || String(group.group_id)) }}
                 </span>
                 <span
-                  v-if="group.rate_multiplier && group.rate_multiplier !== 1.0"
+                  v-if="group.billing_display"
+                  class="shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                >
+                  {{ group.billing_display }}
+                </span>
+                <span
+                  v-else-if="group.rate_multiplier && group.rate_multiplier !== 1.0"
                   class="shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
                 >
                   ×{{ group.rate_multiplier }}
                 </span>
               </div>
-              <div v-if="group.probe_model" class="mt-1 ml-5">
+              <div v-if="group.probe_model || group.platform" class="mt-1 ml-5">
                 <span class="inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500 dark:bg-dark-600 dark:text-gray-400">
-                  {{ platformLabel(group.probe_model) }}
+                  {{ group.probe_model ? platformLabel(group.probe_model) : platformDisplayName(group.platform) }}
                 </span>
               </div>
             </div>
@@ -355,6 +361,15 @@ function platformLabel(model: string): string {
   if (m.includes('mistral')) return 'Mistral'
   if (m.includes('grok')) return 'Grok'
   return model
+}
+
+function platformDisplayName(platform: string): string {
+  const p = platform.toLowerCase()
+  if (p === 'anthropic' || p === 'claude') return 'Claude'
+  if (p === 'openai') return 'GPT'
+  if (p === 'gemini' || p === 'google') return 'Gemini'
+  if (p === 'antigravity') return 'Antigravity'
+  return platform
 }
 
 async function loadConfig() {

@@ -53,6 +53,7 @@ func (h *HealthStatusHandler) GetLatest(c *gin.Context) {
 		Status         int     `json:"status"`
 		LatencyMs      int     `json:"latency_ms"`
 		CheckedAt      string  `json:"checked_at"`
+		BillingDisplay string  `json:"billing_display,omitempty"`
 	}
 
 	var userResults []userResult
@@ -66,6 +67,7 @@ func (h *HealthStatusHandler) GetLatest(c *gin.Context) {
 			Status:         r.Status,
 			LatencyMs:      r.LatencyMs,
 			CheckedAt:      r.CheckedAt.Format("2006-01-02T15:04:05Z07:00"),
+			BillingDisplay: r.BillingDisplay,
 		})
 	}
 	c.JSON(http.StatusOK, userResults)

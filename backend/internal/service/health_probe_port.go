@@ -38,6 +38,7 @@ type HealthProbeResult struct {
 	GroupName      string  `json:"group_name,omitempty"`
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
 	Platform       string  `json:"platform,omitempty"`
+	BillingDisplay string  `json:"billing_display,omitempty"`
 }
 
 // HealthProbeSummary represents an aggregated summary per 30-min bucket.

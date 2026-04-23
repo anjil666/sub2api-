@@ -744,6 +744,9 @@ func (s *HealthProbeService) EnrichResultsWithGroupInfo(ctx context.Context, res
 			r.GroupName = group.Name
 			r.RateMultiplier = group.RateMultiplier
 			r.Platform = group.Platform
+			if group.ImagePrice1K != nil && *group.ImagePrice1K > 0 {
+				r.BillingDisplay = fmt.Sprintf("$%.3g/次", *group.ImagePrice1K)
+			}
 		}
 	}
 }
