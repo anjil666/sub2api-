@@ -25,6 +25,9 @@ export interface GroupModels {
   platform: string
   rate_multiplier: number
   billing_display?: string
+  image_price_1k?: number | null
+  image_price_2k?: number | null
+  image_price_4k?: number | null
   models: ModelInfo[]
 }
 

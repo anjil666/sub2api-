@@ -112,6 +112,7 @@
                   :subscription-type="row.group.subscription_type"
                   :rate-multiplier="row.group.rate_multiplier"
                   :user-rate-multiplier="userGroupRates[row.group.id]"
+                  :billing-display="row.group.billing_display"
                 />
                 <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{
                   t('keys.noGroup')

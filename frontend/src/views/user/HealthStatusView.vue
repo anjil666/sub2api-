@@ -327,7 +327,7 @@ function formatTime(ts: string): string {
 }
 
 function cleanGroupName(name: string): string {
-  return name.replace(/\s*\(gAI\)\s*$/, '')
+  return name.replace(/\s*\([^)]+\)\s*$/, '').trim()
 }
 
 function isOffline(status: number): boolean {
@@ -368,7 +368,7 @@ function platformDisplayName(platform: string): string {
   if (p === 'anthropic' || p === 'claude') return 'Claude'
   if (p === 'openai') return 'GPT'
   if (p === 'gemini' || p === 'google') return 'Gemini'
-  if (p === 'antigravity') return 'Antigravity'
+  if (p === 'antigravity') return 'GPT'
   return platform
 }
 

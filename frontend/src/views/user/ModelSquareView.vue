@@ -214,7 +214,7 @@
               {{ translateMode(model.mode) }}
             </span>
             <span :class="ratePillClass(model.platform)" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-              {{ model.group_name }}<template v-if="model.billing_display"> {{ model.billing_display }}</template><template v-else-if="model.rate_multiplier !== 1"> {{ model.rate_multiplier }}x</template>
+              {{ model.group_name }}<template v-if="model.billing_display">&nbsp;{{ model.billing_display }}</template><template v-else-if="model.rate_multiplier !== 1">&nbsp;{{ model.rate_multiplier }}x</template>
             </span>
           </div>
         </div>

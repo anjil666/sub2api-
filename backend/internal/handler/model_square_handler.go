@@ -59,6 +59,9 @@ type modelSquareGroup struct {
 	Platform       string            `json:"platform"`
 	RateMultiplier float64           `json:"rate_multiplier"`
 	BillingDisplay string            `json:"billing_display,omitempty"`
+	ImagePrice1K   *float64          `json:"image_price_1k,omitempty"`
+	ImagePrice2K   *float64          `json:"image_price_2k,omitempty"`
+	ImagePrice4K   *float64          `json:"image_price_4k,omitempty"`
 	Models         []modelSquareItem `json:"models"`
 }
 
@@ -88,7 +91,10 @@ func (h *ModelSquareHandler) List(c *gin.Context) {
 		models := h.gatewayService.GetAvailableModels(ctx, &groupID, group.Platform)
 
 		var billingDisplay string
-		if m := msPerRequestTagRe.FindStringSubmatch(group.Description); len(m) == 2 {
+		// ImagePrice1K takes priority over per_request tag in description
+		if group.ImagePrice1K != nil && *group.ImagePrice1K > 0 {
+			billingDisplay = fmt.Sprintf("$%.3g/次", *group.ImagePrice1K)
+		} else if m := msPerRequestTagRe.FindStringSubmatch(group.Description); len(m) == 2 {
 			if price, err := strconv.ParseFloat(m[1], 64); err == nil && price > 0 {
 				billingDisplay = fmt.Sprintf("$%.3g/次", price)
 			}
@@ -101,6 +107,9 @@ func (h *ModelSquareHandler) List(c *gin.Context) {
 				Platform:       group.Platform,
 				RateMultiplier: group.RateMultiplier,
 				BillingDisplay: billingDisplay,
+				ImagePrice1K:   group.ImagePrice1K,
+				ImagePrice2K:   group.ImagePrice2K,
+				ImagePrice4K:   group.ImagePrice4K,
 				Models:         []modelSquareItem{},
 			})
 			continue
@@ -119,7 +128,10 @@ func (h *ModelSquareHandler) List(c *gin.Context) {
 				info.BillingMode = string(service.BillingModeImage)
 				info.Mode = "image"
 				info.Provider = inferProviderFromModelName(modelName)
-				if price, ok := service.LookupImageModelPrice(modelName); ok {
+				if group.ImagePrice1K != nil && *group.ImagePrice1K > 0 {
+					p := *group.ImagePrice1K
+					info.PerRequestPrice = &p
+				} else if price, ok := service.LookupImageModelPrice(modelName); ok {
 					p := price * group.RateMultiplier
 					info.PerRequestPrice = &p
 				} else {
@@ -153,6 +165,9 @@ func (h *ModelSquareHandler) List(c *gin.Context) {
 			Platform:       group.Platform,
 			RateMultiplier: group.RateMultiplier,
 			BillingDisplay: billingDisplay,
+			ImagePrice1K:   group.ImagePrice1K,
+			ImagePrice2K:   group.ImagePrice2K,
+			ImagePrice4K:   group.ImagePrice4K,
 			Models:         modelInfos,
 		})
 	}

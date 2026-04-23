@@ -165,14 +165,17 @@ func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
 func groupFromServiceBase(g *service.Group) Group {
 	desc := g.Description
 	var billingDisplay string
+	// Always strip [per_request:] tag from description
+	var perRequestPrice float64
 	if m := perRequestTagRe.FindStringSubmatch(desc); len(m) == 2 {
-		if price, err := strconv.ParseFloat(m[1], 64); err == nil && price > 0 {
-			billingDisplay = fmt.Sprintf("$%.3g/次", price)
-		}
+		perRequestPrice, _ = strconv.ParseFloat(m[1], 64)
 		desc = strings.TrimSpace(perRequestTagRe.ReplaceAllString(desc, ""))
 	}
-	if billingDisplay == "" && g.ImagePrice1K != nil && *g.ImagePrice1K > 0 {
+	// ImagePrice1K takes priority over per_request tag
+	if g.ImagePrice1K != nil && *g.ImagePrice1K > 0 {
 		billingDisplay = fmt.Sprintf("$%.3g/次", *g.ImagePrice1K)
+	} else if perRequestPrice > 0 {
+		billingDisplay = fmt.Sprintf("$%.3g/次", perRequestPrice)
 	}
 	return Group{
 		ID:                              g.ID,
