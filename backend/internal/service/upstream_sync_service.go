@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -853,8 +854,11 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 	if res.UpstreamGroupDescription != "" {
 		groupDesc = res.UpstreamGroupDescription
 	}
+	// 剥离上游描述中的价格信息（如 "价格 1k:0.06 2k:0.12 4k:0.24"）
+	groupDesc = stripUpstreamPriceText(groupDesc)
 
-	// 检测是否为纯图片模型分组，如果是则在描述中嵌入按次计费标记
+	// 检测是否为纯图片模型分组
+	// 仅当本地分组没有 ImagePrice 配置时，才在描述中嵌入按次计费标记
 	if len(models) > 0 {
 		allImage := true
 		var maxPrice float64
@@ -867,7 +871,14 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 				maxPrice = p
 			}
 		}
-		if allImage && maxPrice > 0 {
+		// 检查本地分组是否已有 ImagePrice 配置
+		hasLocalImagePrice := false
+		if existing != nil && existing.ManagedGroupID != nil {
+			if g, err := s.groupRepo.GetByIDLite(ctx, *existing.ManagedGroupID); err == nil && g != nil {
+				hasLocalImagePrice = g.ImagePrice1K != nil && *g.ImagePrice1K > 0
+			}
+		}
+		if allImage && maxPrice > 0 && !hasLocalImagePrice {
 			priceTag := fmt.Sprintf("[per_request:%.4f]", maxPrice*effectiveMultiplier)
 			// 移除旧标记（如果有）再追加
 			if idx := strings.Index(groupDesc, "[per_request:"); idx >= 0 {
@@ -880,6 +891,14 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 				groupDesc = groupDesc + " " + priceTag
 			} else {
 				groupDesc = priceTag
+			}
+		} else if hasLocalImagePrice {
+			// 有本地 ImagePrice 配置时，移除描述中已有的 [per_request:] 标记
+			if idx := strings.Index(groupDesc, "[per_request:"); idx >= 0 {
+				end := strings.Index(groupDesc[idx:], "]")
+				if end >= 0 {
+					groupDesc = strings.TrimSpace(groupDesc[:idx] + groupDesc[idx+end+1:])
+				}
 			}
 		}
 	}
@@ -1446,4 +1465,12 @@ func detectPlatform(modelID string) string {
 	default:
 		return PlatformAntigravity
 	}
+}
+
+// upstreamPriceTextRe matches upstream price text like "价格 1k:0.06 2k:0.12 4k:0.24"
+var upstreamPriceTextRe = regexp.MustCompile(`\s*价格\s+[\dkK:.]+(?:\s+[\dkK:.]+)*\s*`)
+
+// stripUpstreamPriceText removes upstream price text from description.
+func stripUpstreamPriceText(desc string) string {
+	return strings.TrimSpace(upstreamPriceTextRe.ReplaceAllString(desc, ""))
 }
