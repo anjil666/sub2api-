@@ -825,17 +825,18 @@ func (s *BillingService) CalculateImageCost(model string, imageSize string, imag
 		return &CostBreakdown{}
 	}
 
-	// 获取单价
-	unitPrice := s.getImageUnitPrice(model, imageSize, groupConfig)
+	unitPrice, fromGroupConfig := s.getImageUnitPrice(model, imageSize, groupConfig)
 
-	// 计算总费用
 	totalCost := unitPrice * float64(imageCount)
 
-	// 应用倍率
-	if rateMultiplier <= 0 {
-		rateMultiplier = 1.0
+	// 分组 ImagePrice 是最终按次价格，不乘倍率；默认价格才乘倍率
+	actualCost := totalCost
+	if !fromGroupConfig {
+		if rateMultiplier <= 0 {
+			rateMultiplier = 1.0
+		}
+		actualCost = totalCost * rateMultiplier
 	}
-	actualCost := totalCost * rateMultiplier
 
 	return &CostBreakdown{
 		TotalCost:   totalCost,
@@ -844,28 +845,26 @@ func (s *BillingService) CalculateImageCost(model string, imageSize string, imag
 	}
 }
 
-// getImageUnitPrice 获取图片单价
-func (s *BillingService) getImageUnitPrice(model string, imageSize string, groupConfig *ImagePriceConfig) float64 {
-	// 优先使用分组配置的价格
+// getImageUnitPrice 获取图片单价，第二个返回值表示是否来自分组配置
+func (s *BillingService) getImageUnitPrice(model string, imageSize string, groupConfig *ImagePriceConfig) (float64, bool) {
 	if groupConfig != nil {
 		switch imageSize {
 		case "1K":
 			if groupConfig.Price1K != nil {
-				return *groupConfig.Price1K
+				return *groupConfig.Price1K, true
 			}
 		case "2K":
 			if groupConfig.Price2K != nil {
-				return *groupConfig.Price2K
+				return *groupConfig.Price2K, true
 			}
 		case "4K":
 			if groupConfig.Price4K != nil {
-				return *groupConfig.Price4K
+				return *groupConfig.Price4K, true
 			}
 		}
 	}
 
-	// 回退到 LiteLLM 默认价格
-	return s.getDefaultImagePrice(model, imageSize)
+	return s.getDefaultImagePrice(model, imageSize), false
 }
 
 // getDefaultImagePrice 获取 LiteLLM 默认图片价格
