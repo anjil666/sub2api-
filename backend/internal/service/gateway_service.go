@@ -7815,7 +7815,7 @@ func (s *GatewayService) resolveChannelPricing(ctx context.Context, billingModel
 	return nil
 }
 
-// calculateImageCost 计算图片生成费用：渠道级别定价优先，否则走按次计费。
+// calculateImageCost 计算图片生成费用：分组 ImagePrice 优先，其次渠道定价，最后按次计费。
 func (s *GatewayService) calculateImageCost(
 	ctx context.Context,
 	result *ForwardResult,
@@ -7823,6 +7823,16 @@ func (s *GatewayService) calculateImageCost(
 	billingModel string,
 	multiplier float64,
 ) *CostBreakdown {
+	// 分组显式配置了 ImagePrice 时，直接使用，跳过渠道定价
+	if apiKey.Group != nil && hasImagePriceConfig(apiKey.Group) {
+		groupConfig := &ImagePriceConfig{
+			Price1K: apiKey.Group.ImagePrice1K,
+			Price2K: apiKey.Group.ImagePrice2K,
+			Price4K: apiKey.Group.ImagePrice4K,
+		}
+		return s.billingService.CalculateImageCost(billingModel, result.ImageSize, result.ImageCount, groupConfig, multiplier)
+	}
+
 	if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil {
 		tokens := UsageTokens{
 			InputTokens:       result.Usage.InputTokens,
@@ -7856,6 +7866,12 @@ func (s *GatewayService) calculateImageCost(
 		}
 	}
 	return s.billingService.CalculateImageCost(billingModel, result.ImageSize, result.ImageCount, groupConfig, multiplier)
+}
+
+func hasImagePriceConfig(g *Group) bool {
+	return (g.ImagePrice1K != nil && *g.ImagePrice1K > 0) ||
+		(g.ImagePrice2K != nil && *g.ImagePrice2K > 0) ||
+		(g.ImagePrice4K != nil && *g.ImagePrice4K > 0)
 }
 
 // calculateTokenCost 计算 Token 计费：根据 opts 决定走普通/长上下文/渠道统一计费。
