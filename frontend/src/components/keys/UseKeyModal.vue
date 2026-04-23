@@ -287,8 +287,11 @@ const clientTabs = computed((): TabConfig[] => {
       const name = (props.groupName || '').toLowerCase()
       const isCodex = name.includes('codex')
       const isGemini = name.includes('gemini') || name.includes('gemma')
+      const isImage = name.includes('image')
       const tabs: TabConfig[] = []
-      if (isCodex) {
+      if (isImage) {
+        tabs.push({ id: 'image-api', label: '图片 API', icon: TerminalIcon })
+      } else if (isCodex) {
         tabs.push({ id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon })
         tabs.push({ id: 'codex-ws', label: t('keys.useKeyModal.cliTabs.codexCliWs'), icon: TerminalIcon })
       } else if (isGemini) {
@@ -320,7 +323,7 @@ const openaiTabs: TabConfig[] = [
   { id: 'windows', label: 'Windows', icon: WindowsIcon }
 ]
 
-const showShellTabs = computed(() => activeClientTab.value !== 'opencode')
+const showShellTabs = computed(() => activeClientTab.value !== 'opencode' && activeClientTab.value !== 'image-api')
 
 const currentTabs = computed(() => {
   if (!showShellTabs.value) return []
@@ -340,6 +343,9 @@ const platformDescription = computed(() => {
     case 'gemini':
       return t('keys.useKeyModal.gemini.description')
     case 'antigravity':
+      if (activeClientTab.value === 'image-api') {
+        return '使用 OpenAI 兼容接口调用图片生成 API。'
+      }
       return t('keys.useKeyModal.antigravity.description')
     default:
       return t('keys.useKeyModal.description')
@@ -358,6 +364,9 @@ const platformNote = computed(() => {
     case 'gemini':
       return t('keys.useKeyModal.gemini.note')
     case 'antigravity':
+      if (activeClientTab.value === 'image-api') {
+        return '将下方 curl 命令中的参数替换为实际值即可调用。'
+      }
       if (activeClientTab.value === 'codex' || activeClientTab.value === 'codex-ws') {
         return activeTab.value === 'windows'
           ? t('keys.useKeyModal.openai.noteWindows')
@@ -435,6 +444,9 @@ const currentFiles = computed((): FileConfig[] => {
     case 'gemini':
       return [generateGeminiCliContent(baseUrl, apiKey)]
     case 'antigravity':
+      if (activeClientTab.value === 'image-api') {
+        return [generateImageApiContent(baseRoot, apiKey)]
+      }
       if (activeClientTab.value === 'gemini') {
         return [generateGeminiCliContent(baseUrl, apiKey)]
       }
@@ -622,6 +634,41 @@ responses_websockets_v2 = true`
       content: authContent
     }
   ]
+}
+
+function generateImageApiContent(baseUrl: string, apiKey: string): FileConfig {
+  const apiEndpoint = `${baseUrl}/v1/images/generations`
+  const curlCmd = `curl ${apiEndpoint} \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${apiKey}" \\
+  -d '{
+    "model": "gpt-image-1",
+    "prompt": "A cute cat wearing a hat",
+    "n": 1,
+    "size": "1024x1024"
+  }'`
+
+  const highlighted = [
+    keyword('curl') + ' ' + string(apiEndpoint) + ' ' + operator('\\'),
+    '  ' + operator('-H') + ' ' + string('"Content-Type: application/json"') + ' ' + operator('\\'),
+    '  ' + operator('-H') + ' ' + string(`"Authorization: Bearer ${apiKey}"`) + ' ' + operator('\\'),
+    '  ' + operator('-d') + ' ' + string("'{"),
+    '    ' + string('"model"') + operator(':') + ' ' + string('"gpt-image-1"') + operator(','),
+    '    ' + string('"prompt"') + operator(':') + ' ' + string('"A cute cat wearing a hat"') + operator(','),
+    '    ' + string('"n"') + operator(':') + ' ' + variable('1') + operator(','),
+    '    ' + string('"size"') + operator(':') + ' ' + string('"1024x1024"'),
+    "  " + string("}'"),
+    '',
+    comment('# 可选 size: 1024x1024 (1K), 1024x1536 (2K), 2048x2048 (2K)'),
+    comment('# 可选 model: gpt-image-1, gpt-image-1.5, gpt-image-2'),
+  ].join('\n')
+
+  return {
+    path: 'curl',
+    content: curlCmd,
+    highlighted,
+    hint: '将 prompt 替换为你的描述，size 和 model 按需调整。'
+  }
 }
 
 function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: string, pathLabel?: string): FileConfig {
