@@ -23,6 +23,7 @@ type UpstreamSite struct {
 	LastSyncError       string
 	LastSyncModelCount  int
 	Status              string // "active", "disabled"
+	SiteType            string // "standard", "grsai"
 	ManagedResourceCount int   // 从子表 COUNT 获取
 	CreatedAt           time.Time
 	UpdatedAt           time.Time

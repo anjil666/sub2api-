@@ -983,6 +983,7 @@ func (s *UpstreamSyncService) ensureAccount(ctx context.Context, site *UpstreamS
 		"api_key":       apiKey,
 		"base_url":      strings.TrimRight(site.BaseURL, "/"),
 		"model_mapping": modelMapping,
+		"site_type":     site.SiteType,
 	}
 
 	// 如果已有 managed_account_id，更新凭证和名称
@@ -1096,8 +1097,12 @@ func (s *UpstreamSyncService) ensureChannel(ctx context.Context, site *UpstreamS
 
 // ── 模型获取 ──
 
-// fetchModelsWithKey 使用指定的 API Key 获取模型列表（GET /v1/models）
+// fetchModelsWithKey 使用指定的 API Key 获取模型列表
 func (s *UpstreamSyncService) fetchModelsWithKey(ctx context.Context, site *UpstreamSite, apiKey string) ([]UpstreamModelInfo, error) {
+	if site.SiteType == "grsai" {
+		return s.fetchGrsaiModels(ctx, site, apiKey)
+	}
+
 	url := strings.TrimRight(site.BaseURL, "/") + "/v1/models"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -1123,6 +1128,32 @@ func (s *UpstreamSyncService) fetchModelsWithKey(ctx context.Context, site *Upst
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return result.Data, nil
+}
+
+// fetchGrsaiModels grsai 没有 /v1/models 端点，通过验证 API Key 有效性来确认，返回已知模型列表
+func (s *UpstreamSyncService) fetchGrsaiModels(ctx context.Context, site *UpstreamSite, apiKey string) ([]UpstreamModelInfo, error) {
+	// 用 getCredits 接口验证 API Key 是否有效
+	url := strings.TrimRight(site.BaseURL, "/") + "/client/common/getCredits"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return nil, fmt.Errorf("grsai returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	return []UpstreamModelInfo{
+		{ID: "gpt-image-2", Type: "image", DisplayName: "GPT Image 2"},
+	}, nil
 }
 
 // ── 余额查询 ──

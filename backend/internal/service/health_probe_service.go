@@ -515,6 +515,8 @@ func (s *HealthProbeService) executeProbe(ctx context.Context, account *Account,
 		req, err = s.buildOpenAIProbeRequest(ctx, account, model)
 	case account.IsGemini():
 		req, err = s.buildGeminiProbeRequest(ctx, account, model)
+	case account.GetCredential("site_type") == "grsai":
+		req, err = s.buildGrsaiProbeRequest(ctx, account)
 	case account.Platform == PlatformAntigravity:
 		req, err = s.buildClaudeProbeRequest(ctx, account, model)
 	default:
@@ -711,6 +713,21 @@ func (s *HealthProbeService) buildGeminiProbeRequest(ctx context.Context, accoun
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	return req, nil
+}
+
+func (s *HealthProbeService) buildGrsaiProbeRequest(ctx context.Context, account *Account) (*http.Request, error) {
+	baseURL := strings.TrimRight(account.GetCredential("base_url"), "/")
+	if baseURL == "" {
+		return nil, fmt.Errorf("base_url not configured")
+	}
+	apiKey := account.GetCredential("api_key")
+	url := baseURL + "/client/common/getCredits"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 	return req, nil
 }
 

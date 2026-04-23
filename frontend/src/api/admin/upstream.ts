@@ -19,6 +19,7 @@ export interface UpstreamSite {
   last_sync_error: string
   last_sync_model_count: number
   status: string
+  site_type: string
   managed_resource_count: number
   created_at: string
   updated_at: string
@@ -34,6 +35,7 @@ export interface CreateUpstreamSiteRequest {
   price_multiplier: number
   sync_enabled: boolean
   sync_interval_minutes: number
+  site_type?: string
 }
 
 export interface UpdateUpstreamSiteRequest {
@@ -47,6 +49,7 @@ export interface UpdateUpstreamSiteRequest {
   sync_enabled: boolean
   sync_interval_minutes: number
   status?: string
+  site_type?: string
 }
 
 export interface UpstreamBalanceInfo {

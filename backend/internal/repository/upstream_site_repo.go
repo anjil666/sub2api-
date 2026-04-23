@@ -38,12 +38,12 @@ func (r *upstreamSiteRepo) Create(ctx context.Context, site *service.UpstreamSit
 	err = r.db.QueryRowContext(ctx,
 		`INSERT INTO upstream_sites (name, platform, base_url, api_key_encrypted,
 			credential_mode, email_encrypted, password_encrypted,
-			price_multiplier, sync_enabled, sync_interval_minutes, status)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			price_multiplier, sync_enabled, sync_interval_minutes, status, site_type)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		 RETURNING id, created_at, updated_at`,
 		site.Name, site.Platform, site.BaseURL, apiKeyEnc,
 		site.CredentialMode, emailEnc, passwordEnc,
-		site.PriceMultiplier, site.SyncEnabled, site.SyncIntervalMinutes, site.Status,
+		site.PriceMultiplier, site.SyncEnabled, site.SyncIntervalMinutes, site.Status, site.SiteType,
 	).Scan(&site.ID, &site.CreatedAt, &site.UpdatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -66,7 +66,7 @@ func (r *upstreamSiteRepo) GetByID(ctx context.Context, id int64) (*service.Upst
 			us.cached_access_token, us.cached_refresh_token, us.token_expires_at,
 			us.price_multiplier, us.sync_enabled, us.sync_interval_minutes,
 			us.last_sync_at, us.last_sync_status, us.last_sync_error, us.last_sync_model_count,
-			us.status, us.created_at, us.updated_at,
+			us.status, us.site_type, us.created_at, us.updated_at,
 			(SELECT COUNT(*) FROM upstream_managed_resources WHERE upstream_site_id = us.id)
 		 FROM upstream_sites us WHERE us.id = $1`, id,
 	).Scan(
@@ -75,7 +75,7 @@ func (r *upstreamSiteRepo) GetByID(ctx context.Context, id int64) (*service.Upst
 		&cachedAccessToken, &cachedRefreshToken, &tokenExpiresAt,
 		&site.PriceMultiplier, &site.SyncEnabled, &site.SyncIntervalMinutes,
 		&lastSyncAt, &site.LastSyncStatus, &site.LastSyncError, &site.LastSyncModelCount,
-		&site.Status, &site.CreatedAt, &site.UpdatedAt,
+		&site.Status, &site.SiteType, &site.CreatedAt, &site.UpdatedAt,
 		&site.ManagedResourceCount,
 	)
 	if err != nil {
@@ -125,12 +125,12 @@ func (r *upstreamSiteRepo) Update(ctx context.Context, site *service.UpstreamSit
 	// 动态构建 SET 子句，只更新非空的敏感字段（空 = 不修改）
 	setClauses := []string{
 		"name=$1", "base_url=$2", "credential_mode=$3",
-		"price_multiplier=$4", "sync_enabled=$5", "sync_interval_minutes=$6", "status=$7",
+		"price_multiplier=$4", "sync_enabled=$5", "sync_interval_minutes=$6", "status=$7", "site_type=$8",
 		"updated_at=NOW()",
 	}
 	args := []any{site.Name, site.BaseURL, site.CredentialMode,
-		site.PriceMultiplier, site.SyncEnabled, site.SyncIntervalMinutes, site.Status}
-	argIdx := 8
+		site.PriceMultiplier, site.SyncEnabled, site.SyncIntervalMinutes, site.Status, site.SiteType}
+	argIdx := 9
 
 	if site.APIKey != "" {
 		enc, err := r.encryptor.Encrypt(site.APIKey)
@@ -226,7 +226,7 @@ func (r *upstreamSiteRepo) List(ctx context.Context, params pagination.Paginatio
 		`SELECT us.id, us.name, us.platform, us.base_url, us.credential_mode,
 			us.price_multiplier, us.sync_enabled, us.sync_interval_minutes,
 			us.last_sync_at, us.last_sync_status, us.last_sync_error, us.last_sync_model_count,
-			us.status, us.created_at, us.updated_at,
+			us.status, us.site_type, us.created_at, us.updated_at,
 			(SELECT COUNT(*) FROM upstream_managed_resources WHERE upstream_site_id = us.id)
 		 FROM upstream_sites us WHERE %s ORDER BY us.id DESC LIMIT $%d OFFSET $%d`,
 		whereClause, argIdx, argIdx+1,
@@ -248,7 +248,7 @@ func (r *upstreamSiteRepo) List(ctx context.Context, params pagination.Paginatio
 			&site.ID, &site.Name, &site.Platform, &site.BaseURL, &site.CredentialMode,
 			&site.PriceMultiplier, &site.SyncEnabled, &site.SyncIntervalMinutes,
 			&lastSyncAt, &site.LastSyncStatus, &site.LastSyncError, &site.LastSyncModelCount,
-			&site.Status, &site.CreatedAt, &site.UpdatedAt,
+			&site.Status, &site.SiteType, &site.CreatedAt, &site.UpdatedAt,
 			&site.ManagedResourceCount,
 		); err != nil {
 			return nil, nil, fmt.Errorf("scan upstream site: %w", err)
@@ -280,7 +280,7 @@ func (r *upstreamSiteRepo) ListDueForSync(ctx context.Context) ([]service.Upstre
 			us.cached_access_token, us.cached_refresh_token, us.token_expires_at,
 			us.price_multiplier, us.sync_enabled, us.sync_interval_minutes,
 			us.last_sync_at, us.last_sync_status, us.last_sync_error, us.last_sync_model_count,
-			us.status, us.created_at, us.updated_at
+			us.status, us.site_type, us.created_at, us.updated_at
 		 FROM upstream_sites us
 		 WHERE us.sync_enabled = true AND us.status = 'active'
 		   AND (us.last_sync_at IS NULL OR us.last_sync_at + (us.sync_interval_minutes || ' minutes')::INTERVAL < NOW())
@@ -303,7 +303,7 @@ func (r *upstreamSiteRepo) ListDueForSync(ctx context.Context) ([]service.Upstre
 			&cachedAccessToken, &cachedRefreshToken, &tokenExpiresAt,
 			&site.PriceMultiplier, &site.SyncEnabled, &site.SyncIntervalMinutes,
 			&lastSyncAt, &site.LastSyncStatus, &site.LastSyncError, &site.LastSyncModelCount,
-			&site.Status, &site.CreatedAt, &site.UpdatedAt,
+			&site.Status, &site.SiteType, &site.CreatedAt, &site.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan upstream site: %w", err)
 		}

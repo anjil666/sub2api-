@@ -4373,7 +4373,8 @@ export default {
         markupHint: 'Markup on top of upstream rate. 0 = no markup. E.g. 30 = +30%',
         syncInterval: 'Sync Interval',
         minutes: 'minutes',
-        syncEnabled: 'Enable Auto Sync'
+        syncEnabled: 'Enable Auto Sync',
+        siteType: 'Site Type'
       },
       loginModeHint: 'The system will auto-login and discover all API Keys under this account, creating local groups, accounts, and channels for each key. Sites with 2FA or Turnstile enabled are not supported.',
       models: 'Models',

@@ -134,6 +134,15 @@
           <input v-model="form.base_url" type="url" class="input" required maxlength="500" :placeholder="'https://example.com'" />
         </div>
 
+        <!-- 站点类型 -->
+        <div>
+          <label class="label">{{ t('admin.upstream.form.siteType') }}</label>
+          <select v-model="form.site_type" class="input">
+            <option value="standard">Standard</option>
+            <option value="grsai">GRSAI (异步做图)</option>
+          </select>
+        </div>
+
         <!-- 认证方式选择 -->
         <div>
           <label class="label">{{ t('admin.upstream.credentialMode') }}</label>
@@ -382,7 +391,8 @@ const form = reactive({
   password: '',
   price_multiplier: 0,
   sync_enabled: true,
-  sync_interval_minutes: 60
+  sync_interval_minutes: 60,
+  site_type: 'standard' as string
 })
 
 const modelsDialogVisible = ref(false)
@@ -443,7 +453,8 @@ function openCreateDialog() {
     password: '',
     price_multiplier: 0,
     sync_enabled: true,
-    sync_interval_minutes: 60
+    sync_interval_minutes: 60,
+    site_type: 'standard'
   })
   dialogVisible.value = true
 }
@@ -462,7 +473,8 @@ function openEditDialog(site: UpstreamSite) {
     password: '',
     price_multiplier: site.price_multiplier,
     sync_enabled: site.sync_enabled,
-    sync_interval_minutes: site.sync_interval_minutes
+    sync_interval_minutes: site.sync_interval_minutes,
+    site_type: site.site_type || 'standard'
   })
   dialogVisible.value = true
 }
@@ -480,7 +492,8 @@ async function handleSubmit() {
         password: form.credential_mode === 'login' ? form.password : undefined,
         price_multiplier: Number(form.price_multiplier) || 1,
         sync_enabled: form.sync_enabled,
-        sync_interval_minutes: Number(form.sync_interval_minutes) || 60
+        sync_interval_minutes: Number(form.sync_interval_minutes) || 60,
+        site_type: form.site_type
       })
     } else if (editingId.value) {
       await adminAPI.upstream.update(editingId.value, {
@@ -492,7 +505,8 @@ async function handleSubmit() {
         password: form.credential_mode === 'login' && form.password ? form.password : undefined,
         price_multiplier: Number(form.price_multiplier) || 1,
         sync_enabled: form.sync_enabled,
-        sync_interval_minutes: Number(form.sync_interval_minutes) || 60
+        sync_interval_minutes: Number(form.sync_interval_minutes) || 60,
+        site_type: form.site_type
       })
     }
     dialogVisible.value = false

@@ -24,6 +24,11 @@ func (s *GatewayService) ForwardAsImageGenerations(
 	body []byte,
 	startTime time.Time,
 ) (*ForwardResult, error) {
+	// grsai 账号走异步做图适配器
+	if account.GetCredential("site_type") == "grsai" {
+		return s.ForwardAsGrsaiDraw(ctx, c, account, body, startTime)
+	}
+
 	originalModel := gjson.GetBytes(body, "model").String()
 
 	mappedModel := account.GetMappedModel(originalModel)

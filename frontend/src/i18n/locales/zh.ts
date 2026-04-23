@@ -4540,7 +4540,8 @@ export default {
         markupHint: '在上游倍率基础上加价，0 = 不加价。例如 30 表示加价 30%',
         syncInterval: '同步间隔',
         minutes: '分钟',
-        syncEnabled: '启用自动同步'
+        syncEnabled: '启用自动同步',
+        siteType: '站点类型'
       },
       loginModeHint: '系统将自动登录并发现该账号下的所有 API Key，并为每个 Key 创建本地分组、账号和渠道。不支持开启了 2FA 或 Turnstile 的站点。',
       models: '模型',

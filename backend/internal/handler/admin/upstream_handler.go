@@ -82,6 +82,7 @@ type createUpstreamSiteRequest struct {
 	PriceMultiplier     flexFloat64 `json:"price_multiplier"`
 	SyncEnabled         bool        `json:"sync_enabled"`
 	SyncIntervalMinutes flexInt     `json:"sync_interval_minutes"`
+	SiteType            string      `json:"site_type"`
 }
 
 type updateUpstreamSiteRequest struct {
@@ -95,6 +96,7 @@ type updateUpstreamSiteRequest struct {
 	SyncEnabled         bool        `json:"sync_enabled"`
 	SyncIntervalMinutes flexInt     `json:"sync_interval_minutes"`
 	Status              string      `json:"status" binding:"omitempty,oneof=active disabled"`
+	SiteType            string      `json:"site_type"`
 }
 
 type upstreamSiteResponse struct {
@@ -114,6 +116,7 @@ type upstreamSiteResponse struct {
 	LastSyncError        string  `json:"last_sync_error"`
 	LastSyncModelCount   int     `json:"last_sync_model_count"`
 	Status               string  `json:"status"`
+	SiteType             string  `json:"site_type"`
 	ManagedResourceCount int     `json:"managed_resource_count"`
 	CreatedAt            string  `json:"created_at"`
 	UpdatedAt            string  `json:"updated_at"`
@@ -155,6 +158,7 @@ func siteToResponse(s *service.UpstreamSite) *upstreamSiteResponse {
 		LastSyncError:        s.LastSyncError,
 		LastSyncModelCount:   s.LastSyncModelCount,
 		Status:               s.Status,
+		SiteType:             s.SiteType,
 		ManagedResourceCount: s.ManagedResourceCount,
 		CreatedAt:            s.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:            s.UpdatedAt.Format("2006-01-02T15:04:05Z"),
@@ -297,6 +301,11 @@ func (h *UpstreamHandler) Create(c *gin.Context) {
 		req.SyncIntervalMinutes = 60
 	}
 
+	siteType := req.SiteType
+	if siteType == "" {
+		siteType = "standard"
+	}
+
 	// 检查 base_url 唯一
 	exists, err := h.siteRepo.ExistsByBaseURL(c.Request.Context(), req.BaseURL)
 	if err != nil {
@@ -320,6 +329,7 @@ func (h *UpstreamHandler) Create(c *gin.Context) {
 		SyncEnabled:         req.SyncEnabled,
 		SyncIntervalMinutes: int(req.SyncIntervalMinutes),
 		Status:              service.StatusActive,
+		SiteType:            siteType,
 	}
 
 	if err := h.siteRepo.Create(c.Request.Context(), site); err != nil {
@@ -380,6 +390,7 @@ func (h *UpstreamHandler) Update(c *gin.Context) {
 		SyncEnabled:         req.SyncEnabled,
 		SyncIntervalMinutes: int(req.SyncIntervalMinutes),
 		Status:              req.Status,
+		SiteType:            req.SiteType,
 	}
 
 	if err := h.siteRepo.Update(c.Request.Context(), site); err != nil {
