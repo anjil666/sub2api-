@@ -173,9 +173,27 @@
           <!-- Pricing -->
           <div v-if="model.has_pricing && model.billing_mode === 'image'" class="space-y-3">
             <div class="rounded-lg bg-blue-50 px-3 py-3 dark:bg-blue-900/20">
-              <div class="text-xs text-blue-600 dark:text-blue-400">{{ t('modelSquare.perRequest') || '按次计费' }}</div>
-              <div class="mt-1 font-mono text-xl font-bold text-blue-700 dark:text-blue-300">${{ model.per_request_price != null ? formatPrice(model.per_request_price) : '—' }}</div>
-              <div class="text-[10px] text-blue-500 dark:text-blue-400">{{ t('modelSquare.perImage') || '每次请求' }}</div>
+              <div class="flex items-baseline gap-2">
+                <span class="text-xs font-medium text-blue-600 dark:text-blue-400">{{ t('modelSquare.perRequest') || '按次计费' }}</span>
+                <span class="text-[10px] text-blue-400 dark:text-blue-500">{{ t('modelSquare.perImage') || '每次请求' }}</span>
+              </div>
+              <div v-if="model.image_price_1k || model.image_price_2k || model.image_price_4k" class="mt-2 grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <span class="text-blue-500 dark:text-blue-400">1K</span>
+                  <span class="ml-2 font-mono font-semibold text-blue-700 dark:text-blue-300">${{ formatPrice(model.image_price_1k ?? 0) }}</span>
+                </div>
+                <div>
+                  <span class="text-blue-500 dark:text-blue-400">2K</span>
+                  <span class="ml-2 font-mono font-semibold text-blue-700 dark:text-blue-300">${{ formatPrice(model.image_price_2k ?? 0) }}</span>
+                </div>
+                <div>
+                  <span class="text-blue-500 dark:text-blue-400">4K</span>
+                  <span class="ml-2 font-mono font-semibold text-blue-700 dark:text-blue-300">${{ formatPrice(model.image_price_4k ?? 0) }}</span>
+                </div>
+              </div>
+              <div v-else class="mt-1">
+                <span class="font-mono text-xl font-bold text-blue-700 dark:text-blue-300">${{ model.per_request_price != null ? formatPrice(model.per_request_price) : '—' }}</span>
+              </div>
             </div>
           </div>
           <div v-else-if="model.has_pricing" class="space-y-3">
@@ -337,6 +355,9 @@ interface FlatModel extends ModelInfo {
   platform: string
   rate_multiplier: number
   billing_display?: string
+  image_price_1k?: number | null
+  image_price_2k?: number | null
+  image_price_4k?: number | null
 }
 
 const flatModels = computed<FlatModel[]>(() => {
@@ -350,6 +371,9 @@ const flatModels = computed<FlatModel[]>(() => {
         platform: group.platform,
         rate_multiplier: group.rate_multiplier,
         billing_display: group.billing_display,
+        image_price_1k: group.image_price_1k,
+        image_price_2k: group.image_price_2k,
+        image_price_4k: group.image_price_4k,
       })
     }
   }
