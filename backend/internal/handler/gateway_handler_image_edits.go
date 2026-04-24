@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
+	"strings"
 	"time"
 
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
@@ -53,13 +55,10 @@ func (h *GatewayHandler) ImageEdits(c *gin.Context) {
 
 	contentType := c.GetHeader("Content-Type")
 
-	// Restore body so FormValue can parse multipart fields
-	c.Request.Body = io.NopCloser(bytes.NewReader(body))
-
-	// Extract model from multipart form
-	reqModel := c.Request.FormValue("model")
+	// Extract model from raw multipart body (c.Request.Body is already consumed)
+	reqModel := extractMultipartField(body, contentType, "model")
 	if reqModel == "" {
-		reqModel = "gpt-image-1" // default model for image edits
+		reqModel = "gpt-image-1"
 	}
 	reqLog = reqLog.With(zap.String("model", reqModel))
 	setOpsRequestContext(c, reqModel, false, nil)
@@ -165,4 +164,29 @@ func (h *GatewayHandler) ImageEdits(c *gin.Context) {
 		})
 		return
 	}
+}
+
+func extractMultipartField(body []byte, contentType, fieldName string) string {
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil || !strings.HasPrefix(mediaType, "multipart/") {
+		return ""
+	}
+	boundary := params["boundary"]
+	if boundary == "" {
+		return ""
+	}
+	reader := multipart.NewReader(bytes.NewReader(body), boundary)
+	for {
+		part, err := reader.NextPart()
+		if err != nil {
+			break
+		}
+		if part.FormName() == fieldName {
+			var buf bytes.Buffer
+			buf.ReadFrom(part)
+			return strings.TrimSpace(buf.String())
+		}
+		part.Close()
+	}
+	return ""
 }
