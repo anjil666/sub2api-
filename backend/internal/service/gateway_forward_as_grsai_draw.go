@@ -27,25 +27,6 @@ type grsaiDrawRequest struct {
 	ShutProgress bool     `json:"shutProgress"`
 }
 
-type grsaiDrawResultRequest struct {
-	ID string `json:"id"`
-}
-
-type grsaiDrawResultResponse struct {
-	Code int    `json:"code"`
-	Msg  string `json:"msg"`
-	Data struct {
-		ID            string `json:"id"`
-		Progress      int    `json:"progress"`
-		Status        string `json:"status"`
-		FailureReason string `json:"failure_reason"`
-		Error         string `json:"error"`
-		Results       []struct {
-			URL string `json:"url"`
-		} `json:"results"`
-	} `json:"data"`
-}
-
 func sizeToAspectRatio(size string) string {
 	switch size {
 	case "1024x1024":
@@ -234,66 +215,67 @@ func (s *GatewayService) ForwardAsGrsaiDraw(
 		return nil, fmt.Errorf("grsai submit error: %d %s", submitResp.StatusCode, upstreamMsg)
 	}
 
-	// 从提交响应中提取 taskId
-	taskID := gjson.GetBytes(submitBody, "data.id").String()
-	if taskID == "" {
-		taskID = gjson.GetBytes(submitBody, "id").String()
+	// shutProgress=true 时 grsai 返回 SSE 流，最后一条 data: 行包含最终结果
+	// 解析 SSE 响应，提取最终结果
+	var lastData string
+	for _, line := range strings.Split(string(submitBody), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "data: ") {
+			lastData = strings.TrimPrefix(line, "data: ")
+		} else if strings.HasPrefix(line, "data:") {
+			lastData = strings.TrimPrefix(line, "data:")
+		}
 	}
-	if taskID == "" {
-		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "grsai: no task id in response")
-		return nil, fmt.Errorf("grsai: no task id, body: %s", string(submitBody))
+	if lastData == "" {
+		// 兜底：尝试直接作为 JSON 解析（非 SSE 格式）
+		lastData = strings.TrimSpace(string(submitBody))
 	}
 
-	// 2. 轮询结果（间隔 3 秒，超时 5 分钟）
-	pollURL := validatedURL + "/v1/draw/result"
-	pollBody, _ := json.Marshal(grsaiDrawResultRequest{ID: taskID})
-	deadline := time.Now().Add(5 * time.Minute)
+	taskID := gjson.Get(lastData, "id").String()
+	status := gjson.Get(lastData, "status").String()
 
-	var result grsaiDrawResultResponse
-	for {
-		if time.Now().After(deadline) {
-			writeGatewayCCError(c, http.StatusGatewayTimeout, "server_error", "grsai: task timed out")
-			return nil, fmt.Errorf("grsai: task %s timed out", taskID)
+	if status == "failed" {
+		reason := gjson.Get(lastData, "failure_reason").String()
+		if reason == "" {
+			reason = gjson.Get(lastData, "error").String()
 		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(3 * time.Second):
+		if reason == "" {
+			reason = "unknown error"
 		}
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "grsai: "+reason)
+		return nil, fmt.Errorf("grsai task failed: %s", reason)
+	}
 
-		pollReq, _ := http.NewRequestWithContext(ctx, "POST", pollURL, bytes.NewReader(pollBody))
-		pollReq.Header.Set("Content-Type", "application/json")
-		pollReq.Header.Set("Authorization", "Bearer "+apiKey)
+	type grsaiSSEResult struct {
+		ID      string `json:"id"`
+		Status  string `json:"status"`
+		Results []struct {
+			URL string `json:"url"`
+		} `json:"results"`
+		FailureReason string `json:"failure_reason"`
+		Error         string `json:"error"`
+	}
+	var result grsaiSSEResult
+	if err := json.Unmarshal([]byte(lastData), &result); err != nil {
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "grsai: failed to parse response")
+		return nil, fmt.Errorf("grsai: parse error: %w, body: %s", err, string(submitBody))
+	}
 
-		pollResp, err := s.httpUpstream.DoWithTLS(pollReq, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
-		if err != nil {
-			if pollResp != nil && pollResp.Body != nil {
-				_ = pollResp.Body.Close()
-			}
-			continue
+	if result.Status != "succeeded" || len(result.Results) == 0 {
+		reason := result.FailureReason
+		if reason == "" {
+			reason = result.Error
 		}
-		respBytes, _ := io.ReadAll(io.LimitReader(pollResp.Body, 2<<20))
-		_ = pollResp.Body.Close()
-
-		if err := json.Unmarshal(respBytes, &result); err != nil {
-			continue
+		if reason == "" {
+			reason = "no results returned (status: " + result.Status + ")"
 		}
-		if result.Data.Status == "succeeded" {
-			break
-		}
-		if result.Data.Status == "failed" {
-			reason := result.Data.FailureReason
-			if reason == "" {
-				reason = result.Data.Error
-			}
-			writeGatewayCCError(c, http.StatusBadGateway, "server_error", "grsai: "+reason)
-			return nil, fmt.Errorf("grsai task failed: %s", reason)
-		}
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "grsai: "+reason)
+		return nil, fmt.Errorf("grsai task not succeeded: %s", lastData)
 	}
 
 	// 3. 包装成 OpenAI /v1/images/generations 响应格式
-	openaiData := make([]map[string]string, 0, len(result.Data.Results))
-	for _, r := range result.Data.Results {
+	openaiData := make([]map[string]string, 0, len(result.Results))
+	for _, r := range result.Results {
 		openaiData = append(openaiData, map[string]string{"url": r.URL})
 	}
 	openaiResp := map[string]any{
@@ -305,7 +287,7 @@ func (s *GatewayService) ForwardAsGrsaiDraw(
 
 	imageCount := int(gjson.GetBytes(body, "n").Int())
 	if imageCount <= 0 {
-		imageCount = len(result.Data.Results)
+		imageCount = len(result.Results)
 	}
 	if imageCount <= 0 {
 		imageCount = 1
