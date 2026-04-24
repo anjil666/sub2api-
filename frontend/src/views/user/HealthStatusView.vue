@@ -327,7 +327,7 @@ function formatTime(ts: string): string {
 }
 
 function cleanGroupName(name: string): string {
-  return name.replace(/\s*\([^)]+\)\s*$/, '').trim()
+  return name.replace(/^上游:\s*/, '').replace(/\s*\([^)]+\)\s*$/, '').trim()
 }
 
 function isOffline(status: number): boolean {

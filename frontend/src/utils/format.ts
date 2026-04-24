@@ -338,5 +338,5 @@ export function formatRelativeWithDateTime(date: string | Date | null | undefine
  * @returns 清理后的名称
  */
 export function cleanGroupName(name: string): string {
-  return name.replace(/\s*\([^)]+\)\s*$/, '').trim()
+  return name.replace(/^上游:\s*/, '').replace(/\s*\([^)]+\)\s*$/, '').trim()
 }
