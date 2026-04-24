@@ -57,6 +57,11 @@ func (h *GatewayHandler) ImageEdits(c *gin.Context) {
 
 	// Extract model from raw multipart body (c.Request.Body is already consumed)
 	reqModel := extractMultipartField(body, contentType, "model")
+	reqLog.Info("gateway.image_edits.debug_model_extract",
+		zap.String("content_type", contentType),
+		zap.Int("body_len", len(body)),
+		zap.String("extracted_model", reqModel),
+	)
 	if reqModel == "" {
 		reqModel = "gpt-image-1"
 	}
