@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
@@ -50,6 +52,9 @@ func (h *GatewayHandler) ImageEdits(c *gin.Context) {
 	}
 
 	contentType := c.GetHeader("Content-Type")
+
+	// Restore body so FormValue can parse multipart fields
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
 
 	// Extract model from multipart form
 	reqModel := c.Request.FormValue("model")
