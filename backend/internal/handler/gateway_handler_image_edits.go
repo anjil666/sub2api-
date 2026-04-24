@@ -4,8 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"mime"
-	"mime/multipart"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -55,13 +54,12 @@ func (h *GatewayHandler) ImageEdits(c *gin.Context) {
 
 	contentType := c.GetHeader("Content-Type")
 
-	// Extract model from raw multipart body (c.Request.Body is already consumed)
-	reqModel := extractMultipartField(body, contentType, "model")
-	reqLog.Info("gateway.image_edits.debug_model_extract",
-		zap.String("content_type", contentType),
-		zap.Int("body_len", len(body)),
-		zap.String("extracted_model", reqModel),
-	)
+	// Restore body so Gin's native multipart parsing can extract form fields
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	reqModel := c.PostForm("model")
+	if reqModel == "" {
+		reqModel = extractMultipartFieldByBytes(body, "model")
+	}
 	if reqModel == "" {
 		reqModel = "gpt-image-1"
 	}
@@ -171,27 +169,17 @@ func (h *GatewayHandler) ImageEdits(c *gin.Context) {
 	}
 }
 
-func extractMultipartField(body []byte, contentType, fieldName string) string {
-	mediaType, params, err := mime.ParseMediaType(contentType)
-	if err != nil || !strings.HasPrefix(mediaType, "multipart/") {
+func extractMultipartFieldByBytes(body []byte, fieldName string) string {
+	needle := []byte(`name="` + fieldName + `"` + "\r\n\r\n")
+	idx := bytes.Index(body, needle)
+	if idx < 0 {
 		return ""
 	}
-	boundary := params["boundary"]
-	if boundary == "" {
+	valueStart := idx + len(needle)
+	rest := body[valueStart:]
+	valueEnd := bytes.Index(rest, []byte("\r\n"))
+	if valueEnd < 0 {
 		return ""
 	}
-	reader := multipart.NewReader(bytes.NewReader(body), boundary)
-	for {
-		part, err := reader.NextPart()
-		if err != nil {
-			break
-		}
-		if part.FormName() == fieldName {
-			var buf bytes.Buffer
-			buf.ReadFrom(part)
-			return strings.TrimSpace(buf.String())
-		}
-		part.Close()
-	}
-	return ""
+	return strings.TrimSpace(string(rest[:valueEnd]))
 }
