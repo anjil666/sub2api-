@@ -222,6 +222,30 @@ func (s *UpstreamSyncService) ListManagedResources(ctx context.Context, siteID i
 	return s.resourceRepo.ListBySiteID(ctx, siteID)
 }
 
+// SetSiteResourcesStatus 批量设置站点下所有托管资源及其关联本地资源的状态
+func (s *UpstreamSyncService) SetSiteResourcesStatus(ctx context.Context, siteID int64, status string) {
+	resources, err := s.resourceRepo.ListBySiteID(ctx, siteID)
+	if err != nil {
+		log.Printf("[UpstreamSync] Warning: failed to list resources for site %d: %v", siteID, err)
+		return
+	}
+	for _, res := range resources {
+		if res.Status == status {
+			continue
+		}
+		disabledBy := ""
+		if status == "disabled" {
+			disabledBy = "manual"
+		}
+		if err := s.resourceRepo.UpdateStatus(ctx, res.ID, status); err != nil {
+			log.Printf("[UpstreamSync] Warning: failed to update resource %d status: %v", res.ID, err)
+			continue
+		}
+		_ = s.resourceRepo.UpdateDisabledBy(ctx, res.ID, disabledBy)
+		s.setLocalResourceStatus(ctx, res, status)
+	}
+}
+
 // DeleteResource 删除单个托管资源及其关联的本地 channel/account/group
 func (s *UpstreamSyncService) DeleteResource(ctx context.Context, resourceID int64) error {
 	res, err := s.resourceRepo.GetByID(ctx, resourceID)
@@ -1333,6 +1357,8 @@ var defaultModelPrices = map[string]modelDefaultPrice{
 	"gpt-4-turbo":          {InputPerToken: 10e-6, OutputPerToken: 30e-6},
 	"gpt-5.4":              {InputPerToken: 2.5e-6, OutputPerToken: 15e-6},
 	"gpt-5.4-mini":         {InputPerToken: 0.75e-6, OutputPerToken: 4.5e-6},
+	"gpt-5.5":              {InputPerToken: 5e-6, OutputPerToken: 30e-6},
+	"gpt-5.5-pro":          {InputPerToken: 30e-6, OutputPerToken: 180e-6},
 	"o1":                   {InputPerToken: 15e-6, OutputPerToken: 60e-6},
 	"o1-mini":              {InputPerToken: 3e-6, OutputPerToken: 12e-6},
 	"o3":                   {InputPerToken: 10e-6, OutputPerToken: 40e-6},

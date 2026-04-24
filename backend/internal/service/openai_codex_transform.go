@@ -65,6 +65,14 @@ var codexModelMap = map[string]string{
 	"gpt-5-codex-mini":           "gpt-5.1-codex-mini",
 	"gpt-5-codex-mini-medium":    "gpt-5.1-codex-mini",
 	"gpt-5-codex-mini-high":      "gpt-5.1-codex-mini",
+	"gpt-5.5":                    "gpt-5.5",
+	"gpt-5.5-none":               "gpt-5.5",
+	"gpt-5.5-low":                "gpt-5.5",
+	"gpt-5.5-medium":             "gpt-5.5",
+	"gpt-5.5-high":               "gpt-5.5",
+	"gpt-5.5-xhigh":              "gpt-5.5",
+	"gpt-5.5-chat-latest":        "gpt-5.5",
+	"gpt-5.5-pro":                "gpt-5.5-pro",
 	"gpt-5":                      "gpt-5.1",
 	"gpt-5-mini":                 "gpt-5.1",
 	"gpt-5-nano":                 "gpt-5.1",
@@ -264,6 +272,9 @@ func normalizeCodexModel(model string) string {
 	}
 	if strings.Contains(normalized, "gpt-5.1") || strings.Contains(normalized, "gpt 5.1") {
 		return "gpt-5.1"
+	}
+	if strings.Contains(normalized, "gpt-5.5") || strings.Contains(normalized, "gpt 5.5") {
+		return "gpt-5.5"
 	}
 	if strings.Contains(normalized, "codex") {
 		return "gpt-5.1-codex"

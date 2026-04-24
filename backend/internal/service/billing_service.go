@@ -273,6 +273,22 @@ func (s *BillingService) initFallbackPricing() {
 		SupportsCacheBreakdown:         false,
 	}
 	s.fallbackPrices["gpt-5.3-codex"] = s.fallbackPrices["gpt-5.1-codex"]
+	// OpenAI GPT-5.5
+	s.fallbackPrices["gpt-5.5"] = &ModelPricing{
+		InputPricePerToken:             5e-6,    // $5 per MTok
+		InputPricePerTokenPriority:     12.5e-6, // $12.5 per MTok
+		OutputPricePerToken:            30e-6,   // $30 per MTok
+		OutputPricePerTokenPriority:    75e-6,   // $75 per MTok
+		CacheCreationPricePerToken:     5e-6,    // $5 per MTok
+		CacheReadPricePerToken:         0.5e-6,  // $0.5 per MTok
+		CacheReadPricePerTokenPriority: 1.25e-6, // $1.25 per MTok
+		SupportsCacheBreakdown:         false,
+	}
+	// OpenAI GPT-5.5 Pro
+	s.fallbackPrices["gpt-5.5-pro"] = &ModelPricing{
+		InputPricePerToken:  30e-6,  // $30 per MTok
+		OutputPricePerToken: 180e-6, // $180 per MTok
+	}
 }
 
 // getFallbackPricing 根据模型系列获取回退价格
@@ -316,6 +332,10 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 	if strings.Contains(modelLower, "gpt-5") || strings.Contains(modelLower, "codex") {
 		normalized := normalizeCodexModel(modelLower)
 		switch normalized {
+		case "gpt-5.5":
+			return s.fallbackPrices["gpt-5.5"]
+		case "gpt-5.5-pro":
+			return s.fallbackPrices["gpt-5.5-pro"]
 		case "gpt-5.4-mini":
 			return s.fallbackPrices["gpt-5.4-mini"]
 		case "gpt-5.4-nano":

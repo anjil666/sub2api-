@@ -526,6 +526,8 @@ func (h *UpstreamHandler) Toggle(c *gin.Context) {
 		return
 	}
 
+	h.syncService.SetSiteResourcesStatus(c.Request.Context(), site.ID, site.Status)
+
 	response.Success(c, siteToResponse(site))
 }
 

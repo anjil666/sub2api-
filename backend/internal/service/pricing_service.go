@@ -50,6 +50,20 @@ var (
 		Mode:                    "chat",
 		SupportsPromptCaching:   true,
 	}
+	openAIGPT55FallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken:       5e-06,  // $5 per MTok
+		OutputCostPerToken:      3e-05,  // $30 per MTok
+		CacheReadInputTokenCost: 5e-07,  // $0.5 per MTok
+		LiteLLMProvider:         "openai",
+		Mode:                    "chat",
+		SupportsPromptCaching:   true,
+	}
+	openAIGPT55ProFallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken:  3e-05, // $30 per MTok
+		OutputCostPerToken: 1.8e-04, // $180 per MTok
+		LiteLLMProvider:    "openai",
+		Mode:               "chat",
+	}
 )
 
 // LiteLLMModelPricing LiteLLM价格数据结构
@@ -781,6 +795,18 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 		logger.With(zap.String("component", "service.pricing")).
 			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.4(static)"))
 		return openAIGPT54FallbackPricing
+	}
+
+	if strings.HasPrefix(model, "gpt-5.5-pro") {
+		logger.With(zap.String("component", "service.pricing")).
+			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.5-pro(static)"))
+		return openAIGPT55ProFallbackPricing
+	}
+
+	if strings.HasPrefix(model, "gpt-5.5") {
+		logger.With(zap.String("component", "service.pricing")).
+			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.5(static)"))
+		return openAIGPT55FallbackPricing
 	}
 
 	// 最终回退到 DefaultTestModel
