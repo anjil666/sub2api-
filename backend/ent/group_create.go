@@ -425,6 +425,20 @@ func (_c *GroupCreate) SetNillableMessagesDispatchModelConfig(v *domain.OpenAIMe
 	return _c
 }
 
+// SetImageStudioEnabled sets the "image_studio_enabled" field.
+func (_c *GroupCreate) SetImageStudioEnabled(v bool) *GroupCreate {
+	_c.mutation.SetImageStudioEnabled(v)
+	return _c
+}
+
+// SetNillableImageStudioEnabled sets the "image_studio_enabled" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableImageStudioEnabled(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetImageStudioEnabled(*v)
+	}
+	return _c
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_c *GroupCreate) AddAPIKeyIDs(ids ...int64) *GroupCreate {
 	_c.mutation.AddAPIKeyIDs(ids...)
@@ -630,6 +644,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultMessagesDispatchModelConfig
 		_c.mutation.SetMessagesDispatchModelConfig(v)
 	}
+	if _, ok := _c.mutation.ImageStudioEnabled(); !ok {
+		v := group.DefaultImageStudioEnabled
+		_c.mutation.SetImageStudioEnabled(v)
+	}
 	return nil
 }
 
@@ -716,6 +734,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.MessagesDispatchModelConfig(); !ok {
 		return &ValidationError{Name: "messages_dispatch_model_config", err: errors.New(`ent: missing required field "Group.messages_dispatch_model_config"`)}
+	}
+	if _, ok := _c.mutation.ImageStudioEnabled(); !ok {
+		return &ValidationError{Name: "image_studio_enabled", err: errors.New(`ent: missing required field "Group.image_studio_enabled"`)}
 	}
 	return nil
 }
@@ -863,6 +884,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.MessagesDispatchModelConfig(); ok {
 		_spec.SetField(group.FieldMessagesDispatchModelConfig, field.TypeJSON, value)
 		_node.MessagesDispatchModelConfig = value
+	}
+	if value, ok := _c.mutation.ImageStudioEnabled(); ok {
+		_spec.SetField(group.FieldImageStudioEnabled, field.TypeBool, value)
+		_node.ImageStudioEnabled = value
 	}
 	if nodes := _c.mutation.APIKeysIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -1500,6 +1525,18 @@ func (u *GroupUpsert) UpdateMessagesDispatchModelConfig() *GroupUpsert {
 	return u
 }
 
+// SetImageStudioEnabled sets the "image_studio_enabled" field.
+func (u *GroupUpsert) SetImageStudioEnabled(v bool) *GroupUpsert {
+	u.Set(group.FieldImageStudioEnabled, v)
+	return u
+}
+
+// UpdateImageStudioEnabled sets the "image_studio_enabled" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateImageStudioEnabled() *GroupUpsert {
+	u.SetExcluded(group.FieldImageStudioEnabled)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -2102,6 +2139,20 @@ func (u *GroupUpsertOne) SetMessagesDispatchModelConfig(v domain.OpenAIMessagesD
 func (u *GroupUpsertOne) UpdateMessagesDispatchModelConfig() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateMessagesDispatchModelConfig()
+	})
+}
+
+// SetImageStudioEnabled sets the "image_studio_enabled" field.
+func (u *GroupUpsertOne) SetImageStudioEnabled(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetImageStudioEnabled(v)
+	})
+}
+
+// UpdateImageStudioEnabled sets the "image_studio_enabled" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateImageStudioEnabled() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateImageStudioEnabled()
 	})
 }
 
@@ -2873,6 +2924,20 @@ func (u *GroupUpsertBulk) SetMessagesDispatchModelConfig(v domain.OpenAIMessages
 func (u *GroupUpsertBulk) UpdateMessagesDispatchModelConfig() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateMessagesDispatchModelConfig()
+	})
+}
+
+// SetImageStudioEnabled sets the "image_studio_enabled" field.
+func (u *GroupUpsertBulk) SetImageStudioEnabled(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetImageStudioEnabled(v)
+	})
+}
+
+// UpdateImageStudioEnabled sets the "image_studio_enabled" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateImageStudioEnabled() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateImageStudioEnabled()
 	})
 }
 

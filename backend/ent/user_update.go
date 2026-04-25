@@ -263,6 +263,53 @@ func (_u *UserUpdate) ClearLastCheckinAt() *UserUpdate {
 	return _u
 }
 
+// SetReferralCode sets the "referral_code" field.
+func (_u *UserUpdate) SetReferralCode(v string) *UserUpdate {
+	_u.mutation.SetReferralCode(v)
+	return _u
+}
+
+// SetNillableReferralCode sets the "referral_code" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableReferralCode(v *string) *UserUpdate {
+	if v != nil {
+		_u.SetReferralCode(*v)
+	}
+	return _u
+}
+
+// ClearReferralCode clears the value of the "referral_code" field.
+func (_u *UserUpdate) ClearReferralCode() *UserUpdate {
+	_u.mutation.ClearReferralCode()
+	return _u
+}
+
+// SetReferrerID sets the "referrer_id" field.
+func (_u *UserUpdate) SetReferrerID(v int64) *UserUpdate {
+	_u.mutation.ResetReferrerID()
+	_u.mutation.SetReferrerID(v)
+	return _u
+}
+
+// SetNillableReferrerID sets the "referrer_id" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableReferrerID(v *int64) *UserUpdate {
+	if v != nil {
+		_u.SetReferrerID(*v)
+	}
+	return _u
+}
+
+// AddReferrerID adds value to the "referrer_id" field.
+func (_u *UserUpdate) AddReferrerID(v int64) *UserUpdate {
+	_u.mutation.AddReferrerID(v)
+	return _u
+}
+
+// ClearReferrerID clears the value of the "referrer_id" field.
+func (_u *UserUpdate) ClearReferrerID() *UserUpdate {
+	_u.mutation.ClearReferrerID()
+	return _u
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *UserUpdate) AddAPIKeyIDs(ids ...int64) *UserUpdate {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -697,6 +744,11 @@ func (_u *UserUpdate) check() error {
 			return &ValidationError{Name: "username", err: fmt.Errorf(`ent: validator failed for field "User.username": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ReferralCode(); ok {
+		if err := user.ReferralCodeValidator(v); err != nil {
+			return &ValidationError{Name: "referral_code", err: fmt.Errorf(`ent: validator failed for field "User.referral_code": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -771,6 +823,21 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.LastCheckinAtCleared() {
 		_spec.ClearField(user.FieldLastCheckinAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ReferralCode(); ok {
+		_spec.SetField(user.FieldReferralCode, field.TypeString, value)
+	}
+	if _u.mutation.ReferralCodeCleared() {
+		_spec.ClearField(user.FieldReferralCode, field.TypeString)
+	}
+	if value, ok := _u.mutation.ReferrerID(); ok {
+		_spec.SetField(user.FieldReferrerID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedReferrerID(); ok {
+		_spec.AddField(user.FieldReferrerID, field.TypeInt64, value)
+	}
+	if _u.mutation.ReferrerIDCleared() {
+		_spec.ClearField(user.FieldReferrerID, field.TypeInt64)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1480,6 +1547,53 @@ func (_u *UserUpdateOne) ClearLastCheckinAt() *UserUpdateOne {
 	return _u
 }
 
+// SetReferralCode sets the "referral_code" field.
+func (_u *UserUpdateOne) SetReferralCode(v string) *UserUpdateOne {
+	_u.mutation.SetReferralCode(v)
+	return _u
+}
+
+// SetNillableReferralCode sets the "referral_code" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableReferralCode(v *string) *UserUpdateOne {
+	if v != nil {
+		_u.SetReferralCode(*v)
+	}
+	return _u
+}
+
+// ClearReferralCode clears the value of the "referral_code" field.
+func (_u *UserUpdateOne) ClearReferralCode() *UserUpdateOne {
+	_u.mutation.ClearReferralCode()
+	return _u
+}
+
+// SetReferrerID sets the "referrer_id" field.
+func (_u *UserUpdateOne) SetReferrerID(v int64) *UserUpdateOne {
+	_u.mutation.ResetReferrerID()
+	_u.mutation.SetReferrerID(v)
+	return _u
+}
+
+// SetNillableReferrerID sets the "referrer_id" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableReferrerID(v *int64) *UserUpdateOne {
+	if v != nil {
+		_u.SetReferrerID(*v)
+	}
+	return _u
+}
+
+// AddReferrerID adds value to the "referrer_id" field.
+func (_u *UserUpdateOne) AddReferrerID(v int64) *UserUpdateOne {
+	_u.mutation.AddReferrerID(v)
+	return _u
+}
+
+// ClearReferrerID clears the value of the "referrer_id" field.
+func (_u *UserUpdateOne) ClearReferrerID() *UserUpdateOne {
+	_u.mutation.ClearReferrerID()
+	return _u
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *UserUpdateOne) AddAPIKeyIDs(ids ...int64) *UserUpdateOne {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -1927,6 +2041,11 @@ func (_u *UserUpdateOne) check() error {
 			return &ValidationError{Name: "username", err: fmt.Errorf(`ent: validator failed for field "User.username": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ReferralCode(); ok {
+		if err := user.ReferralCodeValidator(v); err != nil {
+			return &ValidationError{Name: "referral_code", err: fmt.Errorf(`ent: validator failed for field "User.referral_code": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -2018,6 +2137,21 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if _u.mutation.LastCheckinAtCleared() {
 		_spec.ClearField(user.FieldLastCheckinAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ReferralCode(); ok {
+		_spec.SetField(user.FieldReferralCode, field.TypeString, value)
+	}
+	if _u.mutation.ReferralCodeCleared() {
+		_spec.ClearField(user.FieldReferralCode, field.TypeString)
+	}
+	if value, ok := _u.mutation.ReferrerID(); ok {
+		_spec.SetField(user.FieldReferrerID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedReferrerID(); ok {
+		_spec.AddField(user.FieldReferrerID, field.TypeInt64, value)
+	}
+	if _u.mutation.ReferrerIDCleared() {
+		_spec.ClearField(user.FieldReferrerID, field.TypeInt64)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{

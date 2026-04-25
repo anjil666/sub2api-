@@ -407,6 +407,7 @@ export interface Group {
   messages_dispatch_model_config?: OpenAIMessagesDispatchModelConfig
   require_oauth_only: boolean
   require_privacy_set: boolean
+  image_studio_enabled: boolean
   billing_display?: string
   created_at: string
   updated_at: string

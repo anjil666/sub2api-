@@ -358,6 +358,7 @@ export default {
     buySubscription: 'Recharge / Subscription',
     docs: 'Docs',
     modelSquare: 'Model Square',
+    imageStudio: 'Image Studio',
     upstreamSync: 'Upstream Sync',
     myOrders: 'My Orders',
     orderManagement: 'Orders',
@@ -444,6 +445,11 @@ export default {
     sortByName: 'Name',
     sortByInputPrice: 'Input Price',
     sortByOutputPrice: 'Output Price',
+  },
+
+  imageStudio: {
+    title: 'Image Studio',
+    description: 'AI image generation and editing',
   },
 
   // Auth

@@ -190,6 +190,11 @@ func DefaultMappedModel(v string) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldDefaultMappedModel, v))
 }
 
+// ImageStudioEnabled applies equality check predicate on the "image_studio_enabled" field. It's identical to ImageStudioEnabledEQ.
+func ImageStudioEnabled(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldImageStudioEnabled, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldCreatedAt, v))
@@ -1318,6 +1323,16 @@ func DefaultMappedModelEqualFold(v string) predicate.Group {
 // DefaultMappedModelContainsFold applies the ContainsFold predicate on the "default_mapped_model" field.
 func DefaultMappedModelContainsFold(v string) predicate.Group {
 	return predicate.Group(sql.FieldContainsFold(FieldDefaultMappedModel, v))
+}
+
+// ImageStudioEnabledEQ applies the EQ predicate on the "image_studio_enabled" field.
+func ImageStudioEnabledEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldImageStudioEnabled, v))
+}
+
+// ImageStudioEnabledNEQ applies the NEQ predicate on the "image_studio_enabled" field.
+func ImageStudioEnabledNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldImageStudioEnabled, v))
 }
 
 // HasAPIKeys applies the HasEdge predicate on the "api_keys" edge.

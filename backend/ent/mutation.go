@@ -8255,6 +8255,7 @@ type GroupMutation struct {
 	require_privacy_set                     *bool
 	default_mapped_model                    *string
 	messages_dispatch_model_config          *domain.OpenAIMessagesDispatchModelConfig
+	image_studio_enabled                    *bool
 	clearedFields                           map[string]struct{}
 	api_keys                                map[int64]struct{}
 	removedapi_keys                         map[int64]struct{}
@@ -9843,6 +9844,42 @@ func (m *GroupMutation) ResetMessagesDispatchModelConfig() {
 	m.messages_dispatch_model_config = nil
 }
 
+// SetImageStudioEnabled sets the "image_studio_enabled" field.
+func (m *GroupMutation) SetImageStudioEnabled(b bool) {
+	m.image_studio_enabled = &b
+}
+
+// ImageStudioEnabled returns the value of the "image_studio_enabled" field in the mutation.
+func (m *GroupMutation) ImageStudioEnabled() (r bool, exists bool) {
+	v := m.image_studio_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImageStudioEnabled returns the old "image_studio_enabled" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldImageStudioEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImageStudioEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImageStudioEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImageStudioEnabled: %w", err)
+	}
+	return oldValue.ImageStudioEnabled, nil
+}
+
+// ResetImageStudioEnabled resets all changes to the "image_studio_enabled" field.
+func (m *GroupMutation) ResetImageStudioEnabled() {
+	m.image_studio_enabled = nil
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by ids.
 func (m *GroupMutation) AddAPIKeyIDs(ids ...int64) {
 	if m.api_keys == nil {
@@ -10201,7 +10238,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 30)
+	fields := make([]string, 0, 31)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -10292,6 +10329,9 @@ func (m *GroupMutation) Fields() []string {
 	if m.messages_dispatch_model_config != nil {
 		fields = append(fields, group.FieldMessagesDispatchModelConfig)
 	}
+	if m.image_studio_enabled != nil {
+		fields = append(fields, group.FieldImageStudioEnabled)
+	}
 	return fields
 }
 
@@ -10360,6 +10400,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.DefaultMappedModel()
 	case group.FieldMessagesDispatchModelConfig:
 		return m.MessagesDispatchModelConfig()
+	case group.FieldImageStudioEnabled:
+		return m.ImageStudioEnabled()
 	}
 	return nil, false
 }
@@ -10429,6 +10471,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldDefaultMappedModel(ctx)
 	case group.FieldMessagesDispatchModelConfig:
 		return m.OldMessagesDispatchModelConfig(ctx)
+	case group.FieldImageStudioEnabled:
+		return m.OldImageStudioEnabled(ctx)
 	}
 	return nil, fmt.Errorf("unknown Group field %s", name)
 }
@@ -10647,6 +10691,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMessagesDispatchModelConfig(v)
+		return nil
+	case group.FieldImageStudioEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImageStudioEnabled(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Group field %s", name)
@@ -10990,6 +11041,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldMessagesDispatchModelConfig:
 		m.ResetMessagesDispatchModelConfig()
+		return nil
+	case group.FieldImageStudioEnabled:
+		m.ResetImageStudioEnabled()
 		return nil
 	}
 	return fmt.Errorf("unknown Group field %s", name)
@@ -28211,6 +28265,9 @@ type UserMutation struct {
 	totp_enabled                  *bool
 	totp_enabled_at               *time.Time
 	last_checkin_at               *time.Time
+	referral_code                 *string
+	referrer_id                   *int64
+	addreferrer_id                *int64
 	clearedFields                 map[string]struct{}
 	api_keys                      map[int64]struct{}
 	removedapi_keys               map[int64]struct{}
@@ -28977,6 +29034,125 @@ func (m *UserMutation) ResetLastCheckinAt() {
 	delete(m.clearedFields, user.FieldLastCheckinAt)
 }
 
+// SetReferralCode sets the "referral_code" field.
+func (m *UserMutation) SetReferralCode(s string) {
+	m.referral_code = &s
+}
+
+// ReferralCode returns the value of the "referral_code" field in the mutation.
+func (m *UserMutation) ReferralCode() (r string, exists bool) {
+	v := m.referral_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReferralCode returns the old "referral_code" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldReferralCode(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReferralCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReferralCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReferralCode: %w", err)
+	}
+	return oldValue.ReferralCode, nil
+}
+
+// ClearReferralCode clears the value of the "referral_code" field.
+func (m *UserMutation) ClearReferralCode() {
+	m.referral_code = nil
+	m.clearedFields[user.FieldReferralCode] = struct{}{}
+}
+
+// ReferralCodeCleared returns if the "referral_code" field was cleared in this mutation.
+func (m *UserMutation) ReferralCodeCleared() bool {
+	_, ok := m.clearedFields[user.FieldReferralCode]
+	return ok
+}
+
+// ResetReferralCode resets all changes to the "referral_code" field.
+func (m *UserMutation) ResetReferralCode() {
+	m.referral_code = nil
+	delete(m.clearedFields, user.FieldReferralCode)
+}
+
+// SetReferrerID sets the "referrer_id" field.
+func (m *UserMutation) SetReferrerID(i int64) {
+	m.referrer_id = &i
+	m.addreferrer_id = nil
+}
+
+// ReferrerID returns the value of the "referrer_id" field in the mutation.
+func (m *UserMutation) ReferrerID() (r int64, exists bool) {
+	v := m.referrer_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReferrerID returns the old "referrer_id" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldReferrerID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReferrerID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReferrerID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReferrerID: %w", err)
+	}
+	return oldValue.ReferrerID, nil
+}
+
+// AddReferrerID adds i to the "referrer_id" field.
+func (m *UserMutation) AddReferrerID(i int64) {
+	if m.addreferrer_id != nil {
+		*m.addreferrer_id += i
+	} else {
+		m.addreferrer_id = &i
+	}
+}
+
+// AddedReferrerID returns the value that was added to the "referrer_id" field in this mutation.
+func (m *UserMutation) AddedReferrerID() (r int64, exists bool) {
+	v := m.addreferrer_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearReferrerID clears the value of the "referrer_id" field.
+func (m *UserMutation) ClearReferrerID() {
+	m.referrer_id = nil
+	m.addreferrer_id = nil
+	m.clearedFields[user.FieldReferrerID] = struct{}{}
+}
+
+// ReferrerIDCleared returns if the "referrer_id" field was cleared in this mutation.
+func (m *UserMutation) ReferrerIDCleared() bool {
+	_, ok := m.clearedFields[user.FieldReferrerID]
+	return ok
+}
+
+// ResetReferrerID resets all changes to the "referrer_id" field.
+func (m *UserMutation) ResetReferrerID() {
+	m.referrer_id = nil
+	m.addreferrer_id = nil
+	delete(m.clearedFields, user.FieldReferrerID)
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by ids.
 func (m *UserMutation) AddAPIKeyIDs(ids ...int64) {
 	if m.api_keys == nil {
@@ -29551,7 +29727,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 17)
 	if m.created_at != nil {
 		fields = append(fields, user.FieldCreatedAt)
 	}
@@ -29597,6 +29773,12 @@ func (m *UserMutation) Fields() []string {
 	if m.last_checkin_at != nil {
 		fields = append(fields, user.FieldLastCheckinAt)
 	}
+	if m.referral_code != nil {
+		fields = append(fields, user.FieldReferralCode)
+	}
+	if m.referrer_id != nil {
+		fields = append(fields, user.FieldReferrerID)
+	}
 	return fields
 }
 
@@ -29635,6 +29817,10 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.TotpEnabledAt()
 	case user.FieldLastCheckinAt:
 		return m.LastCheckinAt()
+	case user.FieldReferralCode:
+		return m.ReferralCode()
+	case user.FieldReferrerID:
+		return m.ReferrerID()
 	}
 	return nil, false
 }
@@ -29674,6 +29860,10 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldTotpEnabledAt(ctx)
 	case user.FieldLastCheckinAt:
 		return m.OldLastCheckinAt(ctx)
+	case user.FieldReferralCode:
+		return m.OldReferralCode(ctx)
+	case user.FieldReferrerID:
+		return m.OldReferrerID(ctx)
 	}
 	return nil, fmt.Errorf("unknown User field %s", name)
 }
@@ -29788,6 +29978,20 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetLastCheckinAt(v)
 		return nil
+	case user.FieldReferralCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReferralCode(v)
+		return nil
+	case user.FieldReferrerID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReferrerID(v)
+		return nil
 	}
 	return fmt.Errorf("unknown User field %s", name)
 }
@@ -29802,6 +30006,9 @@ func (m *UserMutation) AddedFields() []string {
 	if m.addconcurrency != nil {
 		fields = append(fields, user.FieldConcurrency)
 	}
+	if m.addreferrer_id != nil {
+		fields = append(fields, user.FieldReferrerID)
+	}
 	return fields
 }
 
@@ -29814,6 +30021,8 @@ func (m *UserMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedBalance()
 	case user.FieldConcurrency:
 		return m.AddedConcurrency()
+	case user.FieldReferrerID:
+		return m.AddedReferrerID()
 	}
 	return nil, false
 }
@@ -29837,6 +30046,13 @@ func (m *UserMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddConcurrency(v)
 		return nil
+	case user.FieldReferrerID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddReferrerID(v)
+		return nil
 	}
 	return fmt.Errorf("unknown User numeric field %s", name)
 }
@@ -29856,6 +30072,12 @@ func (m *UserMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(user.FieldLastCheckinAt) {
 		fields = append(fields, user.FieldLastCheckinAt)
+	}
+	if m.FieldCleared(user.FieldReferralCode) {
+		fields = append(fields, user.FieldReferralCode)
+	}
+	if m.FieldCleared(user.FieldReferrerID) {
+		fields = append(fields, user.FieldReferrerID)
 	}
 	return fields
 }
@@ -29882,6 +30104,12 @@ func (m *UserMutation) ClearField(name string) error {
 		return nil
 	case user.FieldLastCheckinAt:
 		m.ClearLastCheckinAt()
+		return nil
+	case user.FieldReferralCode:
+		m.ClearReferralCode()
+		return nil
+	case user.FieldReferrerID:
+		m.ClearReferrerID()
 		return nil
 	}
 	return fmt.Errorf("unknown User nullable field %s", name)
@@ -29935,6 +30163,12 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldLastCheckinAt:
 		m.ResetLastCheckinAt()
+		return nil
+	case user.FieldReferralCode:
+		m.ResetReferralCode()
+		return nil
+	case user.FieldReferrerID:
+		m.ResetReferrerID()
 		return nil
 	}
 	return fmt.Errorf("unknown User field %s", name)

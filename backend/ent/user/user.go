@@ -45,6 +45,10 @@ const (
 	FieldTotpEnabledAt = "totp_enabled_at"
 	// FieldLastCheckinAt holds the string denoting the last_checkin_at field in the database.
 	FieldLastCheckinAt = "last_checkin_at"
+	// FieldReferralCode holds the string denoting the referral_code field in the database.
+	FieldReferralCode = "referral_code"
+	// FieldReferrerID holds the string denoting the referrer_id field in the database.
+	FieldReferrerID = "referrer_id"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
 	EdgeAPIKeys = "api_keys"
 	// EdgeRedeemCodes holds the string denoting the redeem_codes edge name in mutations.
@@ -164,6 +168,8 @@ var Columns = []string{
 	FieldTotpEnabled,
 	FieldTotpEnabledAt,
 	FieldLastCheckinAt,
+	FieldReferralCode,
+	FieldReferrerID,
 }
 
 var (
@@ -220,6 +226,8 @@ var (
 	DefaultNotes string
 	// DefaultTotpEnabled holds the default value on creation for the "totp_enabled" field.
 	DefaultTotpEnabled bool
+	// ReferralCodeValidator is a validator for the "referral_code" field. It is called by the builders before save.
+	ReferralCodeValidator func(string) error
 )
 
 // OrderOption defines the ordering options for the User queries.
@@ -303,6 +311,16 @@ func ByTotpEnabledAt(opts ...sql.OrderTermOption) OrderOption {
 // ByLastCheckinAt orders the results by the last_checkin_at field.
 func ByLastCheckinAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastCheckinAt, opts...).ToFunc()
+}
+
+// ByReferralCode orders the results by the referral_code field.
+func ByReferralCode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReferralCode, opts...).ToFunc()
+}
+
+// ByReferrerID orders the results by the referrer_id field.
+func ByReferrerID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReferrerID, opts...).ToFunc()
 }
 
 // ByAPIKeysCount orders the results by api_keys count.

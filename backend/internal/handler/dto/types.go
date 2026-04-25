@@ -99,7 +99,8 @@ type Group struct {
 
 	// 账号过滤控制（仅 OpenAI/Antigravity 平台有效）
 	RequireOAuthOnly  bool `json:"require_oauth_only"`
-	RequirePrivacySet bool `json:"require_privacy_set"`
+	RequirePrivacySet  bool `json:"require_privacy_set"`
+	ImageStudioEnabled bool `json:"image_studio_enabled"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

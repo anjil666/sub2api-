@@ -1,0 +1,59 @@
+<template>
+  <div @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop"
+    :class="[dragging ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600', compact ? 'p-2' : 'p-4', 'rounded-lg border-2 border-dashed transition-colors']">
+    <div v-if="!files.length" class="text-center">
+      <label class="cursor-pointer text-xs text-gray-500 hover:text-blue-600">
+        拖拽或点击上传
+        <input type="file" :accept="accept" :multiple="max > 1" @change="onSelect" class="hidden" />
+      </label>
+    </div>
+    <div v-else class="flex flex-wrap gap-2">
+      <div v-for="(_f, i) in files" :key="i" class="group relative">
+        <img :src="previews[i]" class="h-16 w-16 rounded object-cover" />
+        <button @click="remove(i)" class="absolute -right-1 -top-1 rounded-full bg-red-500 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100">
+          <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <label v-if="files.length < max" class="flex h-16 w-16 cursor-pointer items-center justify-center rounded border-2 border-dashed border-gray-300 text-gray-400 hover:border-blue-400 dark:border-gray-600">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <input type="file" :accept="accept" :multiple="max > 1" @change="onSelect" class="hidden" />
+      </label>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue'
+
+const props = defineProps<{ files: File[]; max: number; accept: string; compact?: boolean }>()
+const emit = defineEmits<{ update: [files: File[]] }>()
+const dragging = ref(false)
+
+const previews = computed(() => props.files.map(f => URL.createObjectURL(f)))
+
+watch(() => props.files, (_n, old) => {
+  if (old) old.forEach((_, i) => { if (previews.value[i]) URL.revokeObjectURL(previews.value[i]) })
+})
+
+function onDrop(e: DragEvent) {
+  dragging.value = false
+  const dt = e.dataTransfer
+  if (!dt) return
+  const added = Array.from(dt.files).filter(f => f.type.startsWith('image/'))
+  emit('update', [...props.files, ...added].slice(0, props.max))
+}
+
+function onSelect(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (!input.files) return
+  const added = Array.from(input.files)
+  emit('update', [...props.files, ...added].slice(0, props.max))
+  input.value = ''
+}
+
+function remove(i: number) {
+  const copy = [...props.files]
+  copy.splice(i, 1)
+  emit('update', copy)
+}
+</script>

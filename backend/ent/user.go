@@ -47,6 +47,10 @@ type User struct {
 	TotpEnabledAt *time.Time `json:"totp_enabled_at,omitempty"`
 	// LastCheckinAt holds the value of the "last_checkin_at" field.
 	LastCheckinAt *time.Time `json:"last_checkin_at,omitempty"`
+	// ReferralCode holds the value of the "referral_code" field.
+	ReferralCode *string `json:"referral_code,omitempty"`
+	// ReferrerID holds the value of the "referrer_id" field.
+	ReferrerID *int64 `json:"referrer_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UserQuery when eager-loading is set.
 	Edges        UserEdges `json:"edges"`
@@ -190,9 +194,9 @@ func (*User) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case user.FieldBalance:
 			values[i] = new(sql.NullFloat64)
-		case user.FieldID, user.FieldConcurrency:
+		case user.FieldID, user.FieldConcurrency, user.FieldReferrerID:
 			values[i] = new(sql.NullInt64)
-		case user.FieldEmail, user.FieldPasswordHash, user.FieldRole, user.FieldStatus, user.FieldUsername, user.FieldNotes, user.FieldTotpSecretEncrypted:
+		case user.FieldEmail, user.FieldPasswordHash, user.FieldRole, user.FieldStatus, user.FieldUsername, user.FieldNotes, user.FieldTotpSecretEncrypted, user.FieldReferralCode:
 			values[i] = new(sql.NullString)
 		case user.FieldCreatedAt, user.FieldUpdatedAt, user.FieldDeletedAt, user.FieldTotpEnabledAt, user.FieldLastCheckinAt:
 			values[i] = new(sql.NullTime)
@@ -310,6 +314,20 @@ func (_m *User) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.LastCheckinAt = new(time.Time)
 				*_m.LastCheckinAt = value.Time
+			}
+		case user.FieldReferralCode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field referral_code", values[i])
+			} else if value.Valid {
+				_m.ReferralCode = new(string)
+				*_m.ReferralCode = value.String
+			}
+		case user.FieldReferrerID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field referrer_id", values[i])
+			} else if value.Valid {
+				_m.ReferrerID = new(int64)
+				*_m.ReferrerID = value.Int64
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -453,6 +471,16 @@ func (_m *User) String() string {
 	if v := _m.LastCheckinAt; v != nil {
 		builder.WriteString("last_checkin_at=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.ReferralCode; v != nil {
+		builder.WriteString("referral_code=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ReferrerID; v != nil {
+		builder.WriteString("referrer_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteByte(')')
 	return builder.String()

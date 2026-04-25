@@ -358,6 +358,7 @@ export default {
     buySubscription: '充值/订阅',
     docs: '文档',
     modelSquare: '模型广场',
+    imageStudio: '做图工作室',
     upstreamSync: '上游同步',
     myOrders: '我的订单',
     orderManagement: '订单管理',
@@ -446,6 +447,11 @@ export default {
     sortByOutputPrice: '输出价格',
     perRequest: '按次计费',
     perImage: '每次请求',
+  },
+
+  imageStudio: {
+    title: '做图工作室',
+    description: 'AI 图片生成与编辑',
   },
 
   // Auth

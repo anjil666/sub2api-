@@ -59,6 +59,8 @@ type Group struct {
 	DefaultMappedModel          string
 	MessagesDispatchModelConfig OpenAIMessagesDispatchModelConfig
 
+	ImageStudioEnabled bool
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
