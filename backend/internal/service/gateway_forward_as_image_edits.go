@@ -205,6 +205,14 @@ func (s *GatewayService) forwardImageEditsAsGrsaiDraw(
 		"image":  imageArr,
 	})
 
+	logger.L().Info("grsai image_edits: converted multipart to JSON",
+		zap.Int64("account_id", account.ID),
+		zap.String("prompt", prompt),
+		zap.String("size", size),
+		zap.Int("image_count", len(images)),
+		zap.Int("json_body_len", len(jsonBody)),
+	)
+
 	return s.ForwardAsGrsaiDraw(ctx, c, account, jsonBody, startTime)
 }
 

@@ -166,6 +166,13 @@ func (s *GatewayService) ForwardAsGrsaiDraw(
 		defer s.cleanupR2Keys(ctx, r2Keys)
 	}
 
+	logger.L().Info("grsai draw: image extraction result",
+		zap.Int64("account_id", account.ID),
+		zap.Int("image_url_count", len(imageURLs)),
+		zap.Strings("image_urls", imageURLs),
+		zap.Int("r2_key_count", len(r2Keys)),
+	)
+
 	// 构建 grsai 请求体
 	grsaiReq := grsaiDrawRequest{
 		Model:        mappedModel,
@@ -176,9 +183,11 @@ func (s *GatewayService) ForwardAsGrsaiDraw(
 	}
 	reqBody, _ := json.Marshal(grsaiReq)
 
-	logger.L().Debug("grsai draw: submitting task",
+	logger.L().Info("grsai draw: submitting task",
 		zap.Int64("account_id", account.ID),
 		zap.String("model", mappedModel),
+		zap.String("submit_url", validatedURL+"/v1/draw/completions"),
+		zap.Int("req_body_len", len(reqBody)),
 	)
 
 	// 1. 提交做图任务
@@ -205,6 +214,12 @@ func (s *GatewayService) ForwardAsGrsaiDraw(
 	defer func() { _ = submitResp.Body.Close() }()
 
 	submitBody, _ := io.ReadAll(io.LimitReader(submitResp.Body, 2<<20))
+
+	logger.L().Info("grsai draw: upstream response",
+		zap.Int64("account_id", account.ID),
+		zap.Int("status_code", submitResp.StatusCode),
+		zap.String("response_body", string(submitBody[:min(len(submitBody), 500)])),
+	)
 
 	if submitResp.StatusCode >= 400 {
 		upstreamMsg := sanitizeUpstreamErrorMessage(strings.TrimSpace(string(submitBody)))
