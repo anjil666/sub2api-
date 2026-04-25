@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -57,6 +59,9 @@ func (h *GatewayHandler) ImageEdits(c *gin.Context) {
 	// Restore body so Gin's native multipart parsing can extract form fields
 	c.Request.Body = io.NopCloser(bytes.NewReader(body))
 	reqModel := c.PostForm("model")
+	if reqModel == "" {
+		reqModel = parseMultipartField(body, contentType, "model")
+	}
 	if reqModel == "" {
 		reqModel = extractMultipartFieldByBytes(body, "model")
 	}
@@ -169,14 +174,56 @@ func (h *GatewayHandler) ImageEdits(c *gin.Context) {
 	}
 }
 
+func parseMultipartField(body []byte, contentType, fieldName string) string {
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil || !strings.HasPrefix(mediaType, "multipart/") {
+		return ""
+	}
+	boundary := params["boundary"]
+	if boundary == "" {
+		return ""
+	}
+	reader := multipart.NewReader(bytes.NewReader(body), boundary)
+	for {
+		part, err := reader.NextPart()
+		if err != nil {
+			break
+		}
+		if part.FormName() == fieldName {
+			val, _ := io.ReadAll(io.LimitReader(part, 256))
+			part.Close()
+			return strings.TrimSpace(string(val))
+		}
+		part.Close()
+	}
+	return ""
+}
+
 func extractMultipartFieldByBytes(body []byte, fieldName string) string {
+	// Try exact match: name="field"\r\n\r\nvalue
 	needle := []byte(`name="` + fieldName + `"` + "\r\n\r\n")
 	idx := bytes.Index(body, needle)
+	if idx >= 0 {
+		valueStart := idx + len(needle)
+		rest := body[valueStart:]
+		valueEnd := bytes.Index(rest, []byte("\r\n"))
+		if valueEnd >= 0 {
+			return strings.TrimSpace(string(rest[:valueEnd]))
+		}
+	}
+	// Fallback: name="field"\r\n followed by headers then \r\n\r\n
+	prefix := []byte(`name="` + fieldName + `"`)
+	idx = bytes.Index(body, prefix)
 	if idx < 0 {
 		return ""
 	}
-	valueStart := idx + len(needle)
-	rest := body[valueStart:]
+	afterName := body[idx+len(prefix):]
+	blankLine := bytes.Index(afterName, []byte("\r\n\r\n"))
+	if blankLine < 0 {
+		return ""
+	}
+	valueStart := blankLine + 4
+	rest := afterName[valueStart:]
 	valueEnd := bytes.Index(rest, []byte("\r\n"))
 	if valueEnd < 0 {
 		return ""
