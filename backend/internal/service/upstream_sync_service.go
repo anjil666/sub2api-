@@ -940,7 +940,7 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 				g.Name = groupName
 				needUpdate = true
 			}
-			if g.Description != groupDesc {
+			if groupDesc != "" && g.Description != groupDesc {
 				g.Description = groupDesc
 				needUpdate = true
 			}
