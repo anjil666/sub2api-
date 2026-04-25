@@ -139,7 +139,7 @@ export function useImageGeneration() {
   const storyScenes = ref<StoryboardScene[]>([])
 
   const imageGroups = computed(() =>
-    groups.value.filter(g => g.models.some(m => /^(gpt-image|dall-e|image)/i.test(m.model_name)))
+    groups.value.filter(g => g.image_studio_enabled && g.models.some(m => /^(gpt-image|dall-e|image)/i.test(m.model_name)))
   )
 
   const selectedGroup = computed(() =>

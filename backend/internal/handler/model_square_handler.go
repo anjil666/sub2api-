@@ -61,8 +61,9 @@ type modelSquareGroup struct {
 	BillingDisplay string            `json:"billing_display,omitempty"`
 	ImagePrice1K   *float64          `json:"image_price_1k,omitempty"`
 	ImagePrice2K   *float64          `json:"image_price_2k,omitempty"`
-	ImagePrice4K   *float64          `json:"image_price_4k,omitempty"`
-	Models         []modelSquareItem `json:"models"`
+	ImagePrice4K        *float64          `json:"image_price_4k,omitempty"`
+	ImageStudioEnabled  bool              `json:"image_studio_enabled"`
+	Models              []modelSquareItem `json:"models"`
 }
 
 // List returns all models available to the current user, grouped by group
@@ -102,15 +103,16 @@ func (h *ModelSquareHandler) List(c *gin.Context) {
 
 		if len(models) == 0 {
 			result = append(result, modelSquareGroup{
-				GroupID:        group.ID,
-				GroupName:      group.Name,
-				Platform:       group.Platform,
-				RateMultiplier: group.RateMultiplier,
-				BillingDisplay: billingDisplay,
-				ImagePrice1K:   group.ImagePrice1K,
-				ImagePrice2K:   group.ImagePrice2K,
-				ImagePrice4K:   group.ImagePrice4K,
-				Models:         []modelSquareItem{},
+				GroupID:            group.ID,
+				GroupName:          group.Name,
+				Platform:           group.Platform,
+				RateMultiplier:     group.RateMultiplier,
+				BillingDisplay:     billingDisplay,
+				ImagePrice1K:       group.ImagePrice1K,
+				ImagePrice2K:       group.ImagePrice2K,
+				ImagePrice4K:       group.ImagePrice4K,
+				ImageStudioEnabled: group.ImageStudioEnabled,
+				Models:             []modelSquareItem{},
 			})
 			continue
 		}
@@ -160,15 +162,16 @@ func (h *ModelSquareHandler) List(c *gin.Context) {
 		}
 
 		result = append(result, modelSquareGroup{
-			GroupID:        group.ID,
-			GroupName:      group.Name,
-			Platform:       group.Platform,
-			RateMultiplier: group.RateMultiplier,
-			BillingDisplay: billingDisplay,
-			ImagePrice1K:   group.ImagePrice1K,
-			ImagePrice2K:   group.ImagePrice2K,
-			ImagePrice4K:   group.ImagePrice4K,
-			Models:         modelInfos,
+			GroupID:            group.ID,
+			GroupName:          group.Name,
+			Platform:           group.Platform,
+			RateMultiplier:     group.RateMultiplier,
+			BillingDisplay:     billingDisplay,
+			ImagePrice1K:       group.ImagePrice1K,
+			ImagePrice2K:       group.ImagePrice2K,
+			ImagePrice4K:       group.ImagePrice4K,
+			ImageStudioEnabled: group.ImageStudioEnabled,
+			Models:             modelInfos,
 		})
 	}
 
