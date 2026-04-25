@@ -32,6 +32,11 @@ func (s *GatewayService) ForwardAsImageEdits(
 	startTime time.Time,
 ) (*ForwardResult, error) {
 	// grsai 账号走异步做图适配器（将 multipart 转为 grsai JSON 格式）
+	logger.L().Info("image_edits: checking site_type",
+		zap.Int64("account_id", account.ID),
+		zap.String("site_type", account.GetCredential("site_type")),
+		zap.Any("credentials_keys", credentialKeys(account.Credentials)),
+	)
 	if account.GetCredential("site_type") == "grsai" {
 		return s.forwardImageEditsAsGrsaiDraw(ctx, c, account, body, contentType, model, startTime)
 	}
@@ -239,4 +244,12 @@ func parseMultipartImageEdits(body []byte, contentType string) (prompt, size str
 		_ = part.Close()
 	}
 	return prompt, size, images, nil
+}
+
+func credentialKeys(creds map[string]any) []string {
+	keys := make([]string, 0, len(creds))
+	for k := range creds {
+		keys = append(keys, k)
+	}
+	return keys
 }
