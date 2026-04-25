@@ -3,8 +3,12 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -27,6 +31,11 @@ func (s *GatewayService) ForwardAsImageEdits(
 	model string,
 	startTime time.Time,
 ) (*ForwardResult, error) {
+	// grsai 账号走异步做图适配器（将 multipart 转为 grsai JSON 格式）
+	if account.GetCredential("site_type") == "grsai" {
+		return s.forwardImageEditsAsGrsaiDraw(ctx, c, account, body, contentType, model, startTime)
+	}
+
 	mappedModel := account.GetMappedModel(model)
 
 	baseURL := strings.TrimRight(account.GetCredential("base_url"), "/")
@@ -157,4 +166,77 @@ func replaceMultipartField(body []byte, contentType, fieldName, newValue string)
 	result = append(result, []byte(newValue)...)
 	result = append(result, body[valueEnd:]...)
 	return result
+}
+
+// forwardImageEditsAsGrsaiDraw converts a multipart /v1/images/edits request
+// into the JSON format expected by ForwardAsGrsaiDraw.
+func (s *GatewayService) forwardImageEditsAsGrsaiDraw(
+	ctx context.Context,
+	c *gin.Context,
+	account *Account,
+	body []byte,
+	contentType string,
+	model string,
+	startTime time.Time,
+) (*ForwardResult, error) {
+	prompt, size, images, err := parseMultipartImageEdits(body, contentType)
+	if err != nil {
+		writeGatewayCCError(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse multipart body")
+		return nil, fmt.Errorf("parse multipart for grsai: %w", err)
+	}
+
+	imageArr := make([]any, 0, len(images))
+	for _, img := range images {
+		ct := http.DetectContentType(img)
+		b64 := "data:" + ct + ";base64," + base64.StdEncoding.EncodeToString(img)
+		imageArr = append(imageArr, b64)
+	}
+
+	jsonBody, _ := json.Marshal(map[string]any{
+		"model":  model,
+		"prompt": prompt,
+		"size":   size,
+		"n":      1,
+		"image":  imageArr,
+	})
+
+	return s.ForwardAsGrsaiDraw(ctx, c, account, jsonBody, startTime)
+}
+
+func parseMultipartImageEdits(body []byte, contentType string) (prompt, size string, images [][]byte, err error) {
+	_, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("parse content-type: %w", err)
+	}
+	boundary := params["boundary"]
+	if boundary == "" {
+		return "", "", nil, fmt.Errorf("no boundary in content-type")
+	}
+
+	reader := multipart.NewReader(bytes.NewReader(body), boundary)
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", "", nil, fmt.Errorf("read part: %w", err)
+		}
+		name := part.FormName()
+		switch name {
+		case "prompt":
+			data, _ := io.ReadAll(part)
+			prompt = strings.TrimSpace(string(data))
+		case "size":
+			data, _ := io.ReadAll(part)
+			size = strings.TrimSpace(string(data))
+		case "image":
+			data, _ := io.ReadAll(part)
+			if len(data) > 0 {
+				images = append(images, data)
+			}
+		}
+		_ = part.Close()
+	}
+	return prompt, size, images, nil
 }
