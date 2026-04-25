@@ -6,8 +6,13 @@
         <div class="flex items-center gap-2">
           <label class="text-sm font-medium text-gray-700 dark:text-gray-300">分组</label>
           <select v-model="selectedGroupId" class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">
-            <option v-for="g in groups" :key="g.group_id" :value="g.group_id">{{ g.group_name }}</option>
+            <option v-for="g in groups" :key="g.group_id" :value="g.group_id">
+              {{ cleanGroupName(g.group_name) }}
+              <template v-if="g.billing_display"> · {{ g.billing_display }}</template>
+              <template v-else-if="g.image_price_1k"> · ${{ g.image_price_1k }}/次</template>
+            </option>
           </select>
+          <span v-if="!groupApiKey && selectedGroupId" class="text-xs text-amber-500">无可用密钥</span>
           <button @click="loadGroupsAndKeys" class="rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700" title="刷新">
             <svg class="h-4 w-4" :class="{ 'animate-spin': loadingGroups }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           </button>
@@ -151,6 +156,7 @@
 import { computed, onMounted } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useImageGeneration, type StudioTab } from '@/composables/useImageGeneration'
+import { cleanGroupName } from '@/utils/format'
 import ParamPanel from '@/components/imageStudio/ParamPanel.vue'
 import ResultPanel from '@/components/imageStudio/ResultPanel.vue'
 import FileDropZone from '@/components/imageStudio/FileDropZone.vue'
