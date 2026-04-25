@@ -121,7 +121,7 @@ func (s *GatewayService) uploadBase64ToR2(ctx context.Context, raw string) (publ
 
 	// 构建公开 URL：用 R2 公共开发 URL
 	_ = cfg // cfg.Bucket 用于构建 URL
-	publicURL = "https://pub-687ca1e489e540c7beeb44d9e7ca281d.r2.dev/" + key
+	publicURL = "https://pub-587ca1e489e540c7beeb44d9e7ca281d.r2.dev/" + key
 	return publicURL, key
 }
 
