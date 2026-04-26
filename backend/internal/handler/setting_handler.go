@@ -62,6 +62,7 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		CheckinEnabled:                   settings.CheckinEnabled,
 		ReferralEnabled:                  settings.ReferralEnabled,
 		PaymentEnabled:                   settings.PaymentEnabled,
+		ImageStudio4KEnabled:             settings.ImageStudio4KEnabled,
 		Version:                          h.version,
 	})
 }
