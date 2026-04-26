@@ -96,12 +96,47 @@ export function computeSize(tier: ResolutionTier, ratioW: number, ratioH: number
   return `${w}x${h}`
 }
 
+function translateError(msg: string): string {
+  if (!msg) return '未知错误'
+  const map: [RegExp, string][] = [
+    [/all available accounts exhausted/i, '所有可用账号已耗尽，请稍后重试'],
+    [/rate limit/i, '请求频率过高，请稍后重试'],
+    [/timeout/i, '请求超时，请重试'],
+    [/network error/i, '网络错误，请检查连接'],
+    [/content policy/i, '内容违反安全策略，请修改提示词'],
+    [/billing/i, '账户余额不足'],
+    [/unauthorized|401/i, '认证失败，请检查密钥'],
+    [/forbidden|403/i, '无权限访问'],
+    [/bad gateway|502/i, '当前分组维护中，请更换分组重试'],
+    [/service unavailable|503/i, '当前分组维护中，请更换分组重试'],
+    [/internal server error|500/i, '服务器内部错误'],
+  ]
+  for (const [re, zh] of map) {
+    if (re.test(msg)) return zh
+  }
+  return msg
+}
+
+function extractApiError(e: any): string {
+  const msg = e?.response?.data?.error?.message || e?.response?.data?.message || e?.message || ''
+  return translateError(msg)
+}
+
 function extractImageUrl(item: any, format?: string): string {
   if (item.url) return item.url
   if (item.b64_json) {
     const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png'
     return `data:${mime};base64,${item.b64_json}`
   }
+  if (item.b64) {
+    const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png'
+    return `data:${mime};base64,${item.b64}`
+  }
+  if (typeof item === 'string' && item.length > 100) {
+    const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png'
+    return `data:${mime};base64,${item}`
+  }
+  if (typeof item === 'string' && item.startsWith('http')) return item
   return ''
 }
 
@@ -202,7 +237,7 @@ export function useImageGeneration() {
         selectedGroupId.value = imageGroups.value[0].group_id
       }
     } catch (e: any) {
-      error.value = e?.response?.data?.message || e.message || '加载分组失败'
+      error.value = extractApiError(e) || '加载分组失败'
     } finally {
       loadingGroups.value = false
     }
@@ -244,7 +279,12 @@ export function useImageGeneration() {
         body.output_compression = outputCompression.value
       }
       const { data } = await api.post('/v1/images/generations', body, { signal: abortController!.signal })
-      resultUrls.value = (data.data || []).map((d: any) => extractImageUrl(d, outputFormat.value))
+      const items = data.data || data.images || (Array.isArray(data) ? data : [])
+      resultUrls.value = items.map((d: any) => extractImageUrl(d, outputFormat.value)).filter(Boolean)
+      if (!resultUrls.value.length) {
+        error.value = '生成完成但未返回有效图片数据'
+        console.warn('[ImageStudio] empty result, raw response:', JSON.stringify(data).slice(0, 500))
+      }
       for (const url of resultUrls.value) {
         await saveImage({
           id: crypto.randomUUID(),
@@ -259,7 +299,7 @@ export function useImageGeneration() {
         })
       }
     } catch (e: any) {
-      if (e.name !== 'CanceledError') error.value = e?.response?.data?.error?.message || e.message || '生成失败'
+      if (e.name !== 'CanceledError') error.value = extractApiError(e) || '生成失败'
     } finally {
       stopTimer()
       loading.value = false
@@ -296,7 +336,12 @@ export function useImageGeneration() {
         signal: abortController!.signal,
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-      resultUrls.value = (data.data || []).map((d: any) => extractImageUrl(d, outputFormat.value))
+      const items = data.data || data.images || (Array.isArray(data) ? data : [])
+      resultUrls.value = items.map((d: any) => extractImageUrl(d, outputFormat.value)).filter(Boolean)
+      if (!resultUrls.value.length) {
+        error.value = '编辑完成但未返回有效图片数据'
+        console.warn('[ImageStudio] empty edit result, raw:', JSON.stringify(data).slice(0, 500))
+      }
       for (const url of resultUrls.value) {
         await saveImage({
           id: crypto.randomUUID(),
@@ -311,7 +356,7 @@ export function useImageGeneration() {
         })
       }
     } catch (e: any) {
-      if (e.name !== 'CanceledError') error.value = e?.response?.data?.error?.message || e.message || '编辑失败'
+      if (e.name !== 'CanceledError') error.value = extractApiError(e) || '编辑失败'
     } finally {
       stopTimer()
       loading.value = false
@@ -402,7 +447,7 @@ export function useImageGeneration() {
         })
       } catch (e: any) {
         task.status = 'failed'
-        task.error = e?.response?.data?.error?.message || e.message || '失败'
+        task.error = extractApiError(e) || '失败'
         task.elapsed = Math.round((Date.now() - start) / 1000)
       }
     })
@@ -483,7 +528,7 @@ export function useImageGeneration() {
         })
       } catch (e: any) {
         scene.status = 'failed'
-        scene.error = e?.response?.data?.error?.message || e.message || '失败'
+        scene.error = extractApiError(e) || '失败'
       }
     })
     await runWithConcurrency(tasks, 3)
