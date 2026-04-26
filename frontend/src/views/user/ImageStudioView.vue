@@ -23,16 +23,12 @@
             <option v-for="m in imageModels" :key="m.model_name" :value="m.model_name">{{ m.model_name }}</option>
           </select>
         </div>
-        <div class="flex items-center gap-2">
-          <label class="text-sm font-medium text-gray-700 dark:text-gray-300">数量</label>
-          <input type="number" v-model.number="imageCount" min="1" max="4" class="input !w-16" />
-        </div>
         <div v-if="error" class="ml-auto text-sm text-red-500">{{ error }}</div>
       </div>
 <!-- PLACEHOLDER_HINT_TABS -->
-      <!-- Hint when no groups -->
-      <div v-if="!loadingGroups && !groups.length" class="card p-4 text-center text-sm text-amber-600 dark:text-amber-400">
-        请先在「API Key」页面创建密钥并绑定做图分组
+      <!-- Hint -->
+      <div v-if="!loadingGroups && !groups.length" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+        提示：请先在「API密钥」页面创建密钥并绑定做图分组，分组才会出现在这里
       </div>
 
       <!-- Tabs -->
@@ -46,7 +42,6 @@
       <!-- GENERATION TAB -->
       <div v-if="activeTab === 'generation'" class="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div class="card p-4">
-          <div class="mb-3 text-base font-semibold text-primary-600 dark:text-primary-400">尺寸和质量</div>
           <ParamPanel v-bind="paramBindings" @update:resolutionTier="resolutionTier = $event" @update:selectedRatio="selectedRatio = $event"
             @update:customW="customW = $event" @update:customH="customH = $event" @update:outputFormat="outputFormat = $event as any"
             @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" />
@@ -54,6 +49,10 @@
         <div class="card flex flex-col gap-3 p-4">
           <div class="text-base font-semibold text-emerald-600 dark:text-emerald-400">创意描述</div>
           <textarea v-model="prompt" rows="8" placeholder="描述你想生成的图片..." class="input flex-1" />
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-medium text-gray-600 dark:text-gray-400">数量</label>
+            <input type="number" v-model.number="imageCount" min="1" max="4" class="input !w-16" />
+          </div>
           <button @click="generate" :disabled="loading || !prompt.trim() || !groupApiKey" class="btn btn-primary">
             {{ loading ? `生成中... ${elapsed}s` : '开始生成' }}
           </button>
@@ -82,6 +81,10 @@
         <div class="card flex flex-col gap-3 p-4">
           <div class="text-base font-semibold text-emerald-600 dark:text-emerald-400">编辑描述</div>
           <textarea v-model="prompt" rows="6" placeholder="描述编辑内容..." class="input flex-1" />
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-medium text-gray-600 dark:text-gray-400">数量</label>
+            <input type="number" v-model.number="imageCount" min="1" max="4" class="input !w-16" />
+          </div>
           <button @click="editImage" :disabled="loading || !prompt.trim() || !groupApiKey" class="btn btn-primary">
             {{ loading ? `编辑中... ${elapsed}s` : '开始编辑' }}
           </button>

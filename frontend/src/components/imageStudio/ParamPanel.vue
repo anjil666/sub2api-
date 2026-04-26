@@ -11,6 +11,7 @@
       <button v-for="p in presets" :key="p.tier + p.ratio.label"
         @click="selectPreset(p)"
         :class="[isActive(p) ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300 dark:hover:border-dark-500', 'flex flex-col items-center rounded-xl border px-3 py-2.5 text-sm transition-colors']">
+        <span class="mb-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-50">{{ p.tier }}</span>
         <span class="font-medium">{{ p.pixels }}</span>
         <span class="text-[11px] opacity-70">{{ p.ratio.label }}</span>
       </button>
