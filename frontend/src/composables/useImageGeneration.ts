@@ -211,7 +211,7 @@ export function useImageGeneration() {
   function createAxios(): AxiosInstance {
     return axios.create({
       baseURL: window.location.origin,
-      timeout: 300000,
+      timeout: 600000,
       headers: { Authorization: `Bearer ${groupApiKey.value}` },
     })
   }
@@ -279,24 +279,30 @@ export function useImageGeneration() {
         body.output_compression = outputCompression.value
       }
       const { data } = await api.post('/v1/images/generations', body, { signal: abortController!.signal })
+      console.log('[ImageStudio] generate response keys:', Object.keys(data), 'data.data length:', data.data?.length)
       const items = data.data || data.images || (Array.isArray(data) ? data : [])
       resultUrls.value = items.map((d: any) => extractImageUrl(d, outputFormat.value)).filter(Boolean)
+      console.log('[ImageStudio] resultUrls count:', resultUrls.value.length, 'first url length:', resultUrls.value[0]?.length)
       if (!resultUrls.value.length) {
         error.value = '生成完成但未返回有效图片数据'
         console.warn('[ImageStudio] empty result, raw response:', JSON.stringify(data).slice(0, 500))
       }
       for (const url of resultUrls.value) {
-        await saveImage({
-          id: crypto.randomUUID(),
-          prompt: fullPrompt.value,
-          model: selectedModel.value,
-          size: sizeString.value,
-          mode: 'generation',
-          imageUrl: url,
-          groupName: selectedGroup.value?.group_name || '',
-          style: stylePreset.value.label,
-          createdAt: Date.now(),
-        })
+        try {
+          await saveImage({
+            id: crypto.randomUUID(),
+            prompt: fullPrompt.value,
+            model: selectedModel.value,
+            size: sizeString.value,
+            mode: 'generation',
+            imageUrl: url,
+            groupName: selectedGroup.value?.group_name || '',
+            style: stylePreset.value.label,
+            createdAt: Date.now(),
+          })
+        } catch (saveErr) {
+          console.warn('[ImageStudio] saveImage failed:', saveErr)
+        }
       }
     } catch (e: any) {
       if (e.name !== 'CanceledError') error.value = extractApiError(e) || '生成失败'
@@ -343,17 +349,21 @@ export function useImageGeneration() {
         console.warn('[ImageStudio] empty edit result, raw:', JSON.stringify(data).slice(0, 500))
       }
       for (const url of resultUrls.value) {
-        await saveImage({
-          id: crypto.randomUUID(),
-          prompt: fullPrompt.value,
-          model: selectedModel.value,
-          size: sizeString.value,
-          mode: 'multi-edit',
-          imageUrl: url,
-          groupName: selectedGroup.value?.group_name || '',
-          style: stylePreset.value.label,
-          createdAt: Date.now(),
-        })
+        try {
+          await saveImage({
+            id: crypto.randomUUID(),
+            prompt: fullPrompt.value,
+            model: selectedModel.value,
+            size: sizeString.value,
+            mode: 'multi-edit',
+            imageUrl: url,
+            groupName: selectedGroup.value?.group_name || '',
+            style: stylePreset.value.label,
+            createdAt: Date.now(),
+          })
+        } catch (saveErr) {
+          console.warn('[ImageStudio] saveImage failed:', saveErr)
+        }
       }
     } catch (e: any) {
       if (e.name !== 'CanceledError') error.value = extractApiError(e) || '编辑失败'
