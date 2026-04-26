@@ -298,6 +298,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		OIDCOAuthEnabled                 bool            `json:"oidc_oauth_enabled"`
 		OIDCOAuthProviderName            string          `json:"oidc_oauth_provider_name"`
 		PaymentEnabled                   bool            `json:"payment_enabled"`
+		ImageStudio4KEnabled             bool            `json:"image_studio_4k_enabled"`
 		Version                          string          `json:"version,omitempty"`
 	}{
 		RegistrationEnabled:              settings.RegistrationEnabled,
@@ -330,6 +331,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		OIDCOAuthEnabled:                 settings.OIDCOAuthEnabled,
 		OIDCOAuthProviderName:            settings.OIDCOAuthProviderName,
 		PaymentEnabled:                   settings.PaymentEnabled,
+		ImageStudio4KEnabled:             settings.ImageStudio4KEnabled,
 		Version:                          s.version,
 	}, nil
 }
