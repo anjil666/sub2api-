@@ -145,6 +145,7 @@ export function useImageGeneration() {
   const loading = ref(false)
   const loadingGroups = ref(false)
   const error = ref('')
+  const debugInfo = ref('')
   const elapsed = ref(0)
   let elapsedTimer: ReturnType<typeof setInterval> | null = null
   let abortController: AbortController | null = null
@@ -262,6 +263,7 @@ export function useImageGeneration() {
     if (!fullPrompt.value.trim() || !groupApiKey.value) return
     loading.value = true
     error.value = ''
+    debugInfo.value = ''
     resultUrls.value = []
     abortController = new AbortController()
     startTimer()
@@ -278,14 +280,31 @@ export function useImageGeneration() {
       if ((outputFormat.value === 'jpeg' || outputFormat.value === 'webp') && outputCompression.value < 100) {
         body.output_compression = outputCompression.value
       }
-      const { data } = await api.post('/v1/images/generations', body, { signal: abortController!.signal })
-      console.log('[ImageStudio] generate response keys:', Object.keys(data), 'data.data length:', data.data?.length)
+      const resp = await api.post('/v1/images/generations', body, { signal: abortController!.signal })
+      const data = resp.data
+      const respKeys = Object.keys(data || {})
+      const dataArr = data?.data
+      const itemCount = Array.isArray(dataArr) ? dataArr.length : 0
+      debugInfo.value = `响应: keys=[${respKeys}], data项=${itemCount}, status=${resp.status}`
+      console.log('[ImageStudio] generate resp:', { keys: respKeys, dataLen: itemCount, status: resp.status })
+      if (itemCount > 0) {
+        const first = dataArr[0]
+        const firstKeys = Object.keys(first || {})
+        const hasB64 = !!first?.b64_json
+        const hasUrl = !!first?.url
+        const b64Len = first?.b64_json?.length || 0
+        debugInfo.value += ` | 首项keys=[${firstKeys}], b64=${hasB64}(${b64Len}), url=${hasUrl}`
+        console.log('[ImageStudio] first item:', { keys: firstKeys, hasB64, b64Len, hasUrl })
+      }
       const items = data.data || data.images || (Array.isArray(data) ? data : [])
       resultUrls.value = items.map((d: any) => extractImageUrl(d, outputFormat.value)).filter(Boolean)
-      console.log('[ImageStudio] resultUrls count:', resultUrls.value.length, 'first url length:', resultUrls.value[0]?.length)
+      debugInfo.value += ` | 提取URL数=${resultUrls.value.length}`
+      if (resultUrls.value.length > 0) {
+        debugInfo.value += `, 首URL长=${resultUrls.value[0].length}, 前缀=${resultUrls.value[0].slice(0, 30)}`
+      }
       if (!resultUrls.value.length) {
         error.value = '生成完成但未返回有效图片数据'
-        console.warn('[ImageStudio] empty result, raw response:', JSON.stringify(data).slice(0, 500))
+        console.warn('[ImageStudio] empty result, raw:', JSON.stringify(data).slice(0, 500))
       }
       for (const url of resultUrls.value) {
         try {
@@ -305,7 +324,10 @@ export function useImageGeneration() {
         }
       }
     } catch (e: any) {
-      if (e.name !== 'CanceledError') error.value = extractApiError(e) || '生成失败'
+      if (e.name !== 'CanceledError') {
+        error.value = extractApiError(e) || '生成失败'
+        debugInfo.value = `错误: name=${e.name}, code=${e.code}, status=${e.response?.status}, msg=${e.message?.slice(0, 100)}`
+      }
     } finally {
       stopTimer()
       loading.value = false
@@ -557,7 +579,7 @@ export function useImageGeneration() {
   })
 
   return {
-    activeTab, loading, loadingGroups, error, elapsed,
+    activeTab, loading, loadingGroups, error, debugInfo, elapsed,
     groups: imageGroups, selectedGroupId, selectedGroup, selectedModel, imageModels, groupApiKey,
     resolutionTier, selectedRatio, customW, customH, outputFormat, outputCompression,
     stylePreset, imageCount, prompt, fullPrompt, sizeString,

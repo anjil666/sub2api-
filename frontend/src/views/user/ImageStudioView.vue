@@ -26,6 +26,11 @@
         <div v-if="error" class="ml-auto text-sm text-red-500">{{ error }}</div>
       </div>
 
+      <!-- Debug Info -->
+      <div v-if="debugInfo" class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400 break-all">
+        调试: {{ debugInfo }}
+      </div>
+
       <!-- Hint -->
       <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
         提示：请先在「API密钥」页面创建密钥并绑定做图分组，分组才会出现在这里
@@ -189,7 +194,7 @@ import FileDropZone from '@/components/imageStudio/FileDropZone.vue'
 import GalleryPanel from '@/components/imageStudio/GalleryPanel.vue'
 
 const {
-  activeTab, loading, loadingGroups, error, elapsed,
+  activeTab, loading, loadingGroups, error, debugInfo, elapsed,
   groups, selectedGroupId, selectedModel, imageModels, groupApiKey,
   resolutionTier, selectedRatio, customW, customH, outputFormat, outputCompression,
   stylePreset, imageCount, prompt, sizeString,
