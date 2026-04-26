@@ -1674,6 +1674,23 @@
             </div>
           </div>
         </div>
+
+        <!-- Image Studio -->
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">做图工作室</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">控制做图工作室的功能开关</p>
+          </div>
+          <div class="space-y-4 p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="font-medium text-gray-900 dark:text-white">启用 4K 分辨率</label>
+                <p class="text-sm text-gray-500 dark:text-gray-400">关闭后用户无法选择 4K 分辨率预设</p>
+              </div>
+              <Toggle v-model="form.image_studio_4k_enabled" />
+            </div>
+          </div>
+        </div>
         </div><!-- /Tab: Users -->
 
         <!-- Tab: Gateway — Claude Code, Scheduling -->
@@ -2837,7 +2854,9 @@ const form = reactive<SettingsForm>({
   checkin_reward_amount: 1.0,
   // Referral settings
   referral_enabled: false,
-  referral_commission_rate: 10
+  referral_commission_rate: 10,
+  // Image Studio
+  image_studio_4k_enabled: true
 })
 
 const defaultSubscriptionGroupOptions = computed<DefaultSubscriptionGroupOption[]>(() =>
@@ -3242,6 +3261,8 @@ async function saveSettings() {
       // Referral settings
       referral_enabled: form.referral_enabled,
       referral_commission_rate: form.referral_commission_rate,
+      // Image Studio
+      image_studio_4k_enabled: form.image_studio_4k_enabled,
       // Payment configuration
       payment_enabled: form.payment_enabled,
       payment_min_amount: Number(form.payment_min_amount) || 0,

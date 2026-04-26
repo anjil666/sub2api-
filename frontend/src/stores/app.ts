@@ -341,6 +341,7 @@ export const useAppStore = defineStore('app', () => {
         backend_mode_enabled: false,
         checkin_enabled: false,
         referral_enabled: false,
+        image_studio_4k_enabled: true,
         version: siteVersion.value
       }
     }

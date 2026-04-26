@@ -4,6 +4,7 @@ import { keysAPI } from '@/api/keys'
 import { modelsAPI, type GroupModels } from '@/api/models'
 import { compressImageIfNeeded } from '@/utils/imageCompression'
 import { saveImage } from '@/utils/imageDB'
+import { useAppStore } from '@/stores/app'
 
 export type StudioTab = 'generation' | 'edit' | 'batch' | 'storyboard'
 
@@ -122,30 +123,29 @@ function extractApiError(e: any): string {
   return translateError(msg)
 }
 
+function b64ToBlobUrl(b64: string, mime: string): string {
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return URL.createObjectURL(new Blob([bytes], { type: mime }))
+}
+
 function extractImageUrl(item: any, format?: string): string {
+  const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png'
   if (item.url) return item.url
-  if (item.b64_json) {
-    const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png'
-    return `data:${mime};base64,${item.b64_json}`
-  }
-  if (item.b64) {
-    const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png'
-    return `data:${mime};base64,${item.b64}`
-  }
-  if (typeof item === 'string' && item.length > 100) {
-    const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png'
-    return `data:${mime};base64,${item}`
-  }
+  if (item.b64_json) return b64ToBlobUrl(item.b64_json, mime)
+  if (item.b64) return b64ToBlobUrl(item.b64, mime)
+  if (typeof item === 'string' && item.length > 100) return b64ToBlobUrl(item, mime)
   if (typeof item === 'string' && item.startsWith('http')) return item
   return ''
 }
 
 export function useImageGeneration() {
+  const appStore = useAppStore()
   const activeTab = ref<StudioTab>('generation')
   const loading = ref(false)
   const loadingGroups = ref(false)
   const error = ref('')
-  const debugInfo = ref('')
   const elapsed = ref(0)
   let elapsedTimer: ReturnType<typeof setInterval> | null = null
   let abortController: AbortController | null = null
@@ -175,6 +175,12 @@ export function useImageGeneration() {
 
   // results
   const resultUrls = ref<string[]>([])
+
+  function revokeResultUrls() {
+    for (const u of resultUrls.value) {
+      if (u.startsWith('blob:')) URL.revokeObjectURL(u)
+    }
+  }
 
   // batch
   const batchTasks = ref<BatchTask[]>([])
@@ -208,6 +214,8 @@ export function useImageGeneration() {
   const qualityString = computed(() => TIER_QUALITY[resolutionTier.value] || undefined)
 
   const fullPrompt = computed(() => stylePreset.value.prefix + prompt.value)
+
+  const is4KEnabled = computed(() => appStore.cachedPublicSettings?.image_studio_4k_enabled ?? true)
 
   function createAxios(): AxiosInstance {
     return axios.create({
@@ -263,7 +271,7 @@ export function useImageGeneration() {
     if (!fullPrompt.value.trim() || !groupApiKey.value) return
     loading.value = true
     error.value = ''
-    debugInfo.value = ''
+    revokeResultUrls()
     resultUrls.value = []
     abortController = new AbortController()
     startTimer()
@@ -280,31 +288,11 @@ export function useImageGeneration() {
       if ((outputFormat.value === 'jpeg' || outputFormat.value === 'webp') && outputCompression.value < 100) {
         body.output_compression = outputCompression.value
       }
-      const resp = await api.post('/v1/images/generations', body, { signal: abortController!.signal })
-      const data = resp.data
-      const respKeys = Object.keys(data || {})
-      const dataArr = data?.data
-      const itemCount = Array.isArray(dataArr) ? dataArr.length : 0
-      debugInfo.value = `响应: keys=[${respKeys}], data项=${itemCount}, status=${resp.status}`
-      console.log('[ImageStudio] generate resp:', { keys: respKeys, dataLen: itemCount, status: resp.status })
-      if (itemCount > 0) {
-        const first = dataArr[0]
-        const firstKeys = Object.keys(first || {})
-        const hasB64 = !!first?.b64_json
-        const hasUrl = !!first?.url
-        const b64Len = first?.b64_json?.length || 0
-        debugInfo.value += ` | 首项keys=[${firstKeys}], b64=${hasB64}(${b64Len}), url=${hasUrl}`
-        console.log('[ImageStudio] first item:', { keys: firstKeys, hasB64, b64Len, hasUrl })
-      }
+      const { data } = await api.post('/v1/images/generations', body, { signal: abortController!.signal })
       const items = data.data || data.images || (Array.isArray(data) ? data : [])
       resultUrls.value = items.map((d: any) => extractImageUrl(d, outputFormat.value)).filter(Boolean)
-      debugInfo.value += ` | 提取URL数=${resultUrls.value.length}`
-      if (resultUrls.value.length > 0) {
-        debugInfo.value += `, 首URL长=${resultUrls.value[0].length}, 前缀=${resultUrls.value[0].slice(0, 30)}`
-      }
       if (!resultUrls.value.length) {
         error.value = '生成完成但未返回有效图片数据'
-        console.warn('[ImageStudio] empty result, raw:', JSON.stringify(data).slice(0, 500))
       }
       for (const url of resultUrls.value) {
         try {
@@ -319,15 +307,10 @@ export function useImageGeneration() {
             style: stylePreset.value.label,
             createdAt: Date.now(),
           })
-        } catch (saveErr) {
-          console.warn('[ImageStudio] saveImage failed:', saveErr)
-        }
+        } catch {}
       }
     } catch (e: any) {
-      if (e.name !== 'CanceledError') {
-        error.value = extractApiError(e) || '生成失败'
-        debugInfo.value = `错误: name=${e.name}, code=${e.code}, status=${e.response?.status}, msg=${e.message?.slice(0, 100)}`
-      }
+      if (e.name !== 'CanceledError') error.value = extractApiError(e) || '生成失败'
     } finally {
       stopTimer()
       loading.value = false
@@ -338,6 +321,7 @@ export function useImageGeneration() {
     if (!fullPrompt.value.trim() || !groupApiKey.value) return
     loading.value = true
     error.value = ''
+    revokeResultUrls()
     resultUrls.value = []
     abortController = new AbortController()
     startTimer()
@@ -579,10 +563,10 @@ export function useImageGeneration() {
   })
 
   return {
-    activeTab, loading, loadingGroups, error, debugInfo, elapsed,
+    activeTab, loading, loadingGroups, error, elapsed,
     groups: imageGroups, selectedGroupId, selectedGroup, selectedModel, imageModels, groupApiKey,
     resolutionTier, selectedRatio, customW, customH, outputFormat, outputCompression,
-    stylePreset, imageCount, prompt, fullPrompt, sizeString,
+    stylePreset, imageCount, prompt, fullPrompt, sizeString, is4KEnabled,
     maskFile, multiFiles,
     resultUrls,
     batchTasks, batchProgress,

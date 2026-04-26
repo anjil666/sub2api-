@@ -250,6 +250,9 @@ const (
 	SettingKeyReferralEnabled        = "referral_enabled"         // 是否启用推荐返利
 	SettingKeyReferralCommissionRate = "referral_commission_rate"  // 返利比例（如 0.10 = 10%）
 
+	// 做图工作室
+	SettingKeyImageStudio4KEnabled = "image_studio_4k_enabled" // 是否启用4K分辨率
+
 	// Gateway Forwarding Behavior
 	// SettingKeyEnableFingerprintUnification 是否统一 OAuth 账号的 X-Stainless-* 指纹头（默认 true）
 	SettingKeyEnableFingerprintUnification = "enable_fingerprint_unification"

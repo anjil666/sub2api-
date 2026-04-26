@@ -173,6 +173,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingPaymentEnabled,
 		SettingKeyCheckinEnabled,
 		SettingKeyReferralEnabled,
+		SettingKeyImageStudio4KEnabled,
 	}
 
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)
@@ -239,6 +240,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		BackendModeEnabled:               settings[SettingKeyBackendModeEnabled] == "true",
 		CheckinEnabled:                   settings[SettingKeyCheckinEnabled] == "true",
 		ReferralEnabled:                  settings[SettingKeyReferralEnabled] == "true",
+		ImageStudio4KEnabled:             settings[SettingKeyImageStudio4KEnabled] != "false",
 		OIDCOAuthEnabled:                 oidcEnabled,
 		OIDCOAuthProviderName:            oidcProviderName,
 		PaymentEnabled:                   settings[SettingPaymentEnabled] == "true",
@@ -605,6 +607,9 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	// 推荐返利设置
 	updates[SettingKeyReferralEnabled] = strconv.FormatBool(settings.ReferralEnabled)
 	updates[SettingKeyReferralCommissionRate] = strconv.FormatFloat(settings.ReferralCommissionRate, 'f', 4, 64)
+
+	// 做图工作室
+	updates[SettingKeyImageStudio4KEnabled] = strconv.FormatBool(settings.ImageStudio4KEnabled)
 
 	// Gateway forwarding behavior
 	updates[SettingKeyEnableFingerprintUnification] = strconv.FormatBool(settings.EnableFingerprintUnification)
@@ -1031,6 +1036,9 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	} else {
 		result.ReferralCommissionRate = 10 // 默认 10%
 	}
+
+	// 做图工作室
+	result.ImageStudio4KEnabled = settings[SettingKeyImageStudio4KEnabled] != "false" // 默认启用
 
 	result.DefaultSubscriptions = parseDefaultSubscriptions(settings[SettingKeyDefaultSubscriptions])
 

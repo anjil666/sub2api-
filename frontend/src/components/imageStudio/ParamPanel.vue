@@ -5,8 +5,9 @@
       <span class="text-[11px] text-gray-500 dark:text-gray-400">{{ currentLabel }}</span>
     </div>
     <div class="grid grid-cols-3 gap-1.5">
-      <button v-for="p in presets" :key="p.tier + p.ratio.label" @click="selectPreset(p)"
-        :class="[isActive(p) ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300', 'flex flex-col items-center rounded-lg border px-1.5 py-1 text-xs transition-colors']">
+      <button v-for="p in presets" :key="p.tier + p.ratio.label" @click="!isDisabled(p) && selectPreset(p)"
+        :disabled="isDisabled(p)"
+        :class="[isDisabled(p) ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed dark:border-dark-700 dark:bg-dark-900 dark:text-gray-600' : isActive(p) ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300', 'flex flex-col items-center rounded-lg border px-1.5 py-1 text-xs transition-colors']">
         <span class="text-[9px] font-semibold uppercase opacity-50">{{ p.tier }}</span>
         <span class="font-medium leading-tight">{{ p.pixels }}</span>
         <span class="text-[10px] opacity-70">{{ p.ratio.label }}</span>
@@ -66,6 +67,7 @@ const props = defineProps<{
   stylePreset: StylePreset
   imageCount: number
   compact?: boolean
+  disabled4K?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -84,7 +86,7 @@ interface Preset { tier: ResolutionTier; ratio: AspectRatio; pixels: string }
 const presets = computed<Preset[]>(() => {
   const items: Preset[] = []
   for (const tier of ['1K', '2K', '4K'] as ResolutionTier[]) {
-    for (const ratio of [ASPECT_RATIOS[0], ASPECT_RATIOS[1]]) {
+    for (const ratio of [ASPECT_RATIOS[0], ASPECT_RATIOS[1], ASPECT_RATIOS[2]]) {
       items.push({ tier, ratio, pixels: computeSize(tier, ratio.w, ratio.h) })
     }
   }
@@ -101,6 +103,10 @@ const currentLabel = computed(() => {
 
 function isActive(p: Preset) {
   return props.resolutionTier === p.tier && props.selectedRatio.label === p.ratio.label
+}
+
+function isDisabled(p: Preset) {
+  return p.tier === '4K' && props.disabled4K
 }
 
 function selectPreset(p: Preset) {

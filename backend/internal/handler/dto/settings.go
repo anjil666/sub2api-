@@ -132,6 +132,9 @@ type SystemSettings struct {
 	ReferralEnabled        bool    `json:"referral_enabled"`
 	ReferralCommissionRate float64 `json:"referral_commission_rate"`
 
+	// Image Studio
+	ImageStudio4KEnabled bool `json:"image_studio_4k_enabled"`
+
 	// Payment configuration
 	PaymentEnabled           bool     `json:"payment_enabled"`
 	PaymentMinAmount         float64  `json:"payment_min_amount"`
@@ -191,6 +194,7 @@ type PublicSettings struct {
 	CheckinEnabled                   bool             `json:"checkin_enabled"`
 	ReferralEnabled                  bool             `json:"referral_enabled"`
 	PaymentEnabled                   bool             `json:"payment_enabled"`
+	ImageStudio4KEnabled             bool             `json:"image_studio_4k_enabled"`
 	Version                          string           `json:"version"`
 }
 

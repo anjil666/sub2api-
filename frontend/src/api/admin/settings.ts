@@ -123,6 +123,9 @@ export interface SystemSettings {
   referral_enabled: boolean
   referral_commission_rate: number
 
+  // Image Studio
+  image_studio_4k_enabled: boolean
+
   // Payment configuration
   payment_enabled: boolean
   payment_min_amount: number
@@ -228,6 +231,8 @@ export interface UpdateSettingsRequest {
   // Referral settings
   referral_enabled?: boolean
   referral_commission_rate?: number
+  // Image Studio
+  image_studio_4k_enabled?: boolean
   // Payment configuration
   payment_enabled?: boolean
   payment_min_amount?: number

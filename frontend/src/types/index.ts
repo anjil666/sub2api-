@@ -118,6 +118,7 @@ export interface PublicSettings {
   backend_mode_enabled: boolean
   checkin_enabled: boolean
   referral_enabled: boolean
+  image_studio_4k_enabled: boolean
   version: string
 }
 

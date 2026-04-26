@@ -179,6 +179,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		CheckinRewardAmount:                  settings.CheckinRewardAmount,
 		ReferralEnabled:                      settings.ReferralEnabled,
 		ReferralCommissionRate:               settings.ReferralCommissionRate,
+		ImageStudio4KEnabled:                 settings.ImageStudio4KEnabled,
 		PaymentEnabled:                       paymentCfg.Enabled,
 		PaymentMinAmount:                     paymentCfg.MinAmount,
 		PaymentMaxAmount:                     paymentCfg.MaxAmount,
@@ -335,6 +336,7 @@ type UpdateSettingsRequest struct {
 	CheckinRewardAmount    float64 `json:"checkin_reward_amount"`
 	ReferralEnabled        bool    `json:"referral_enabled"`
 	ReferralCommissionRate float64 `json:"referral_commission_rate"`
+	ImageStudio4KEnabled   bool    `json:"image_studio_4k_enabled"`
 }
 
 // UpdateSettings 更新系统设置
@@ -895,6 +897,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		CheckinRewardAmount: req.CheckinRewardAmount,
 		ReferralEnabled:        req.ReferralEnabled,
 		ReferralCommissionRate: req.ReferralCommissionRate,
+		ImageStudio4KEnabled:   req.ImageStudio4KEnabled,
 	}
 
 	if err := h.settingService.UpdateSettings(c.Request.Context(), settings); err != nil {
@@ -1045,6 +1048,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		CheckinRewardAmount:                  updatedSettings.CheckinRewardAmount,
 		ReferralEnabled:                      updatedSettings.ReferralEnabled,
 		ReferralCommissionRate:               updatedSettings.ReferralCommissionRate,
+		ImageStudio4KEnabled:                 updatedSettings.ImageStudio4KEnabled,
 		PaymentEnabled:                       updatedPaymentCfg.Enabled,
 		PaymentMinAmount:                     updatedPaymentCfg.MinAmount,
 		PaymentMaxAmount:                     updatedPaymentCfg.MaxAmount,

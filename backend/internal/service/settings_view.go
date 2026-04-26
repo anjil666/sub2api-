@@ -110,6 +110,9 @@ type SystemSettings struct {
 	ReferralEnabled        bool
 	ReferralCommissionRate float64
 
+	// 做图工作室
+	ImageStudio4KEnabled bool
+
 	// Gateway forwarding behavior
 	EnableFingerprintUnification bool // 是否统一 OAuth 账号的指纹头（默认 true）
 	EnableMetadataPassthrough    bool // 是否透传客户端原始 metadata（默认 false）
@@ -154,6 +157,7 @@ type PublicSettings struct {
 	OIDCOAuthEnabled      bool
 	OIDCOAuthProviderName string
 	PaymentEnabled        bool
+	ImageStudio4KEnabled  bool
 	Version               string
 }
 

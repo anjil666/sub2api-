@@ -23,17 +23,8 @@
             <option v-for="m in imageModels" :key="m.model_name" :value="m.model_name">{{ m.model_name }}</option>
           </select>
         </div>
-        <div v-if="error" class="ml-auto text-sm text-red-500">{{ error }}</div>
-      </div>
-
-      <!-- Debug Info -->
-      <div v-if="debugInfo" class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400 break-all">
-        调试: {{ debugInfo }}
-      </div>
-
-      <!-- Hint -->
-      <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
-        提示：请先在「API密钥」页面创建密钥并绑定做图分组，分组才会出现在这里
+        <div v-if="error" class="text-sm text-red-500">{{ error }}</div>
+        <div v-else class="text-xs text-amber-600 dark:text-amber-400">提示：请先在「API密钥」页面创建密钥并绑定做图分组</div>
       </div>
 
       <!-- Tabs -->
@@ -52,7 +43,7 @@
             @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" />
         </div>
         <div class="card flex flex-col gap-2 p-3">
-          <div class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">创意描述</div>
+          <div class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">创意描述提示词</div>
           <textarea v-model="prompt" rows="5" placeholder="描述你想生成的图片..." class="input flex-1" />
           <div class="flex items-center gap-2">
             <label class="text-xs text-gray-500 dark:text-gray-400">数量</label>
@@ -84,7 +75,7 @@
             @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" />
         </div>
         <div class="card flex flex-col gap-2 p-3">
-          <div class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">编辑描述</div>
+          <div class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">创意描述提示词</div>
           <textarea v-model="prompt" rows="4" placeholder="描述编辑内容..." class="input flex-1" />
           <div class="flex items-center gap-2">
             <label class="text-xs text-gray-500 dark:text-gray-400">数量</label>
@@ -96,7 +87,7 @@
           <button v-if="loading" @click="abort" class="btn btn-secondary !border-red-300 !text-red-600 text-sm hover:!bg-red-50">取消</button>
         </div>
         <div class="card p-3">
-          <div class="mb-2 text-sm font-semibold text-blue-600 dark:text-blue-400">编辑结果</div>
+          <div class="mb-2 text-sm font-semibold text-blue-600 dark:text-blue-400">生成结果</div>
           <ResultPanel :urls="resultUrls" :loading="loading" :elapsed="elapsed" :model="selectedModel" :size="sizeString" />
         </div>
       </div>
@@ -194,10 +185,10 @@ import FileDropZone from '@/components/imageStudio/FileDropZone.vue'
 import GalleryPanel from '@/components/imageStudio/GalleryPanel.vue'
 
 const {
-  activeTab, loading, loadingGroups, error, debugInfo, elapsed,
+  activeTab, loading, loadingGroups, error, elapsed,
   groups, selectedGroupId, selectedModel, imageModels, groupApiKey,
   resolutionTier, selectedRatio, customW, customH, outputFormat, outputCompression,
-  stylePreset, imageCount, prompt, sizeString,
+  stylePreset, imageCount, prompt, sizeString, is4KEnabled,
   maskFile, multiFiles,
   resultUrls,
   batchTasks, batchProgress,
@@ -226,6 +217,7 @@ const paramBindings = computed(() => ({
   outputCompression: outputCompression.value,
   stylePreset: stylePreset.value,
   imageCount: imageCount.value,
+  disabled4K: !is4KEnabled.value,
 }))
 
 function statusClass(s: string) {
