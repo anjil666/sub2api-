@@ -27,7 +27,7 @@
       </div>
 <!-- PLACEHOLDER_HINT_TABS -->
       <!-- Hint -->
-      <div v-if="!loadingGroups && !groups.length" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+      <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
         提示：请先在「API密钥」页面创建密钥并绑定做图分组，分组才会出现在这里
       </div>
 
