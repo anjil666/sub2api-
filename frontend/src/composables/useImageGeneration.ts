@@ -123,19 +123,16 @@ function extractApiError(e: any): string {
   return translateError(msg)
 }
 
-function b64ToBlobUrl(b64: string, mime: string): string {
-  const bin = atob(b64)
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  return URL.createObjectURL(new Blob([bytes], { type: mime }))
+function b64ToDataUrl(b64: string, mime: string): string {
+  return `data:${mime};base64,${b64}`
 }
 
 function extractImageUrl(item: any, format?: string): string {
   const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png'
   if (item.url) return item.url
-  if (item.b64_json) return b64ToBlobUrl(item.b64_json, mime)
-  if (item.b64) return b64ToBlobUrl(item.b64, mime)
-  if (typeof item === 'string' && item.length > 100) return b64ToBlobUrl(item, mime)
+  if (item.b64_json) return b64ToDataUrl(item.b64_json, mime)
+  if (item.b64) return b64ToDataUrl(item.b64, mime)
+  if (typeof item === 'string' && item.length > 100) return b64ToDataUrl(item, mime)
   if (typeof item === 'string' && item.startsWith('http')) return item
   return ''
 }
@@ -177,9 +174,7 @@ export function useImageGeneration() {
   const resultUrls = ref<string[]>([])
 
   function revokeResultUrls() {
-    for (const u of resultUrls.value) {
-      if (u.startsWith('blob:')) URL.revokeObjectURL(u)
-    }
+    resultUrls.value = []
   }
 
   // batch

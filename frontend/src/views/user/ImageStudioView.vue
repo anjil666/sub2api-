@@ -64,8 +64,8 @@
       <div v-if="activeTab === 'edit'" class="grid grid-cols-1 gap-3 lg:grid-cols-[200px_240px_1fr_1fr]">
         <div class="card space-y-2 p-3">
           <div class="text-sm font-semibold text-orange-600 dark:text-orange-400">上传图片</div>
-          <label class="block text-[10px] font-medium text-gray-500 dark:text-gray-400">参考图 (0~5张)</label>
-          <FileDropZone :files="multiFiles" :max="5" accept="image/*" @update="multiFiles = $event" :compact="true" />
+          <label class="block text-[10px] font-medium text-gray-500 dark:text-gray-400">参考图 ({{ multiFiles.length }}/4张)</label>
+          <FileDropZone :files="multiFiles" :max="4" accept="image/*" @update="multiFiles = $event" :compact="true" />
           <label class="block text-[10px] font-medium text-gray-500 dark:text-gray-400">遮罩图 (可选)</label>
           <FileDropZone :files="maskFile ? [maskFile] : []" :max="1" accept="image/*" @update="maskFile = $event[0] || null" :compact="true" />
         </div>
@@ -82,7 +82,7 @@
             <input type="number" v-model.number="imageCount" min="1" max="4" class="input !w-14 !py-1 !text-xs" />
           </div>
           <button @click="editImage" :disabled="loading || !prompt.trim() || !groupApiKey" class="btn btn-primary text-sm">
-            {{ loading ? `编辑中... ${elapsed}s` : '开始编辑' }}
+            {{ loading ? `生成中... ${elapsed}s` : '开始生成' }}
           </button>
           <button v-if="loading" @click="abort" class="btn btn-secondary !border-red-300 !text-red-600 text-sm hover:!bg-red-50">取消</button>
         </div>
@@ -122,7 +122,7 @@
               </div>
             </div>
             <textarea v-model="task.prompt" rows="1" placeholder="提示词..." class="input !py-1 !text-xs" />
-            <FileDropZone :files="task.referenceFiles" :max="5" accept="image/*" @update="task.referenceFiles = $event" :compact="true" />
+            <FileDropZone :files="task.referenceFiles" :max="4" accept="image/*" @update="task.referenceFiles = $event" :compact="true" />
             <img v-if="task.result" :src="task.result" class="w-full rounded-lg object-cover" />
             <div v-if="task.error" class="text-[10px] text-red-500">{{ task.error }}</div>
           </div>
@@ -148,8 +148,8 @@
               @update:customW="customW = $event" @update:customH="customH = $event" @update:outputFormat="outputFormat = $event as any"
               @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" />
             <div class="space-y-1.5">
-              <label class="text-xs font-medium text-gray-600 dark:text-gray-400">角色参考图 (最多5张，所有场景共用)</label>
-              <FileDropZone :files="storyCharacterFiles" :max="5" accept="image/*" @update="storyCharacterFiles = $event" :compact="true" />
+              <label class="text-xs font-medium text-gray-600 dark:text-gray-400">角色参考图 ({{ storyCharacterFiles.length }}/4张，所有场景共用)</label>
+              <FileDropZone :files="storyCharacterFiles" :max="4" accept="image/*" @update="storyCharacterFiles = $event" :compact="true" />
             </div>
           </div>
         </div>
