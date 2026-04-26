@@ -9,7 +9,7 @@
     </div>
     <div v-else class="flex flex-wrap gap-1.5">
       <div v-for="(_f, i) in files" :key="i" class="group relative">
-        <img :src="previewUrls[i]" class="h-12 w-12 rounded-lg object-cover" />
+        <img :src="preview(_f)" class="h-12 w-12 rounded-lg object-cover" />
         <button @click="remove(i)" class="absolute -right-1 -top-1 rounded-full bg-red-500 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100">
           <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
@@ -23,18 +23,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 
 const props = defineProps<{ files: File[]; max: number; accept: string; compact?: boolean }>()
 const emit = defineEmits<{ update: [files: File[]] }>()
 const dragging = ref(false)
 
-const previewUrls = ref<string[]>([])
-
-watch(() => props.files, (newFiles) => {
-  previewUrls.value.forEach(u => URL.revokeObjectURL(u))
-  previewUrls.value = newFiles.map(f => URL.createObjectURL(f))
-}, { immediate: true })
+const urlCache = new WeakMap<File, string>()
+function preview(file: File): string {
+  let url = urlCache.get(file)
+  if (!url) {
+    url = URL.createObjectURL(file)
+    urlCache.set(file, url)
+  }
+  return url
+}
 
 function onDrop(e: DragEvent) {
   dragging.value = false
