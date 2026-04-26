@@ -1,20 +1,20 @@
 <template>
   <div @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop"
-    :class="[dragging ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600', compact ? 'p-2' : 'p-4', 'rounded-lg border-2 border-dashed transition-colors']">
+    :class="[dragging ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-dark-600', compact ? 'p-2' : 'p-4', 'rounded-xl border-2 border-dashed transition-colors']">
     <div v-if="!files.length" class="text-center">
-      <label class="cursor-pointer text-xs text-gray-500 hover:text-blue-600">
+      <label class="cursor-pointer text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400">
         拖拽或点击上传
         <input type="file" :accept="accept" :multiple="max > 1" @change="onSelect" class="hidden" />
       </label>
     </div>
     <div v-else class="flex flex-wrap gap-2">
       <div v-for="(_f, i) in files" :key="i" class="group relative">
-        <img :src="previews[i]" class="h-16 w-16 rounded object-cover" />
+        <img :src="previews[i]" class="h-16 w-16 rounded-lg object-cover" />
         <button @click="remove(i)" class="absolute -right-1 -top-1 rounded-full bg-red-500 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100">
           <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
-      <label v-if="files.length < max" class="flex h-16 w-16 cursor-pointer items-center justify-center rounded border-2 border-dashed border-gray-300 text-gray-400 hover:border-blue-400 dark:border-gray-600">
+      <label v-if="files.length < max" class="flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-200 text-gray-400 hover:border-primary-400 dark:border-dark-600">
         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         <input type="file" :accept="accept" :multiple="max > 1" @change="onSelect" class="hidden" />
       </label>

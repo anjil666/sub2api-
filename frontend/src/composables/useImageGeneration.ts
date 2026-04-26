@@ -5,7 +5,7 @@ import { modelsAPI, type GroupModels } from '@/api/models'
 import { compressImageIfNeeded } from '@/utils/imageCompression'
 import { saveImage } from '@/utils/imageDB'
 
-export type StudioTab = 'generation' | 'single-edit' | 'multi-edit' | 'batch' | 'storyboard' | 'gallery'
+export type StudioTab = 'generation' | 'edit' | 'batch' | 'storyboard'
 
 export interface SizePreset {
   label: string
@@ -72,6 +72,7 @@ export const STYLE_PRESETS: StylePreset[] = [
 ]
 
 const TIER_BASE: Record<string, number> = { '1K': 1024, '2K': 2048, '4K': 3840 }
+const TIER_QUALITY: Record<string, string> = { '1K': 'standard', '2K': 'hd', '4K': '4k' }
 
 export function computeSize(tier: ResolutionTier, ratioW: number, ratioH: number, customW?: number, customH?: number): string {
   if (tier === 'AUTO') return 'auto'
@@ -93,6 +94,15 @@ export function computeSize(tier: ResolutionTier, ratioW: number, ratioH: number
   w = Math.round(w / 16) * 16
   h = Math.round(h / 16) * 16
   return `${w}x${h}`
+}
+
+function extractImageUrl(item: any, format?: string): string {
+  if (item.url) return item.url
+  if (item.b64_json) {
+    const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png'
+    return `data:${mime};base64,${item.b64_json}`
+  }
+  return ''
 }
 
 export function useImageGeneration() {
@@ -121,8 +131,7 @@ export function useImageGeneration() {
   const imageCount = ref(1)
   const prompt = ref('')
 
-  // single edit
-  const editFile = ref<File | null>(null)
+  // single edit (legacy)
   const maskFile = ref<File | null>(null)
 
   // multi edit
@@ -159,6 +168,8 @@ export function useImageGeneration() {
   const sizeString = computed(() =>
     computeSize(resolutionTier.value, selectedRatio.value.w, selectedRatio.value.h, customW.value, customH.value)
   )
+
+  const qualityString = computed(() => TIER_QUALITY[resolutionTier.value] || undefined)
 
   const fullPrompt = computed(() => stylePreset.value.prefix + prompt.value)
 
@@ -228,11 +239,12 @@ export function useImageGeneration() {
         output_format: outputFormat.value,
       }
       if (sizeString.value !== 'auto') body.size = sizeString.value
+      if (qualityString.value) body.quality = qualityString.value
       if ((outputFormat.value === 'jpeg' || outputFormat.value === 'webp') && outputCompression.value < 100) {
         body.output_compression = outputCompression.value
       }
       const { data } = await api.post('/v1/images/generations', body, { signal: abortController!.signal })
-      resultUrls.value = (data.data || []).map((d: any) => d.url || d.b64_json)
+      resultUrls.value = (data.data || []).map((d: any) => extractImageUrl(d, outputFormat.value))
       for (const url of resultUrls.value) {
         await saveImage({
           id: crypto.randomUUID(),
@@ -267,32 +279,31 @@ export function useImageGeneration() {
       fd.append('model', selectedModel.value)
       fd.append('prompt', fullPrompt.value)
       if (sizeString.value !== 'auto') fd.append('size', sizeString.value)
+      if (qualityString.value) fd.append('quality', qualityString.value)
       fd.append('output_format', outputFormat.value)
       if ((outputFormat.value === 'jpeg' || outputFormat.value === 'webp') && outputCompression.value < 100) {
         fd.append('output_compression', String(outputCompression.value))
       }
-      const mode = activeTab.value === 'single-edit' ? 'single' : 'multi'
-      const files = mode === 'single' ? (editFile.value ? [editFile.value] : []) : multiFiles.value
+      const files = multiFiles.value
       for (const f of files) {
         const compressed = await compressImageIfNeeded(f)
         fd.append('image[]', compressed, compressed.name)
       }
-      if (mode === 'single' && maskFile.value) {
+      if (maskFile.value) {
         fd.append('mask', maskFile.value, maskFile.value.name)
       }
       const { data } = await api.post('/v1/images/edits', fd, {
         signal: abortController!.signal,
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-      resultUrls.value = (data.data || []).map((d: any) => d.url || d.b64_json)
-      const recMode = mode === 'single' ? 'single-edit' : 'multi-edit'
+      resultUrls.value = (data.data || []).map((d: any) => extractImageUrl(d, outputFormat.value))
       for (const url of resultUrls.value) {
         await saveImage({
           id: crypto.randomUUID(),
           prompt: fullPrompt.value,
           model: selectedModel.value,
           size: sizeString.value,
-          mode: recMode,
+          mode: 'multi-edit',
           imageUrl: url,
           groupName: selectedGroup.value?.group_name || '',
           style: stylePreset.value.label,
@@ -350,6 +361,7 @@ export function useImageGeneration() {
           fd.append('model', selectedModel.value)
           fd.append('prompt', (stylePreset.value.prefix + task.prompt))
           if (sizeString.value !== 'auto') fd.append('size', sizeString.value)
+          if (qualityString.value) fd.append('quality', qualityString.value)
           fd.append('output_format', outputFormat.value)
           for (const f of task.referenceFiles) {
             const c = await compressImageIfNeeded(f)
@@ -368,10 +380,11 @@ export function useImageGeneration() {
             output_format: outputFormat.value,
           }
           if (sizeString.value !== 'auto') body.size = sizeString.value
+          if (qualityString.value) body.quality = qualityString.value
           const resp = await api.post('/v1/images/generations', body, { signal: abortController!.signal })
           data = resp.data
         }
-        const url = data.data?.[0]?.url || data.data?.[0]?.b64_json || ''
+        const url = extractImageUrl(data.data?.[0] || {}, outputFormat.value)
         task.result = url
         task.status = 'success'
         task.elapsed = Math.round((Date.now() - start) / 1000)
@@ -424,6 +437,7 @@ export function useImageGeneration() {
         fd.append('model', selectedModel.value)
         fd.append('prompt', (stylePreset.value.prefix + scene.prompt))
         if (sizeString.value !== 'auto') fd.append('size', sizeString.value)
+        if (qualityString.value) fd.append('quality', qualityString.value)
         fd.append('output_format', outputFormat.value)
         for (const f of storyCharacterFiles.value) {
           const c = await compressImageIfNeeded(f)
@@ -448,9 +462,10 @@ export function useImageGeneration() {
             n: 1,
             output_format: outputFormat.value,
             ...(sizeString.value !== 'auto' ? { size: sizeString.value } : {}),
+            ...(qualityString.value ? { quality: qualityString.value } : {}),
           }, { signal: abortController!.signal })
         }
-        const url = resp.data.data?.[0]?.url || resp.data.data?.[0]?.b64_json || ''
+        const url = extractImageUrl(resp.data.data?.[0] || {}, outputFormat.value)
         scene.result = url
         scene.status = 'success'
         await saveImage({
@@ -491,7 +506,7 @@ export function useImageGeneration() {
     groups: imageGroups, selectedGroupId, selectedGroup, selectedModel, imageModels, groupApiKey,
     resolutionTier, selectedRatio, customW, customH, outputFormat, outputCompression,
     stylePreset, imageCount, prompt, fullPrompt, sizeString,
-    editFile, maskFile, multiFiles,
+    maskFile, multiFiles,
     resultUrls,
     batchTasks, batchProgress,
     storyCharacterFiles, storyScenes, storyProgress,
