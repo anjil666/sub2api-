@@ -20,12 +20,16 @@
     <div v-if="!images.length" class="py-8 text-center text-sm text-gray-400">暂无历史记录</div>
     <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
       <div v-for="img in images" :key="img.id"
-        class="group relative cursor-pointer overflow-hidden rounded-xl border border-gray-100 transition-shadow hover:shadow-card-hover dark:border-dark-700/50"
-        @click="toggleSelect(img.id)">
+        class="group relative overflow-hidden rounded-xl border border-gray-100 transition-shadow hover:shadow-card-hover dark:border-dark-700/50">
         <div class="absolute left-2 top-2 z-10">
-          <input type="checkbox" :checked="selectedIds.has(img.id)" @click.stop class="rounded" @change="toggleSelect(img.id)" />
+          <input type="checkbox" :checked="selectedIds.has(img.id)" class="cursor-pointer rounded" @click.stop="toggleSelect(img.id)" />
         </div>
-        <img :src="img.imageUrl" class="aspect-square w-full object-cover" loading="lazy" />
+        <div class="relative">
+          <img :src="img.imageUrl" class="aspect-square w-full cursor-pointer object-cover" loading="lazy" @click="previewSrc = img.imageUrl; previewVisible = true" />
+          <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
+            <svg class="h-8 w-8 text-white opacity-0 drop-shadow transition-opacity group-hover:opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
+          </div>
+        </div>
         <div class="p-2">
           <div class="truncate text-xs text-gray-700 dark:text-gray-300">{{ img.prompt }}</div>
           <div class="flex items-center justify-between text-[10px] text-gray-400">
@@ -36,11 +40,13 @@
       </div>
     </div>
     <button v-if="hasMore" @click="loadMore" class="btn btn-secondary mx-auto block text-sm">加载更多</button>
+    <ImagePreview v-model:visible="previewVisible" :src="previewSrc" />
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { getImages, deleteImages, type ImageRecord } from '@/utils/imageDB'
+import ImagePreview from './ImagePreview.vue'
 
 const filterMode = ref<string>('')
 const images = ref<ImageRecord[]>([])
@@ -48,6 +54,8 @@ const selectedIds = ref<Set<string>>(new Set())
 const page = ref(0)
 const pageSize = 50
 const hasMore = ref(true)
+const previewVisible = ref(false)
+const previewSrc = ref('')
 
 const allSelected = computed(() => images.value.length > 0 && images.value.every(i => selectedIds.value.has(i.id)))
 
@@ -79,34 +87,40 @@ async function deleteSelected() {
   load(true)
 }
 
+function urlToBlob(url: string): Promise<Blob> {
+  if (url.startsWith('data:')) {
+    const [header, b64] = url.split(',')
+    const mime = header.match(/:(.*?);/)?.[1] || 'image/png'
+    const bin = atob(b64)
+    const arr = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+    return Promise.resolve(new Blob([arr], { type: mime }))
+  }
+  return fetch(url).then(r => r.blob())
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function sanitizeFilename(prompt: string): string {
+  const clean = prompt.replace(/[\\/:*?"<>|\n\r]/g, '').trim()
+  return clean.slice(0, 30) || 'image'
+}
+
 async function downloadSelected() {
   const sel = images.value.filter(i => selectedIds.value.has(i.id))
-  if (sel.length === 1) {
+  for (const img of sel) {
     try {
-      const resp = await fetch(sel[0].imageUrl)
-      const blob = await resp.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = blobUrl; a.download = `image_${sel[0].id}.png`; a.click()
-      URL.revokeObjectURL(blobUrl)
-    } catch { window.open(sel[0].imageUrl, '_blank') }
-    return
+      const blob = await urlToBlob(img.imageUrl)
+      const ext = blob.type.split('/')[1] || 'png'
+      triggerDownload(blob, `${sanitizeFilename(img.prompt)}.${ext}`)
+    } catch (e) { console.error('[download]', e) }
   }
-  try {
-    const { default: JSZip } = await import('jszip')
-    const zip = new JSZip()
-    await Promise.all(sel.map(async (img, i) => {
-      try {
-        const resp = await fetch(img.imageUrl)
-        const blob = await resp.blob()
-        zip.file(`image_${i + 1}.${blob.type.split('/')[1] || 'png'}`, blob)
-      } catch { /* skip */ }
-    }))
-    const content = await zip.generateAsync({ type: 'blob' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(content); a.download = 'images.zip'; a.click()
-    URL.revokeObjectURL(a.href)
-  } catch { alert('下载失败，请重试') }
 }
 
 function formatDate(ts: number) {
@@ -115,5 +129,10 @@ function formatDate(ts: number) {
 }
 
 watch(filterMode, () => load(true))
-onMounted(() => load(true))
+onMounted(() => {
+  load(true)
+  window.addEventListener('image-studio-saved', onSaved)
+})
+onUnmounted(() => window.removeEventListener('image-studio-saved', onSaved))
+function onSaved() { load(true) }
 </script>

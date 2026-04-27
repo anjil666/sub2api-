@@ -20,6 +20,26 @@ export interface StylePreset {
   prefix: string
 }
 
+export interface GenerationTask {
+  id: string
+  prompt: string
+  mode: 'generation' | 'edit'
+  status: 'pending' | 'running' | 'success' | 'failed'
+  urls: string[]
+  error?: string
+  elapsed?: number
+  model: string
+  size: string
+  style: string
+  editFiles?: File[]
+  maskFile?: File | null
+  imageCount: number
+  _abort?: AbortController
+  outputFormat: 'png' | 'jpeg' | 'webp'
+  outputCompression: number
+  quality?: string
+}
+
 export interface BatchTask {
   id: string
   prompt: string
@@ -123,18 +143,29 @@ function extractApiError(e: any): string {
   return translateError(msg)
 }
 
+function genId(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36)
+}
+
 function b64ToDataUrl(b64: string, mime: string): string {
   return `data:${mime};base64,${b64}`
 }
 
-function extractImageUrl(item: any, format?: string): string {
+function b64ToBlobUrl(b64: string, mime: string): string {
+  const bin = atob(b64)
+  const arr = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+  return URL.createObjectURL(new Blob([arr], { type: mime }))
+}
+
+interface ExtractedImage { display: string; storage: string }
+
+function extractImage(item: any, format?: string): ExtractedImage {
   const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png'
-  if (item.url) return item.url
-  if (item.b64_json) return b64ToDataUrl(item.b64_json, mime)
-  if (item.b64) return b64ToDataUrl(item.b64, mime)
-  if (typeof item === 'string' && item.length > 100) return b64ToDataUrl(item, mime)
-  if (typeof item === 'string' && item.startsWith('http')) return item
-  return ''
+  const b64 = item.b64_json || item.b64 || (typeof item === 'string' && item.length > 100 ? item : null)
+  if (b64) return { display: b64ToBlobUrl(b64, mime), storage: b64ToDataUrl(b64, mime) }
+  const url = item.url || (typeof item === 'string' && item.startsWith('http') ? item : '')
+  return { display: url, storage: url }
 }
 
 export function useImageGeneration() {
@@ -144,7 +175,6 @@ export function useImageGeneration() {
   const loadingGroups = ref(false)
   const error = ref('')
   const elapsed = ref(0)
-  let elapsedTimer: ReturnType<typeof setInterval> | null = null
   let abortController: AbortController | null = null
 
   // group & model
@@ -163,6 +193,7 @@ export function useImageGeneration() {
   const stylePreset = ref(STYLE_PRESETS[0])
   const imageCount = ref(1)
   const prompt = ref('')
+  const qualityOverride = ref('')
 
   // single edit (legacy)
   const maskFile = ref<File | null>(null)
@@ -170,12 +201,13 @@ export function useImageGeneration() {
   // multi edit
   const multiFiles = ref<File[]>([])
 
-  // results
-  const resultUrls = ref<string[]>([])
+  // results — task queue
+  const generationTasks = ref<GenerationTask[]>([])
 
-  function revokeResultUrls() {
-    resultUrls.value = []
-  }
+  const resultUrls = computed(() => {
+    const last = generationTasks.value.filter(t => t.status === 'success').slice(-1)[0]
+    return last?.urls || []
+  })
 
   // batch
   const batchTasks = ref<BatchTask[]>([])
@@ -206,7 +238,10 @@ export function useImageGeneration() {
     computeSize(resolutionTier.value, selectedRatio.value.w, selectedRatio.value.h, customW.value, customH.value)
   )
 
-  const qualityString = computed(() => TIER_QUALITY[resolutionTier.value] || undefined)
+  const qualityString = computed(() => {
+    if (qualityOverride.value) return qualityOverride.value
+    return TIER_QUALITY[resolutionTier.value] || undefined
+  })
 
   const fullPrompt = computed(() => stylePreset.value.prefix + prompt.value)
 
@@ -247,131 +282,139 @@ export function useImageGeneration() {
     }
   }
 
-  function startTimer() {
-    elapsed.value = 0
-    elapsedTimer = setInterval(() => elapsed.value++, 1000)
-  }
-  function stopTimer() {
-    if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null }
-  }
-
   function abort() {
-    abortController?.abort()
-    abortController = null
-    stopTimer()
+    const running = generationTasks.value.filter(t => t.status === 'running')
+    for (const t of running) {
+      t._abort?.abort()
+      t.status = 'failed'
+      t.error = '已取消'
+      t._abort = undefined
+    }
+    const pending = generationTasks.value.filter(t => t.status === 'pending')
+    for (const t of pending) {
+      t.status = 'failed'
+      t.error = '已取消'
+    }
     loading.value = false
   }
 
-  async function generate() {
-    if (!fullPrompt.value.trim() || !groupApiKey.value) return
-    loading.value = true
-    error.value = ''
-    revokeResultUrls()
-    resultUrls.value = []
-    abortController = new AbortController()
-    startTimer()
+  function abortTask(id: string) {
+    const task = generationTasks.value.find(t => t.id === id)
+    if (!task) return
+    if (task.status === 'running') {
+      task._abort?.abort()
+      task._abort = undefined
+    }
+    task.status = 'failed'
+    task.error = '已取消'
+    scheduleQueue()
+  }
+
+  async function runTask(task: GenerationTask) {
+    task.status = 'running'
+    const taskAbort = new AbortController()
+    task._abort = taskAbort
+    const startTime = Date.now()
+    const timer = setInterval(() => { task.elapsed = Math.round((Date.now() - startTime) / 1000) }, 1000)
     try {
       const api = createAxios()
-      const body: Record<string, any> = {
-        model: selectedModel.value,
-        prompt: fullPrompt.value,
-        n: imageCount.value,
-        output_format: outputFormat.value,
+      let items: any[]
+      if (task.mode === 'generation') {
+        const body: Record<string, any> = {
+          model: task.model, prompt: task.prompt, n: task.imageCount, output_format: task.outputFormat,
+        }
+        if (task.size !== 'auto') body.size = task.size
+        if (task.quality) body.quality = task.quality
+        if ((task.outputFormat === 'jpeg' || task.outputFormat === 'webp') && task.outputCompression < 100) {
+          body.output_compression = task.outputCompression
+        }
+        const { data } = await api.post('/v1/images/generations', body, { signal: taskAbort.signal })
+        console.log('[ImageStudio] API response:', JSON.stringify(data).slice(0, 500))
+        items = data.data || data.images || (Array.isArray(data) ? data : [])
+      } else {
+        const fd = new FormData()
+        fd.append('model', task.model)
+        fd.append('prompt', task.prompt)
+        if (task.size !== 'auto') fd.append('size', task.size)
+        if (task.quality) fd.append('quality', task.quality)
+        fd.append('output_format', task.outputFormat)
+        if ((task.outputFormat === 'jpeg' || task.outputFormat === 'webp') && task.outputCompression < 100) {
+          fd.append('output_compression', String(task.outputCompression))
+        }
+        if (task.editFiles) {
+          for (const f of task.editFiles) {
+            const c = await compressImageIfNeeded(f)
+            fd.append('image[]', c, c.name)
+          }
+        }
+        if (task.maskFile) fd.append('mask', task.maskFile, task.maskFile.name)
+        const { data } = await api.post('/v1/images/edits', fd, {
+          signal: taskAbort.signal, headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        items = data.data || data.images || (Array.isArray(data) ? data : [])
       }
-      if (sizeString.value !== 'auto') body.size = sizeString.value
-      if (qualityString.value) body.quality = qualityString.value
-      if ((outputFormat.value === 'jpeg' || outputFormat.value === 'webp') && outputCompression.value < 100) {
-        body.output_compression = outputCompression.value
-      }
-      const { data } = await api.post('/v1/images/generations', body, { signal: abortController!.signal })
-      const items = data.data || data.images || (Array.isArray(data) ? data : [])
-      resultUrls.value = items.map((d: any) => extractImageUrl(d, outputFormat.value)).filter(Boolean)
-      if (!resultUrls.value.length) {
-        error.value = '生成完成但未返回有效图片数据'
-      }
-      for (const url of resultUrls.value) {
+      const extracted = items.map((d: any) => extractImage(d, task.outputFormat)).filter(e => e.display)
+      task.urls = extracted.map(e => e.display)
+      task.status = task.urls.length ? 'success' : 'failed'
+      if (!task.urls.length) task.error = '未返回有效图片数据'
+      for (const img of extracted) {
         try {
           await saveImage({
-            id: crypto.randomUUID(),
-            prompt: fullPrompt.value,
-            model: selectedModel.value,
-            size: sizeString.value,
-            mode: 'generation',
-            imageUrl: url,
-            groupName: selectedGroup.value?.group_name || '',
-            style: stylePreset.value.label,
-            createdAt: Date.now(),
+            id: genId(), prompt: task.prompt, model: task.model,
+            size: task.size, mode: task.mode === 'generation' ? 'generation' : 'multi-edit',
+            imageUrl: img.storage, groupName: selectedGroup.value?.group_name || '',
+            style: task.style, createdAt: Date.now(),
           })
         } catch {}
       }
+      if (task.urls.length) window.dispatchEvent(new CustomEvent('image-studio-saved'))
     } catch (e: any) {
-      if (e.name !== 'CanceledError') error.value = extractApiError(e) || '生成失败'
+      if (e.name !== 'CanceledError') {
+        task.status = 'failed'
+        task.error = extractApiError(e) || '生成失败'
+      }
     } finally {
-      stopTimer()
-      loading.value = false
+      clearInterval(timer)
+      task._abort = undefined
+      scheduleQueue()
     }
   }
 
-  async function editImage() {
-    if (!fullPrompt.value.trim() || !groupApiKey.value) return
-    loading.value = true
-    error.value = ''
-    revokeResultUrls()
-    resultUrls.value = []
-    abortController = new AbortController()
-    startTimer()
-    try {
-      const api = createAxios()
-      const fd = new FormData()
-      fd.append('model', selectedModel.value)
-      fd.append('prompt', fullPrompt.value)
-      if (sizeString.value !== 'auto') fd.append('size', sizeString.value)
-      if (qualityString.value) fd.append('quality', qualityString.value)
-      fd.append('output_format', outputFormat.value)
-      if ((outputFormat.value === 'jpeg' || outputFormat.value === 'webp') && outputCompression.value < 100) {
-        fd.append('output_compression', String(outputCompression.value))
-      }
-      const files = multiFiles.value
-      for (const f of files) {
-        const compressed = await compressImageIfNeeded(f)
-        fd.append('image[]', compressed, compressed.name)
-      }
-      if (maskFile.value) {
-        fd.append('mask', maskFile.value, maskFile.value.name)
-      }
-      const { data } = await api.post('/v1/images/edits', fd, {
-        signal: abortController!.signal,
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      const items = data.data || data.images || (Array.isArray(data) ? data : [])
-      resultUrls.value = items.map((d: any) => extractImageUrl(d, outputFormat.value)).filter(Boolean)
-      if (!resultUrls.value.length) {
-        error.value = '编辑完成但未返回有效图片数据'
-        console.warn('[ImageStudio] empty edit result, raw:', JSON.stringify(data).slice(0, 500))
-      }
-      for (const url of resultUrls.value) {
-        try {
-          await saveImage({
-            id: crypto.randomUUID(),
-            prompt: fullPrompt.value,
-            model: selectedModel.value,
-            size: sizeString.value,
-            mode: 'multi-edit',
-            imageUrl: url,
-            groupName: selectedGroup.value?.group_name || '',
-            style: stylePreset.value.label,
-            createdAt: Date.now(),
-          })
-        } catch (saveErr) {
-          console.warn('[ImageStudio] saveImage failed:', saveErr)
-        }
-      }
-    } catch (e: any) {
-      if (e.name !== 'CanceledError') error.value = extractApiError(e) || '编辑失败'
-    } finally {
-      stopTimer()
-      loading.value = false
+  function scheduleQueue() {
+    const running = generationTasks.value.filter(t => t.status === 'running').length
+    const pending = generationTasks.value.filter(t => t.status === 'pending')
+    const slots = 5 - running
+    for (let i = 0; i < Math.min(slots, pending.length); i++) {
+      runTask(pending[i])
     }
+    loading.value = generationTasks.value.some(t => t.status === 'running' || t.status === 'pending')
+  }
+
+  function generate() {
+    if (!fullPrompt.value.trim() || !groupApiKey.value) return
+    error.value = ''
+    generationTasks.value.unshift({
+      id: genId(), prompt: fullPrompt.value, mode: 'generation',
+      status: 'pending', urls: [], model: selectedModel.value, size: sizeString.value,
+      style: stylePreset.value.label, imageCount: imageCount.value,
+      outputFormat: outputFormat.value, outputCompression: outputCompression.value,
+      quality: qualityString.value,
+    })
+    scheduleQueue()
+  }
+
+  function editImage() {
+    if (!fullPrompt.value.trim() || !groupApiKey.value) return
+    error.value = ''
+    generationTasks.value.unshift({
+      id: genId(), prompt: fullPrompt.value, mode: 'edit',
+      status: 'pending', urls: [], model: selectedModel.value, size: sizeString.value,
+      style: stylePreset.value.label, imageCount: imageCount.value,
+      outputFormat: outputFormat.value, outputCompression: outputCompression.value,
+      quality: qualityString.value,
+      editFiles: [...multiFiles.value], maskFile: maskFile.value,
+    })
+    scheduleQueue()
   }
 
   // concurrency limiter
@@ -390,7 +433,7 @@ export function useImageGeneration() {
 
   function addBatchTask() {
     batchTasks.value.push({
-      id: crypto.randomUUID(),
+      id: genId(),
       prompt: '',
       referenceFiles: [],
       status: 'pending',
@@ -440,17 +483,17 @@ export function useImageGeneration() {
           const resp = await api.post('/v1/images/generations', body, { signal: abortController!.signal })
           data = resp.data
         }
-        const url = extractImageUrl(data.data?.[0] || {}, outputFormat.value)
-        task.result = url
+        const img = extractImage(data.data?.[0] || {}, outputFormat.value)
+        task.result = img.display
         task.status = 'success'
         task.elapsed = Math.round((Date.now() - start) / 1000)
         await saveImage({
-          id: crypto.randomUUID(),
+          id: genId(),
           prompt: stylePreset.value.prefix + task.prompt,
           model: selectedModel.value,
           size: sizeString.value,
           mode: 'batch',
-          imageUrl: url,
+          imageUrl: img.storage,
           groupName: selectedGroup.value?.group_name || '',
           style: stylePreset.value.label,
           createdAt: Date.now(),
@@ -468,7 +511,7 @@ export function useImageGeneration() {
   function addScene() {
     const idx = storyScenes.value.length
     storyScenes.value.push({
-      id: crypto.randomUUID(),
+      id: genId(),
       index: idx + 1,
       prompt: '',
       status: 'pending',
@@ -521,16 +564,16 @@ export function useImageGeneration() {
             ...(qualityString.value ? { quality: qualityString.value } : {}),
           }, { signal: abortController!.signal })
         }
-        const url = extractImageUrl(resp.data.data?.[0] || {}, outputFormat.value)
-        scene.result = url
+        const img = extractImage(resp.data.data?.[0] || {}, outputFormat.value)
+        scene.result = img.display
         scene.status = 'success'
         await saveImage({
-          id: crypto.randomUUID(),
+          id: genId(),
           prompt: stylePreset.value.prefix + scene.prompt,
           model: selectedModel.value,
           size: sizeString.value,
           mode: 'storyboard',
-          imageUrl: url,
+          imageUrl: img.storage,
           groupName: selectedGroup.value?.group_name || '',
           style: stylePreset.value.label,
           createdAt: Date.now(),
@@ -561,12 +604,12 @@ export function useImageGeneration() {
     activeTab, loading, loadingGroups, error, elapsed,
     groups: imageGroups, selectedGroupId, selectedGroup, selectedModel, imageModels, groupApiKey,
     resolutionTier, selectedRatio, customW, customH, outputFormat, outputCompression,
-    stylePreset, imageCount, prompt, fullPrompt, sizeString, is4KEnabled,
+    stylePreset, imageCount, prompt, fullPrompt, sizeString, is4KEnabled, qualityOverride,
     maskFile, multiFiles,
-    resultUrls,
+    resultUrls, generationTasks,
     batchTasks, batchProgress,
     storyCharacterFiles, storyScenes, storyProgress,
-    loadGroupsAndKeys, generate, editImage, abort,
+    loadGroupsAndKeys, generate, editImage, abort, abortTask,
     addBatchTask, removeBatchTask, runBatchTasks,
     addScene, removeScene, runStoryboard,
   }

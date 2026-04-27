@@ -40,23 +40,23 @@
         <div class="card p-3">
           <ParamPanel v-bind="paramBindings" @update:resolutionTier="resolutionTier = $event" @update:selectedRatio="selectedRatio = $event"
             @update:customW="customW = $event" @update:customH="customH = $event" @update:outputFormat="outputFormat = $event as any"
-            @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" />
+            @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" @update:qualityOverride="qualityOverride = $event" />
         </div>
-        <div class="card flex flex-col gap-2 p-3">
+        <div class="card flex min-w-0 flex-col gap-2 p-3">
           <div class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">创意描述提示词</div>
           <textarea v-model="prompt" rows="5" placeholder="描述你想生成的图片..." class="input flex-1" />
           <div class="flex items-center gap-2">
             <label class="text-xs text-gray-500 dark:text-gray-400">数量</label>
             <input type="number" v-model.number="imageCount" min="1" max="4" class="input !w-14 !py-1 !text-xs" />
           </div>
-          <button @click="generate" :disabled="loading || !prompt.trim() || !groupApiKey" class="btn btn-primary text-sm">
-            {{ loading ? `生成中... ${elapsed}s` : '开始生成' }}
+          <button @click="generate" :disabled="!prompt.trim() || !groupApiKey" class="btn btn-primary text-sm">
+            {{ loading ? '继续生成' : '开始生成' }}
           </button>
-          <button v-if="loading" @click="abort" class="btn btn-secondary !border-red-300 !text-red-600 text-sm hover:!bg-red-50">取消</button>
+          <button v-if="loading" @click="abort" class="btn btn-secondary !border-red-300 !text-red-600 text-sm hover:!bg-red-50">取消全部</button>
         </div>
-        <div class="card p-3">
+        <div class="card min-w-0 p-3">
           <div class="mb-2 text-sm font-semibold text-blue-600 dark:text-blue-400">生成结果</div>
-          <ResultPanel :urls="resultUrls" :loading="loading" :elapsed="elapsed" :model="selectedModel" :size="sizeString" />
+          <ResultPanel :tasks="generationTasks" :loading="loading" :elapsed="elapsed" @abort-task="abortTask" />
         </div>
       </div>
 
@@ -72,23 +72,23 @@
         <div class="card p-3">
           <ParamPanel v-bind="paramBindings" @update:resolutionTier="resolutionTier = $event" @update:selectedRatio="selectedRatio = $event"
             @update:customW="customW = $event" @update:customH="customH = $event" @update:outputFormat="outputFormat = $event as any"
-            @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" />
+            @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" @update:qualityOverride="qualityOverride = $event" />
         </div>
-        <div class="card flex flex-col gap-2 p-3">
+        <div class="card flex min-w-0 flex-col gap-2 p-3">
           <div class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">创意描述提示词</div>
           <textarea v-model="prompt" rows="4" placeholder="描述编辑内容..." class="input flex-1" />
           <div class="flex items-center gap-2">
             <label class="text-xs text-gray-500 dark:text-gray-400">数量</label>
             <input type="number" v-model.number="imageCount" min="1" max="4" class="input !w-14 !py-1 !text-xs" />
           </div>
-          <button @click="editImage" :disabled="loading || !prompt.trim() || !groupApiKey" class="btn btn-primary text-sm">
-            {{ loading ? `生成中... ${elapsed}s` : '开始生成' }}
+          <button @click="editImage" :disabled="!prompt.trim() || !groupApiKey" class="btn btn-primary text-sm">
+            {{ loading ? '继续生成' : '开始生成' }}
           </button>
-          <button v-if="loading" @click="abort" class="btn btn-secondary !border-red-300 !text-red-600 text-sm hover:!bg-red-50">取消</button>
+          <button v-if="loading" @click="abort" class="btn btn-secondary !border-red-300 !text-red-600 text-sm hover:!bg-red-50">取消全部</button>
         </div>
-        <div class="card p-3">
+        <div class="card min-w-0 p-3">
           <div class="mb-2 text-sm font-semibold text-blue-600 dark:text-blue-400">生成结果</div>
-          <ResultPanel :urls="resultUrls" :loading="loading" :elapsed="elapsed" :model="selectedModel" :size="sizeString" />
+          <ResultPanel :tasks="generationTasks" :loading="loading" :elapsed="elapsed" @abort-task="abortTask" />
         </div>
       </div>
 <!-- PLACEHOLDER_BATCH_STORY -->
@@ -109,7 +109,7 @@
           <div v-if="batchParamOpen" class="mt-3 border-t pt-3 dark:border-dark-600">
             <ParamPanel v-bind="paramBindings" @update:resolutionTier="resolutionTier = $event" @update:selectedRatio="selectedRatio = $event"
               @update:customW="customW = $event" @update:customH="customH = $event" @update:outputFormat="outputFormat = $event as any"
-              @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" />
+              @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" @update:qualityOverride="qualityOverride = $event" />
           </div>
         </div>
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -146,7 +146,7 @@
           <div v-if="storyParamOpen" class="mt-3 grid grid-cols-1 gap-3 border-t pt-3 dark:border-dark-600 lg:grid-cols-2">
             <ParamPanel v-bind="paramBindings" @update:resolutionTier="resolutionTier = $event" @update:selectedRatio="selectedRatio = $event"
               @update:customW="customW = $event" @update:customH="customH = $event" @update:outputFormat="outputFormat = $event as any"
-              @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" />
+              @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" @update:qualityOverride="qualityOverride = $event" />
             <div class="space-y-1.5">
               <label class="text-xs font-medium text-gray-600 dark:text-gray-400">角色参考图 ({{ storyCharacterFiles.length }}/4张，所有场景共用)</label>
               <FileDropZone :files="storyCharacterFiles" :max="4" accept="image/*" @update="storyCharacterFiles = $event" :compact="true" />
@@ -188,12 +188,12 @@ const {
   activeTab, loading, loadingGroups, error, elapsed,
   groups, selectedGroupId, selectedModel, imageModels, groupApiKey,
   resolutionTier, selectedRatio, customW, customH, outputFormat, outputCompression,
-  stylePreset, imageCount, prompt, sizeString, is4KEnabled,
+  stylePreset, imageCount, prompt, is4KEnabled, qualityOverride,
   maskFile, multiFiles,
-  resultUrls,
+  generationTasks,
   batchTasks, batchProgress,
   storyCharacterFiles, storyScenes, storyProgress,
-  loadGroupsAndKeys, generate, editImage, abort,
+  loadGroupsAndKeys, generate, editImage, abort, abortTask,
   addBatchTask, removeBatchTask, runBatchTasks,
   addScene, removeScene, runStoryboard,
 } = useImageGeneration()
@@ -218,6 +218,7 @@ const paramBindings = computed(() => ({
   stylePreset: stylePreset.value,
   imageCount: imageCount.value,
   disabled4K: !is4KEnabled.value,
+  qualityOverride: qualityOverride.value,
 }))
 
 function statusClass(s: string) {
