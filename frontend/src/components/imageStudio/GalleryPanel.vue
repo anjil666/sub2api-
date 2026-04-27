@@ -87,27 +87,16 @@ async function deleteSelected() {
   load(true)
 }
 
-function toBlobUrl(url: string): string {
-  if (url.startsWith('blob:')) return url
+function toDownloadBlobUrl(url: string): string {
   if (url.startsWith('data:')) {
-    const [header, b64] = url.split(',')
-    const mime = header.match(/:(.*?);/)?.[1] || 'image/png'
+    const [, b64] = url.split(',')
     const bin = atob(b64)
     const arr = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-    return URL.createObjectURL(new Blob([arr], { type: mime }))
+    return URL.createObjectURL(new Blob([arr], { type: 'application/octet-stream' }))
   }
+  if (url.startsWith('blob:')) return url
   return url
-}
-
-function triggerDownload(blobUrl: string, filename: string, needRevoke: boolean) {
-  const a = document.createElement('a')
-  a.href = blobUrl; a.download = filename
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  if (needRevoke) setTimeout(() => URL.revokeObjectURL(blobUrl), 2000)
 }
 
 function sanitizeFilename(prompt: string): string {
@@ -119,9 +108,14 @@ function downloadSelected() {
   const sel = images.value.filter(i => selectedIds.value.has(i.id))
   sel.forEach((img, idx) => {
     setTimeout(() => {
-      const blobUrl = toBlobUrl(img.imageUrl)
-      const needRevoke = blobUrl !== img.imageUrl
-      triggerDownload(blobUrl, `${sanitizeFilename(img.prompt)}.png`, needRevoke)
+      const blobUrl = toDownloadBlobUrl(img.imageUrl)
+      const a = document.createElement('a')
+      a.href = blobUrl; a.download = `${sanitizeFilename(img.prompt)}.png`
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      if (blobUrl !== img.imageUrl) setTimeout(() => URL.revokeObjectURL(blobUrl), 2000)
     }, idx * 300)
   })
 }

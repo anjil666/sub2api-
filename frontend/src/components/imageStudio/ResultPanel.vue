@@ -15,7 +15,7 @@
       </div>
       <div v-if="task.urls.length" v-for="(url, i) in task.urls" :key="i" class="group relative cursor-zoom-in" @click="preview(url)">
         <img :src="url" class="max-h-[400px] w-full rounded-xl object-contain" loading="lazy" />
-        <button @click.stop="downloadImage(url, i)" title="下载图片"
+        <button @click.stop="downloadImage(task, i)" title="下载图片"
           class="absolute right-2 top-2 rounded-lg bg-black/50 p-1.5 text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-black/70">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
         </button>
@@ -43,27 +43,14 @@ function taskStatusLabel(s: string) {
   return { pending: '排队中', running: '生成中', success: '成功', failed: '失败' }[s] || s
 }
 
-function toBlobUrl(url: string): string {
-  if (url.startsWith('blob:')) return url
-  if (url.startsWith('data:')) {
-    const [header, b64] = url.split(',')
-    const mime = header.match(/:(.*?);/)?.[1] || 'image/png'
-    const bin = atob(b64)
-    const arr = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-    return URL.createObjectURL(new Blob([arr], { type: mime }))
-  }
-  return url
-}
-
-function downloadImage(url: string, index: number) {
-  const blobUrl = toBlobUrl(url)
+function downloadImage(task: GenerationTask, index: number) {
+  const url = task._downloadUrls?.[index] || task.urls[index]
+  if (!url) return
   const a = document.createElement('a')
-  a.href = blobUrl; a.download = `image_${index + 1}.png`
+  a.href = url; a.download = `image_${index + 1}.png`
   a.style.display = 'none'
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
-  if (blobUrl !== url) setTimeout(() => URL.revokeObjectURL(blobUrl), 2000)
 }
 </script>
