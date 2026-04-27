@@ -329,7 +329,6 @@ export function useImageGeneration() {
           body.output_compression = task.outputCompression
         }
         const { data } = await api.post('/v1/images/generations', body, { signal: taskAbort.signal })
-        console.log('[ImageStudio] API response:', JSON.stringify(data).slice(0, 500))
         items = data.data || data.images || (Array.isArray(data) ? data : [])
       } else {
         const fd = new FormData()

@@ -87,24 +87,27 @@ async function deleteSelected() {
   load(true)
 }
 
-function urlToBlob(url: string): Promise<Blob> {
+function toBlobUrl(url: string): string {
+  if (url.startsWith('blob:')) return url
   if (url.startsWith('data:')) {
     const [header, b64] = url.split(',')
     const mime = header.match(/:(.*?);/)?.[1] || 'image/png'
     const bin = atob(b64)
     const arr = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-    return Promise.resolve(new Blob([arr], { type: mime }))
+    return URL.createObjectURL(new Blob([arr], { type: mime }))
   }
-  return fetch(url).then(r => r.blob())
+  return url
 }
 
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
+function triggerDownload(blobUrl: string, filename: string, needRevoke: boolean) {
   const a = document.createElement('a')
-  a.href = url; a.download = filename
-  document.body.appendChild(a); a.click(); document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  a.href = blobUrl; a.download = filename
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  if (needRevoke) setTimeout(() => URL.revokeObjectURL(blobUrl), 2000)
 }
 
 function sanitizeFilename(prompt: string): string {
@@ -112,15 +115,15 @@ function sanitizeFilename(prompt: string): string {
   return clean.slice(0, 30) || 'image'
 }
 
-async function downloadSelected() {
+function downloadSelected() {
   const sel = images.value.filter(i => selectedIds.value.has(i.id))
-  for (const img of sel) {
-    try {
-      const blob = await urlToBlob(img.imageUrl)
-      const ext = blob.type.split('/')[1] || 'png'
-      triggerDownload(blob, `${sanitizeFilename(img.prompt)}.${ext}`)
-    } catch (e) { console.error('[download]', e) }
-  }
+  sel.forEach((img, idx) => {
+    setTimeout(() => {
+      const blobUrl = toBlobUrl(img.imageUrl)
+      const needRevoke = blobUrl !== img.imageUrl
+      triggerDownload(blobUrl, `${sanitizeFilename(img.prompt)}.png`, needRevoke)
+    }, idx * 300)
+  })
 }
 
 function formatDate(ts: number) {

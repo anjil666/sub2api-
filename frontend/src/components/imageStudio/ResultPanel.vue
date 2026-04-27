@@ -43,34 +43,27 @@ function taskStatusLabel(s: string) {
   return { pending: '排队中', running: '生成中', success: '成功', failed: '失败' }[s] || s
 }
 
-function urlToBlob(url: string): Promise<Blob> {
+function toBlobUrl(url: string): string {
+  if (url.startsWith('blob:')) return url
   if (url.startsWith('data:')) {
     const [header, b64] = url.split(',')
     const mime = header.match(/:(.*?);/)?.[1] || 'image/png'
     const bin = atob(b64)
     const arr = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-    return Promise.resolve(new Blob([arr], { type: mime }))
+    return URL.createObjectURL(new Blob([arr], { type: mime }))
   }
-  return fetch(url).then(r => r.blob())
+  return url
 }
 
-function triggerDownload(blobUrl: string, filename: string) {
+function downloadImage(url: string, index: number) {
+  const blobUrl = toBlobUrl(url)
   const a = document.createElement('a')
-  a.href = blobUrl; a.download = filename
+  a.href = blobUrl; a.download = `image_${index + 1}.png`
   a.style.display = 'none'
   document.body.appendChild(a)
   a.click()
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl) }, 2000)
-}
-
-async function downloadImage(url: string, index: number) {
-  try {
-    const blob = await urlToBlob(url)
-    const blobUrl = URL.createObjectURL(blob)
-    triggerDownload(blobUrl, `image_${index + 1}.png`)
-  } catch (e) {
-    console.error('[download]', e)
-  }
+  document.body.removeChild(a)
+  if (blobUrl !== url) setTimeout(() => URL.revokeObjectURL(blobUrl), 2000)
 }
 </script>
