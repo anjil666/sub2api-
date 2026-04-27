@@ -43,20 +43,7 @@ function taskStatusLabel(s: string) {
   return { pending: '排队中', running: '生成中', success: '成功', failed: '失败' }[s] || s
 }
 
-function forceDownload(dataOrBlobUrl: string, filename: string) {
-  let blobUrl: string
-  let needRevoke = false
-  if (dataOrBlobUrl.startsWith('data:')) {
-    const commaIdx = dataOrBlobUrl.indexOf(',')
-    const b64 = dataOrBlobUrl.slice(commaIdx + 1)
-    const bin = atob(b64)
-    const arr = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-    blobUrl = URL.createObjectURL(new Blob([arr], { type: 'application/octet-stream' }))
-    needRevoke = true
-  } else {
-    blobUrl = dataOrBlobUrl
-  }
+function triggerAnchorDownload(blobUrl: string, filename: string) {
   const a = document.createElement('a')
   a.href = blobUrl
   a.download = filename
@@ -64,7 +51,22 @@ function forceDownload(dataOrBlobUrl: string, filename: string) {
   document.body.appendChild(a)
   a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
   document.body.removeChild(a)
-  if (needRevoke) setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
+}
+
+function forceDownload(url: string, filename: string) {
+  if (url.startsWith('data:')) {
+    const commaIdx = url.indexOf(',')
+    const b64 = url.slice(commaIdx + 1)
+    const bin = atob(b64)
+    const arr = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+    triggerAnchorDownload(URL.createObjectURL(new Blob([arr], { type: 'application/octet-stream' })), filename)
+    return
+  }
+  fetch(url).then(r => r.blob()).then(blob => {
+    triggerAnchorDownload(URL.createObjectURL(new Blob([blob], { type: 'application/octet-stream' })), filename)
+  }).catch(() => window.open(url, '_blank'))
 }
 
 function downloadImage(task: GenerationTask, index: number) {
