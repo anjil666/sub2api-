@@ -43,14 +43,33 @@ function taskStatusLabel(s: string) {
   return { pending: '排队中', running: '生成中', success: '成功', failed: '失败' }[s] || s
 }
 
-function downloadImage(task: GenerationTask, index: number) {
-  const url = task._downloadUrls?.[index] || task.urls[index]
-  if (!url) return
+function forceDownload(dataOrBlobUrl: string, filename: string) {
+  let blobUrl: string
+  let needRevoke = false
+  if (dataOrBlobUrl.startsWith('data:')) {
+    const commaIdx = dataOrBlobUrl.indexOf(',')
+    const b64 = dataOrBlobUrl.slice(commaIdx + 1)
+    const bin = atob(b64)
+    const arr = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+    blobUrl = URL.createObjectURL(new Blob([arr], { type: 'application/octet-stream' }))
+    needRevoke = true
+  } else {
+    blobUrl = dataOrBlobUrl
+  }
   const a = document.createElement('a')
-  a.href = url; a.download = `image_${index + 1}.png`
+  a.href = blobUrl
+  a.download = filename
   a.style.display = 'none'
   document.body.appendChild(a)
-  a.click()
+  a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
   document.body.removeChild(a)
+  if (needRevoke) setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
+}
+
+function downloadImage(task: GenerationTask, index: number) {
+  const url = task.urls[index]
+  if (!url) return
+  forceDownload(url, `image_${index + 1}.png`)
 }
 </script>

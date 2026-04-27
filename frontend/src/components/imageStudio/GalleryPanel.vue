@@ -87,16 +87,28 @@ async function deleteSelected() {
   load(true)
 }
 
-function toDownloadBlobUrl(url: string): string {
-  if (url.startsWith('data:')) {
-    const [, b64] = url.split(',')
+function forceDownload(dataOrBlobUrl: string, filename: string) {
+  let blobUrl: string
+  let needRevoke = false
+  if (dataOrBlobUrl.startsWith('data:')) {
+    const commaIdx = dataOrBlobUrl.indexOf(',')
+    const b64 = dataOrBlobUrl.slice(commaIdx + 1)
     const bin = atob(b64)
     const arr = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-    return URL.createObjectURL(new Blob([arr], { type: 'application/octet-stream' }))
+    blobUrl = URL.createObjectURL(new Blob([arr], { type: 'application/octet-stream' }))
+    needRevoke = true
+  } else {
+    blobUrl = dataOrBlobUrl
   }
-  if (url.startsWith('blob:')) return url
-  return url
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+  document.body.removeChild(a)
+  if (needRevoke) setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
 }
 
 function sanitizeFilename(prompt: string): string {
@@ -108,14 +120,7 @@ function downloadSelected() {
   const sel = images.value.filter(i => selectedIds.value.has(i.id))
   sel.forEach((img, idx) => {
     setTimeout(() => {
-      const blobUrl = toDownloadBlobUrl(img.imageUrl)
-      const a = document.createElement('a')
-      a.href = blobUrl; a.download = `${sanitizeFilename(img.prompt)}.png`
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      if (blobUrl !== img.imageUrl) setTimeout(() => URL.revokeObjectURL(blobUrl), 2000)
+      forceDownload(img.imageUrl, `${sanitizeFilename(img.prompt)}.png`)
     }, idx * 300)
   })
 }

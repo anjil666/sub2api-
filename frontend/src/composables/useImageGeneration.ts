@@ -26,7 +26,6 @@ export interface GenerationTask {
   mode: 'generation' | 'edit'
   status: 'pending' | 'running' | 'success' | 'failed'
   urls: string[]
-  _downloadUrls: string[]
   error?: string
   elapsed?: number
   model: string
@@ -159,7 +158,7 @@ function b64ToBlobUrl(b64: string, mime: string): string {
   return URL.createObjectURL(new Blob([arr], { type: mime }))
 }
 
-interface ExtractedImage { display: string; storage: string; download: string }
+interface ExtractedImage { display: string; storage: string }
 
 function extractImage(item: any, format?: string): ExtractedImage {
   const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png'
@@ -168,11 +167,10 @@ function extractImage(item: any, format?: string): ExtractedImage {
     const bin = atob(b64)
     const arr = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-    const downloadUrl = URL.createObjectURL(new Blob([arr], { type: 'application/octet-stream' }))
-    return { display: b64ToBlobUrl(b64, mime), storage: b64ToDataUrl(b64, mime), download: downloadUrl }
+    return { display: b64ToBlobUrl(b64, mime), storage: b64ToDataUrl(b64, mime) }
   }
   const url = item.url || (typeof item === 'string' && item.startsWith('http') ? item : '')
-  return { display: url, storage: url, download: url }
+  return { display: url, storage: url }
 }
 
 export function useImageGeneration() {
@@ -361,7 +359,6 @@ export function useImageGeneration() {
       }
       const extracted = items.map((d: any) => extractImage(d, task.outputFormat)).filter(e => e.display)
       task.urls = extracted.map(e => e.display)
-      task._downloadUrls = extracted.map(e => e.download)
       task.status = task.urls.length ? 'success' : 'failed'
       if (!task.urls.length) task.error = '未返回有效图片数据'
       for (const img of extracted) {
@@ -403,7 +400,7 @@ export function useImageGeneration() {
     error.value = ''
     generationTasks.value.unshift({
       id: genId(), prompt: fullPrompt.value, mode: 'generation',
-      status: 'pending', urls: [], _downloadUrls: [], model: selectedModel.value, size: sizeString.value,
+      status: 'pending', urls: [], model: selectedModel.value, size: sizeString.value,
       style: stylePreset.value.label, imageCount: imageCount.value,
       outputFormat: outputFormat.value, outputCompression: outputCompression.value,
       quality: qualityString.value,
@@ -416,7 +413,7 @@ export function useImageGeneration() {
     error.value = ''
     generationTasks.value.unshift({
       id: genId(), prompt: fullPrompt.value, mode: 'edit',
-      status: 'pending', urls: [], _downloadUrls: [], model: selectedModel.value, size: sizeString.value,
+      status: 'pending', urls: [], model: selectedModel.value, size: sizeString.value,
       style: stylePreset.value.label, imageCount: imageCount.value,
       outputFormat: outputFormat.value, outputCompression: outputCompression.value,
       quality: qualityString.value,
