@@ -118,13 +118,43 @@ function sanitizeFilename(prompt: string): string {
   return clean.slice(0, 30) || 'image'
 }
 
-function downloadSelected() {
+async function urlToBlob(url: string): Promise<Blob> {
+  if (url.startsWith('data:')) {
+    const commaIdx = url.indexOf(',')
+    const b64 = url.slice(commaIdx + 1)
+    const bin = atob(b64)
+    const arr = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+    return new Blob([arr], { type: 'image/png' })
+  }
+  const r = await fetch(url)
+  return r.blob()
+}
+
+async function downloadSelected() {
   const sel = images.value.filter(i => selectedIds.value.has(i.id))
-  sel.forEach((img, idx) => {
-    setTimeout(() => {
+  if (!sel.length) return
+  if (sel.length === 1) {
+    forceDownload(sel[0].imageUrl, `${sanitizeFilename(sel[0].prompt)}.png`)
+    return
+  }
+  try {
+    const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' })
+    for (const img of sel) {
+      const blob = await urlToBlob(img.imageUrl)
+      const name = `${sanitizeFilename(img.prompt)}_${img.id.slice(0, 6)}.png`
+      const fileHandle = await dirHandle.getFileHandle(name, { create: true })
+      const writable = await fileHandle.createWritable()
+      await writable.write(blob)
+      await writable.close()
+    }
+  } catch (e: any) {
+    if (e.name === 'AbortError') return
+    for (const img of sel) {
       forceDownload(img.imageUrl, `${sanitizeFilename(img.prompt)}.png`)
-    }, idx * 300)
-  })
+      await new Promise(r => setTimeout(r, 300))
+    }
+  }
 }
 
 function formatDate(ts: number) {
