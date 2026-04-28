@@ -65,7 +65,7 @@ async function load(reset = false) {
   const items = await getImages(mode as any, pageSize, page.value * pageSize)
   for (const img of items) {
     if (img.imageUrl.startsWith('data:')) {
-      img._origUrl = img.imageUrl
+      (img as any)._origUrl = img.imageUrl
       try {
         const commaIdx = img.imageUrl.indexOf(',')
         const b64 = img.imageUrl.slice(commaIdx + 1)
