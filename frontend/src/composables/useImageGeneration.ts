@@ -164,13 +164,25 @@ function extractImage(item: any, format?: string): ExtractedImage {
   const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png'
   const b64 = item.b64_json || item.b64 || (typeof item === 'string' && item.length > 100 ? item : null)
   if (b64) {
-    const bin = atob(b64)
-    const arr = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
     return { display: b64ToBlobUrl(b64, mime), storage: b64ToDataUrl(b64, mime) }
   }
   const url = item.url || (typeof item === 'string' && item.startsWith('http') ? item : '')
-  return { display: url, storage: url }
+  return { display: url, storage: '' }
+}
+
+async function fetchUrlToDataUrl(url: string): Promise<string> {
+  try {
+    const resp = await fetch(url)
+    const blob = await resp.blob()
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return url
+  }
 }
 
 export function useImageGeneration() {
@@ -358,7 +370,13 @@ export function useImageGeneration() {
         items = data.data || data.images || (Array.isArray(data) ? data : [])
       }
       const extracted = items.map((d: any) => extractImage(d, task.outputFormat)).filter(e => e.display)
-      task.urls = extracted.map(e => e.display)
+      for (const img of extracted) {
+        if (!img.storage && img.display.startsWith('http')) {
+          img.storage = await fetchUrlToDataUrl(img.display)
+          img.display = img.storage
+        }
+      }
+      task.urls = extracted.map(e => e.storage || e.display)
       task.status = task.urls.length ? 'success' : 'failed'
       if (!task.urls.length) task.error = '未返回有效图片数据'
       for (const img of extracted) {
@@ -366,12 +384,12 @@ export function useImageGeneration() {
           await saveImage({
             id: genId(), prompt: task.prompt, model: task.model,
             size: task.size, mode: task.mode === 'generation' ? 'generation' : 'multi-edit',
-            imageUrl: img.storage, groupName: selectedGroup.value?.group_name || '',
+            imageUrl: img.storage || img.display, groupName: selectedGroup.value?.group_name || '',
             style: task.style, createdAt: Date.now(),
           })
         } catch {}
       }
-      task.urls = extracted.map(e => e.storage)
+      task.urls = extracted.map(e => e.storage || e.display)
       if (extracted.length) window.dispatchEvent(new CustomEvent('image-studio-saved'))
     } catch (e: any) {
       if (e.name !== 'CanceledError') {
