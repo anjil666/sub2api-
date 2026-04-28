@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/base64"
 	"io"
 	"net/http"
 	"time"
@@ -44,4 +45,24 @@ func (h *GatewayHandler) ImageProxy(c *gin.Context) {
 	c.Status(http.StatusOK)
 	c.Header("Content-Type", contentType)
 	io.Copy(c.Writer, io.LimitReader(resp.Body, 20<<20))
+}
+
+func (h *GatewayHandler) ImageDownload(c *gin.Context) {
+	data := c.PostForm("data")
+	fn := c.PostForm("fn")
+	if fn == "" {
+		fn = "image.png"
+	}
+	if data == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "data required"})
+		return
+	}
+	imgData, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid base64"})
+		return
+	}
+	c.Header("Content-Disposition", "attachment; filename=\""+fn+"\"")
+	c.Header("Cache-Control", "no-cache")
+	c.Data(http.StatusOK, "application/octet-stream", imgData)
 }

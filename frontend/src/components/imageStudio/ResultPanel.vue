@@ -43,25 +43,44 @@ function taskStatusLabel(s: string) {
   return { pending: '排队中', running: '生成中', success: '成功', failed: '失败' }[s] || s
 }
 
-function triggerAnchorDownload(blobUrl: string, filename: string) {
-  const a = document.createElement('a')
-  a.href = blobUrl
-  a.download = filename
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
-  document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
+function postDownload(b64: string, filename: string) {
+  const token = localStorage.getItem('auth_token') || ''
+  let iframe = document.getElementById('_dl_frame') as HTMLIFrameElement
+  if (!iframe) {
+    iframe = document.createElement('iframe')
+    iframe.id = '_dl_frame'
+    iframe.name = '_dl_frame'
+    iframe.style.display = 'none'
+    document.body.appendChild(iframe)
+  }
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.action = `/v1/user/image-download?token=${encodeURIComponent(token)}`
+  form.target = '_dl_frame'
+  form.style.display = 'none'
+  const d = document.createElement('textarea')
+  d.name = 'data'; d.value = b64; form.appendChild(d)
+  const f = document.createElement('input')
+  f.name = 'fn'; f.value = filename; form.appendChild(f)
+  document.body.appendChild(form)
+  form.submit()
+  document.body.removeChild(form)
 }
 
 function forceDownload(url: string, filename: string) {
   if (url.startsWith('data:')) {
-    const commaIdx = url.indexOf(',')
-    const b64 = url.slice(commaIdx + 1)
-    const bin = atob(b64)
-    const arr = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-    triggerAnchorDownload(URL.createObjectURL(new Blob([arr], { type: 'application/octet-stream' })), filename)
+    postDownload(url.slice(url.indexOf(',') + 1), filename)
+    return
+  }
+  if (url.startsWith('blob:')) {
+    fetch(url).then(r => r.blob()).then(blob => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const result = reader.result as string
+        postDownload(result.slice(result.indexOf(',') + 1), filename)
+      }
+      reader.readAsDataURL(blob)
+    }).catch(() => {})
     return
   }
   const token = localStorage.getItem('auth_token') || ''

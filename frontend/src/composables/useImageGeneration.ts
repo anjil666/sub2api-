@@ -373,10 +373,10 @@ export function useImageGeneration() {
       for (const img of extracted) {
         if (!img.storage && img.display.startsWith('http')) {
           img.storage = await fetchUrlToDataUrl(img.display)
-          img.display = img.storage
+          img.display = img.storage.startsWith('data:') ? b64ToBlobUrl(img.storage.slice(img.storage.indexOf(',') + 1), 'image/png') : img.storage
         }
       }
-      task.urls = extracted.map(e => e.storage || e.display)
+      task.urls = extracted.map(e => e.display)
       task.status = task.urls.length ? 'success' : 'failed'
       if (!task.urls.length) task.error = '未返回有效图片数据'
       for (const img of extracted) {
@@ -389,7 +389,6 @@ export function useImageGeneration() {
           })
         } catch {}
       }
-      task.urls = extracted.map(e => e.storage || e.display)
       if (extracted.length) window.dispatchEvent(new CustomEvent('image-studio-saved'))
     } catch (e: any) {
       if (e.name !== 'CanceledError') {
