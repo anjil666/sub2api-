@@ -97,18 +97,20 @@ func (h *GatewayHandler) ImageDownloadPrepare(c *gin.Context) {
 	id := hex.EncodeToString(b)
 	dlStore.Store(id, &dlEntry{data: imgData, name: fn, created: time.Now()})
 	token := c.Query("token")
-	c.Redirect(http.StatusFound, fmt.Sprintf("/v1/user/image-download/%s?token=%s", id, token))
+	c.JSON(http.StatusOK, gin.H{"url": fmt.Sprintf("/v1/user/image-download/%s?token=%s", id, token)})
 }
 
 func (h *GatewayHandler) ImageDownloadGet(c *gin.Context) {
 	id := c.Param("id")
-	val, ok := dlStore.LoadAndDelete(id)
+	val, ok := dlStore.Load(id)
 	if !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": "download expired"})
 		return
 	}
 	e := val.(*dlEntry)
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", e.name))
+	c.Header("Content-Type", "image/png")
+	c.Header("Accept-Ranges", "bytes")
 	c.Header("Cache-Control", "no-cache")
-	c.Data(http.StatusOK, "application/octet-stream", e.data)
+	c.Data(http.StatusOK, "image/png", e.data)
 }

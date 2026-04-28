@@ -63,20 +63,6 @@ async function load(reset = false) {
   if (reset) { page.value = 0; images.value = []; hasMore.value = true }
   const mode = filterMode.value || undefined
   const items = await getImages(mode as any, pageSize, page.value * pageSize)
-  for (const img of items) {
-    if (img.imageUrl.startsWith('data:')) {
-      (img as any)._origUrl = img.imageUrl
-      try {
-        const commaIdx = img.imageUrl.indexOf(',')
-        const b64 = img.imageUrl.slice(commaIdx + 1)
-        const mime = img.imageUrl.slice(5, img.imageUrl.indexOf(';'))
-        const bin = atob(b64)
-        const arr = new Uint8Array(bin.length)
-        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-        img.imageUrl = URL.createObjectURL(new Blob([arr], { type: mime || 'image/png' }))
-      } catch {}
-    }
-  }
   if (reset) images.value = items; else images.value.push(...items)
   hasMore.value = items.length === pageSize
 }
@@ -101,54 +87,29 @@ async function deleteSelected() {
   load(true)
 }
 
-function postDownload(b64: string, filename: string) {
+function uploadAndDownload(b64: string, filename: string) {
   const token = localStorage.getItem('auth_token') || ''
-  let iframe = document.getElementById('_dl_frame') as HTMLIFrameElement
-  if (!iframe) {
-    iframe = document.createElement('iframe')
-    iframe.id = '_dl_frame'
-    iframe.name = '_dl_frame'
-    iframe.style.display = 'none'
-    document.body.appendChild(iframe)
+  const xhr = new XMLHttpRequest()
+  xhr.open('POST', `/v1/user/image-download?token=${encodeURIComponent(token)}`, false)
+  const fd = new FormData()
+  fd.append('data', b64)
+  fd.append('fn', filename)
+  xhr.send(fd)
+  if (xhr.status === 200) {
+    try {
+      const { url } = JSON.parse(xhr.responseText)
+      if (url) window.location.href = url
+    } catch {}
   }
-  const form = document.createElement('form')
-  form.method = 'POST'
-  form.action = `/v1/user/image-download?token=${encodeURIComponent(token)}`
-  form.target = '_dl_frame'
-  form.style.display = 'none'
-  const d = document.createElement('textarea')
-  d.name = 'data'; d.value = b64; form.appendChild(d)
-  const f = document.createElement('input')
-  f.name = 'fn'; f.value = filename; form.appendChild(f)
-  document.body.appendChild(form)
-  form.submit()
-  document.body.removeChild(form)
 }
 
 function forceDownload(url: string, filename: string) {
   if (url.startsWith('data:')) {
-    postDownload(url.slice(url.indexOf(',') + 1), filename)
-    return
-  }
-  if (url.startsWith('blob:')) {
-    fetch(url).then(r => r.blob()).then(blob => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const result = reader.result as string
-        postDownload(result.slice(result.indexOf(',') + 1), filename)
-      }
-      reader.readAsDataURL(blob)
-    }).catch(() => {})
+    uploadAndDownload(url.slice(url.indexOf(',') + 1), filename)
     return
   }
   const token = localStorage.getItem('auth_token') || ''
-  const a = document.createElement('a')
-  a.href = `/v1/user/image-proxy?url=${encodeURIComponent(url)}&fn=${encodeURIComponent(filename)}&token=${encodeURIComponent(token)}`
-  a.download = filename
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+  window.location.href = `/v1/user/image-proxy?url=${encodeURIComponent(url)}&fn=${encodeURIComponent(filename)}&token=${encodeURIComponent(token)}`
 }
 
 function sanitizeFilename(prompt: string): string {
@@ -173,15 +134,13 @@ async function downloadSelected() {
   const sel = images.value.filter(i => selectedIds.value.has(i.id))
   if (!sel.length) return
   if (sel.length === 1) {
-    const dlUrl = (sel[0] as any)._origUrl || sel[0].imageUrl
-    forceDownload(dlUrl, `${sanitizeFilename(sel[0].prompt)}.png`)
+    forceDownload(sel[0].imageUrl, `${sanitizeFilename(sel[0].prompt)}.png`)
     return
   }
   try {
     const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' })
     for (const img of sel) {
-      const dlUrl = (img as any)._origUrl || img.imageUrl
-      const blob = await urlToBlob(dlUrl)
+      const blob = await urlToBlob(img.imageUrl)
       const name = `${sanitizeFilename(img.prompt)}_${img.id.slice(0, 6)}.png`
       const fileHandle = await dirHandle.getFileHandle(name, { create: true })
       const writable = await fileHandle.createWritable()
@@ -191,8 +150,7 @@ async function downloadSelected() {
   } catch (e: any) {
     if (e.name === 'AbortError') return
     for (const img of sel) {
-      const dlUrl = (img as any)._origUrl || img.imageUrl
-      forceDownload(dlUrl, `${sanitizeFilename(img.prompt)}.png`)
+      forceDownload(img.imageUrl, `${sanitizeFilename(img.prompt)}.png`)
       await new Promise(r => setTimeout(r, 300))
     }
   }

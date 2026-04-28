@@ -43,54 +43,29 @@ function taskStatusLabel(s: string) {
   return { pending: '排队中', running: '生成中', success: '成功', failed: '失败' }[s] || s
 }
 
-function postDownload(b64: string, filename: string) {
+function uploadAndDownload(b64: string, filename: string) {
   const token = localStorage.getItem('auth_token') || ''
-  let iframe = document.getElementById('_dl_frame') as HTMLIFrameElement
-  if (!iframe) {
-    iframe = document.createElement('iframe')
-    iframe.id = '_dl_frame'
-    iframe.name = '_dl_frame'
-    iframe.style.display = 'none'
-    document.body.appendChild(iframe)
+  const xhr = new XMLHttpRequest()
+  xhr.open('POST', `/v1/user/image-download?token=${encodeURIComponent(token)}`, false)
+  const fd = new FormData()
+  fd.append('data', b64)
+  fd.append('fn', filename)
+  xhr.send(fd)
+  if (xhr.status === 200) {
+    try {
+      const { url } = JSON.parse(xhr.responseText)
+      if (url) window.location.href = url
+    } catch {}
   }
-  const form = document.createElement('form')
-  form.method = 'POST'
-  form.action = `/v1/user/image-download?token=${encodeURIComponent(token)}`
-  form.target = '_dl_frame'
-  form.style.display = 'none'
-  const d = document.createElement('textarea')
-  d.name = 'data'; d.value = b64; form.appendChild(d)
-  const f = document.createElement('input')
-  f.name = 'fn'; f.value = filename; form.appendChild(f)
-  document.body.appendChild(form)
-  form.submit()
-  document.body.removeChild(form)
 }
 
 function forceDownload(url: string, filename: string) {
   if (url.startsWith('data:')) {
-    postDownload(url.slice(url.indexOf(',') + 1), filename)
-    return
-  }
-  if (url.startsWith('blob:')) {
-    fetch(url).then(r => r.blob()).then(blob => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const result = reader.result as string
-        postDownload(result.slice(result.indexOf(',') + 1), filename)
-      }
-      reader.readAsDataURL(blob)
-    }).catch(() => {})
+    uploadAndDownload(url.slice(url.indexOf(',') + 1), filename)
     return
   }
   const token = localStorage.getItem('auth_token') || ''
-  const a = document.createElement('a')
-  a.href = `/v1/user/image-proxy?url=${encodeURIComponent(url)}&fn=${encodeURIComponent(filename)}&token=${encodeURIComponent(token)}`
-  a.download = filename
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+  window.location.href = `/v1/user/image-proxy?url=${encodeURIComponent(url)}&fn=${encodeURIComponent(filename)}&token=${encodeURIComponent(token)}`
 }
 
 function downloadImage(task: GenerationTask, index: number) {
