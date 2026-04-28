@@ -190,13 +190,22 @@ func convertImageURLsToBase64(respBody []byte) []byte {
 		if _, hasB64 := m["b64_json"]; hasB64 {
 			continue
 		}
-		resp, err := client.Get(urlVal)
+		req, err := http.NewRequest("GET", urlVal, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+		resp, err := client.Do(req)
 		if err != nil {
 			continue
 		}
 		imgData, err := io.ReadAll(io.LimitReader(resp.Body, 20<<20))
 		resp.Body.Close()
-		if err != nil || len(imgData) == 0 {
+		if err != nil || len(imgData) == 0 || resp.StatusCode != 200 {
+			continue
+		}
+		contentType := resp.Header.Get("Content-Type")
+		if contentType != "" && !strings.HasPrefix(contentType, "image/") {
 			continue
 		}
 		m["b64_json"] = base64.StdEncoding.EncodeToString(imgData)

@@ -20,6 +20,10 @@ func (h *GatewayHandler) ImageProxy(c *gin.Context) {
 		return
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "upstream returned " + resp.Status})
+		return
+	}
 	contentType := resp.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
