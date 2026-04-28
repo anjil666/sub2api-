@@ -43,28 +43,19 @@ function taskStatusLabel(s: string) {
   return { pending: '排队中', running: '生成中', success: '成功', failed: '失败' }[s] || s
 }
 
-function uploadAndDownload(b64: string, filename: string) {
-  const token = localStorage.getItem('auth_token') || ''
-  const xhr = new XMLHttpRequest()
-  xhr.open('POST', `/v1/user/image-download?token=${encodeURIComponent(token)}`, false)
-  const fd = new FormData()
-  fd.append('data', b64)
-  fd.append('fn', filename)
-  xhr.send(fd)
-  if (xhr.status === 200) {
-    try {
-      const { url } = JSON.parse(xhr.responseText)
-      if (url) window.location.href = url
-    } catch {}
-  }
-}
-
 function forceDownload(url: string, filename: string) {
+  const token = localStorage.getItem('auth_token') || ''
   if (url.startsWith('data:')) {
-    uploadAndDownload(url.slice(url.indexOf(',') + 1), filename)
+    const b64 = url.slice(url.indexOf(',') + 1)
+    const fd = new FormData()
+    fd.append('data', b64)
+    fd.append('fn', filename)
+    fetch(`/v1/user/image-download?token=${encodeURIComponent(token)}`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => { if (j.url) window.location.href = j.url })
+      .catch(() => {})
     return
   }
-  const token = localStorage.getItem('auth_token') || ''
   window.location.href = `/v1/user/image-proxy?url=${encodeURIComponent(url)}&fn=${encodeURIComponent(filename)}&token=${encodeURIComponent(token)}`
 }
 
