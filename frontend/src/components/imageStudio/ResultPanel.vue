@@ -45,12 +45,21 @@ function taskStatusLabel(s: string) {
 
 function forceDownload(url: string, filename: string) {
   const token = localStorage.getItem('auth_token') || ''
-  if (url.startsWith('data:')) {
-    const b64 = url.slice(url.indexOf(',') + 1)
-    const fd = new FormData()
-    fd.append('data', b64)
-    fd.append('fn', filename)
-    fetch(`/v1/user/image-download?token=${encodeURIComponent(token)}`, { method: 'POST', body: fd })
+  if (url.startsWith('data:') || url.startsWith('blob:')) {
+    fetch(url)
+      .then(r => r.blob())
+      .then(blob => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve((reader.result as string).split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      }))
+      .then(b64 => {
+        const fd = new FormData()
+        fd.append('data', b64)
+        fd.append('fn', filename)
+        return fetch(`/v1/user/image-download?token=${encodeURIComponent(token)}`, { method: 'POST', body: fd })
+      })
       .then(r => r.json())
       .then(j => { if (j.url) window.location.href = j.url })
       .catch(() => {})

@@ -25,7 +25,7 @@
           <input type="checkbox" :checked="selectedIds.has(img.id)" class="cursor-pointer rounded" @click.stop="toggleSelect(img.id)" />
         </div>
         <div class="relative">
-          <img :src="img.imageUrl" class="aspect-square w-full cursor-pointer object-cover" loading="lazy" @click="previewSrc = img.imageUrl; previewVisible = true" @error="onImgError(img)" />
+          <img :src="getDisplayUrl(img)" class="aspect-square w-full cursor-pointer object-cover" loading="lazy" @click="previewSrc = getDisplayUrl(img); previewVisible = true" @error="onImgError(img)" />
           <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
             <svg class="h-8 w-8 text-white opacity-0 drop-shadow transition-opacity group-hover:opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
           </div>
@@ -59,8 +59,38 @@ const previewSrc = ref('')
 
 const allSelected = computed(() => images.value.length > 0 && images.value.every(i => selectedIds.value.has(i.id)))
 
+function dataUrlToBlobUrl(dataUrl: string): string {
+  const commaIdx = dataUrl.indexOf(',')
+  if (commaIdx < 0) return dataUrl
+  const meta = dataUrl.slice(0, commaIdx)
+  const mime = meta.replace('data:', '').replace(';base64', '') || 'image/png'
+  const b64 = dataUrl.slice(commaIdx + 1)
+  const bin = atob(b64)
+  const arr = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+  return URL.createObjectURL(new Blob([arr], { type: mime }))
+}
+
+const displayUrlMap = new Map<string, string>()
+
+function getDisplayUrl(img: ImageRecord): string {
+  if (!img.imageUrl.startsWith('data:')) return img.imageUrl
+  let blobUrl = displayUrlMap.get(img.id)
+  if (!blobUrl) {
+    blobUrl = dataUrlToBlobUrl(img.imageUrl)
+    displayUrlMap.set(img.id, blobUrl)
+  }
+  return blobUrl
+}
+
 async function load(reset = false) {
-  if (reset) { page.value = 0; images.value = []; hasMore.value = true }
+  if (reset) {
+    page.value = 0
+    displayUrlMap.forEach(u => URL.revokeObjectURL(u))
+    displayUrlMap.clear()
+    images.value = []
+    hasMore.value = true
+  }
   const mode = filterMode.value || undefined
   const items = await getImages(mode as any, pageSize, page.value * pageSize)
   if (reset) images.value = items; else images.value.push(...items)
@@ -89,12 +119,21 @@ async function deleteSelected() {
 
 function forceDownload(url: string, filename: string) {
   const token = localStorage.getItem('auth_token') || ''
-  if (url.startsWith('data:')) {
-    const b64 = url.slice(url.indexOf(',') + 1)
-    const fd = new FormData()
-    fd.append('data', b64)
-    fd.append('fn', filename)
-    fetch(`/v1/user/image-download?token=${encodeURIComponent(token)}`, { method: 'POST', body: fd })
+  if (url.startsWith('data:') || url.startsWith('blob:')) {
+    fetch(url)
+      .then(r => r.blob())
+      .then(blob => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve((reader.result as string).split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      }))
+      .then(b64 => {
+        const fd = new FormData()
+        fd.append('data', b64)
+        fd.append('fn', filename)
+        return fetch(`/v1/user/image-download?token=${encodeURIComponent(token)}`, { method: 'POST', body: fd })
+      })
       .then(r => r.json())
       .then(j => { if (j.url) window.location.href = j.url })
       .catch(() => {})
@@ -178,6 +217,10 @@ onMounted(() => {
   load(true)
   window.addEventListener('image-studio-saved', onSaved)
 })
-onUnmounted(() => window.removeEventListener('image-studio-saved', onSaved))
+onUnmounted(() => {
+  window.removeEventListener('image-studio-saved', onSaved)
+  displayUrlMap.forEach(u => URL.revokeObjectURL(u))
+  displayUrlMap.clear()
+})
 function onSaved() { load(true) }
 </script>
