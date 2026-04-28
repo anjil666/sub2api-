@@ -64,16 +64,14 @@ function forceDownload(url: string, filename: string) {
     triggerAnchorDownload(URL.createObjectURL(new Blob([arr], { type: 'application/octet-stream' })), filename)
     return
   }
-  fetch(url).then(r => { if (!r.ok) throw new Error(); return r.blob() }).then(blob => {
-    triggerAnchorDownload(URL.createObjectURL(new Blob([blob], { type: 'application/octet-stream' })), filename)
-  }).catch(() => {
-    const token = localStorage.getItem('auth_token')
-    fetch(`/v1/user/image-proxy?url=${encodeURIComponent(url)}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    }).then(r => { if (!r.ok) throw new Error(); return r.blob() }).then(blob => {
-      triggerAnchorDownload(URL.createObjectURL(new Blob([blob], { type: 'application/octet-stream' })), filename)
-    }).catch(() => {})
-  })
+  const token = localStorage.getItem('auth_token') || ''
+  const a = document.createElement('a')
+  a.href = `/v1/user/image-proxy?url=${encodeURIComponent(url)}&fn=${encodeURIComponent(filename)}&token=${encodeURIComponent(token)}`
+  a.download = filename
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
 }
 
 function downloadImage(task: GenerationTask, index: number) {

@@ -17,11 +17,15 @@ func NewJWTAuthMiddleware(authService *service.AuthService, userService *service
 // jwtAuth JWT认证中间件实现
 func jwtAuth(authService *service.AuthService, userService *service.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 从Authorization header中提取token
+		// 从Authorization header中提取token，fallback到query param ?token=
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			AbortWithError(c, 401, "UNAUTHORIZED", "Authorization header is required")
-			return
+			if qt := c.Query("token"); qt != "" {
+				authHeader = "Bearer " + qt
+			} else {
+				AbortWithError(c, 401, "UNAUTHORIZED", "Authorization header is required")
+				return
+			}
 		}
 
 		// 验证Bearer scheme
