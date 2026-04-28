@@ -43,6 +43,17 @@ function taskStatusLabel(s: string) {
   return { pending: '排队中', running: '生成中', success: '成功', failed: '失败' }[s] || s
 }
 
+function iframeDownload(url: string) {
+  let iframe = document.getElementById('_dl_iframe') as HTMLIFrameElement
+  if (!iframe) {
+    iframe = document.createElement('iframe')
+    iframe.id = '_dl_iframe'
+    iframe.style.display = 'none'
+    document.body.appendChild(iframe)
+  }
+  iframe.src = url
+}
+
 function forceDownload(url: string, filename: string) {
   const token = localStorage.getItem('auth_token') || ''
   if (url.startsWith('data:') || url.startsWith('blob:')) {
@@ -61,11 +72,11 @@ function forceDownload(url: string, filename: string) {
         return fetch(`/v1/user/image-download?token=${encodeURIComponent(token)}`, { method: 'POST', body: fd })
       })
       .then(r => r.json())
-      .then(j => { if (j.url) window.location.href = j.url })
+      .then(j => { if (j.url) iframeDownload(j.url) })
       .catch(() => {})
     return
   }
-  window.location.href = `/v1/user/image-proxy?url=${encodeURIComponent(url)}&fn=${encodeURIComponent(filename)}&token=${encodeURIComponent(token)}`
+  iframeDownload(`/v1/user/image-proxy?url=${encodeURIComponent(url)}&fn=${encodeURIComponent(filename)}&token=${encodeURIComponent(token)}`)
 }
 
 function downloadImage(task: GenerationTask, index: number) {
