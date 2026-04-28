@@ -110,7 +110,14 @@ function forceDownload(url: string, filename: string) {
   }
   fetch(url).then(r => r.blob()).then(blob => {
     triggerAnchorDownload(URL.createObjectURL(new Blob([blob], { type: 'application/octet-stream' })), filename)
-  }).catch(() => window.open(url, '_blank'))
+  }).catch(() => {
+    const token = localStorage.getItem('auth_token')
+    fetch(`/v1/user/image-proxy?url=${encodeURIComponent(url)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then(r => r.blob()).then(blob => {
+      triggerAnchorDownload(URL.createObjectURL(new Blob([blob], { type: 'application/octet-stream' })), filename)
+    }).catch(() => window.open(url, '_blank'))
+  })
 }
 
 function sanitizeFilename(prompt: string): string {
@@ -167,7 +174,10 @@ async function onImgError(img: ImageRecord) {
   if (fixingIds.has(img.id) || !img.imageUrl.startsWith('http')) return
   fixingIds.add(img.id)
   try {
-    const resp = await fetch(img.imageUrl)
+    const token = localStorage.getItem('auth_token')
+    const resp = await fetch(`/v1/user/image-proxy?url=${encodeURIComponent(img.imageUrl)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
     const blob = await resp.blob()
     const dataUrl: string = await new Promise((resolve, reject) => {
       const reader = new FileReader()

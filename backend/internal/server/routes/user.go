@@ -26,6 +26,7 @@ func RegisterUserRoutes(
 			user.PUT("/password", h.User.ChangePassword)
 			user.PUT("", h.User.UpdateProfile)
 			user.POST("/checkin", h.User.DailyCheckin)
+			user.GET("/image-proxy", h.Gateway.ImageProxy)
 
 			// 推荐返利
 			referral := user.Group("/referral")

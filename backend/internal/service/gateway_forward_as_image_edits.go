@@ -123,6 +123,8 @@ func (s *GatewayService) ForwardAsImageEdits(
 		return nil, fmt.Errorf("read upstream response: %w", err)
 	}
 
+	respBody = convertImageURLsToBase64(respBody)
+
 	c.Data(resp.StatusCode, "application/json", respBody)
 
 	// Extract billing fields from multipart form values
