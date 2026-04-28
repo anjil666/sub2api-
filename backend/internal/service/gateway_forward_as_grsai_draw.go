@@ -298,6 +298,7 @@ func (s *GatewayService) ForwardAsGrsaiDraw(
 		"data":    openaiData,
 	}
 	respJSON, _ := json.Marshal(openaiResp)
+	respJSON = convertImageURLsToBase64(respJSON)
 	c.Data(http.StatusOK, "application/json", respJSON)
 
 	imageCount := int(gjson.GetBytes(body, "n").Int())

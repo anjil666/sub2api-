@@ -25,7 +25,7 @@
           <input type="checkbox" :checked="selectedIds.has(img.id)" class="cursor-pointer rounded" @click.stop="toggleSelect(img.id)" />
         </div>
         <div class="relative">
-          <img :src="img.imageUrl" class="aspect-square w-full cursor-pointer object-cover" loading="lazy" @click="previewSrc = img.imageUrl; previewVisible = true" />
+          <img :src="img.imageUrl" class="aspect-square w-full cursor-pointer object-cover" loading="lazy" @click="previewSrc = img.imageUrl; previewVisible = true" @error="onImgError(img)" />
           <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
             <svg class="h-8 w-8 text-white opacity-0 drop-shadow transition-opacity group-hover:opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
           </div>
@@ -45,7 +45,7 @@
 </template>
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { getImages, deleteImages, type ImageRecord } from '@/utils/imageDB'
+import { getImages, deleteImages, saveImage, type ImageRecord } from '@/utils/imageDB'
 import ImagePreview from './ImagePreview.vue'
 
 const filterMode = ref<string>('')
@@ -160,6 +160,24 @@ async function downloadSelected() {
 function formatDate(ts: number) {
   const d = new Date(ts)
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+const fixingIds = new Set<string>()
+async function onImgError(img: ImageRecord) {
+  if (fixingIds.has(img.id) || !img.imageUrl.startsWith('http')) return
+  fixingIds.add(img.id)
+  try {
+    const resp = await fetch(img.imageUrl)
+    const blob = await resp.blob()
+    const dataUrl: string = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+    img.imageUrl = dataUrl
+    await saveImage({ ...img })
+  } catch {}
 }
 
 watch(filterMode, () => load(true))

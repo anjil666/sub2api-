@@ -3,6 +3,8 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -109,6 +111,8 @@ func (s *GatewayService) ForwardAsImageGenerations(
 		return nil, fmt.Errorf("read upstream response: %w", err)
 	}
 
+	respBody = convertImageURLsToBase64(respBody)
+
 	c.Data(resp.StatusCode, "application/json", respBody)
 
 	imageCount := int(gjson.GetBytes(body, "n").Int())
@@ -148,4 +152,59 @@ func parseOpenAIImageSize(size string) string {
 		}
 		return "1K"
 	}
+}
+
+func convertImageURLsToBase64(respBody []byte) []byte {
+	dataArr := gjson.GetBytes(respBody, "data")
+	if !dataArr.IsArray() {
+		return respBody
+	}
+	needConvert := false
+	for _, item := range dataArr.Array() {
+		if item.Get("url").Exists() && !item.Get("b64_json").Exists() {
+			needConvert = true
+			break
+		}
+	}
+	if !needConvert {
+		return respBody
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(respBody, &parsed); err != nil {
+		return respBody
+	}
+	dataSlice, ok := parsed["data"].([]any)
+	if !ok {
+		return respBody
+	}
+	client := &http.Client{Timeout: 30 * time.Second}
+	for _, item := range dataSlice {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		urlVal, hasURL := m["url"].(string)
+		if !hasURL || urlVal == "" {
+			continue
+		}
+		if _, hasB64 := m["b64_json"]; hasB64 {
+			continue
+		}
+		resp, err := client.Get(urlVal)
+		if err != nil {
+			continue
+		}
+		imgData, err := io.ReadAll(io.LimitReader(resp.Body, 20<<20))
+		resp.Body.Close()
+		if err != nil || len(imgData) == 0 {
+			continue
+		}
+		m["b64_json"] = base64.StdEncoding.EncodeToString(imgData)
+		delete(m, "url")
+	}
+	out, err := json.Marshal(parsed)
+	if err != nil {
+		return respBody
+	}
+	return out
 }
