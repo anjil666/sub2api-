@@ -1014,6 +1014,11 @@ func (s *UpstreamSyncService) ensureAccount(ctx context.Context, site *UpstreamS
 	if existing != nil && existing.ManagedAccountID != nil {
 		existingAccount, err := s.adminService.GetAccount(ctx, *existing.ManagedAccountID)
 		if err == nil && existingAccount != nil {
+			// 保留用户手动修改的 base_url
+			existingBaseURL := existingAccount.GetCredential("base_url")
+			if existingBaseURL != "" && existingBaseURL != strings.TrimRight(site.BaseURL, "/") {
+				credentials["base_url"] = existingBaseURL
+			}
 			accountName := fmt.Sprintf("上游: %s", site.Name)
 			if res.UpstreamKeyName != "" && res.UpstreamKeyName != "Manual API Key" {
 				accountName = fmt.Sprintf("%s (%s)", res.UpstreamKeyName, site.Name)
