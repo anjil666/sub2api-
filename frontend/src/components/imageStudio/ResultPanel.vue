@@ -43,45 +43,42 @@ function taskStatusLabel(s: string) {
   return { pending: '排队中', running: '生成中', success: '成功', failed: '失败' }[s] || s
 }
 
-function iframeDownload(url: string) {
-  let iframe = document.getElementById('_dl_iframe') as HTMLIFrameElement
-  if (!iframe) {
-    iframe = document.createElement('iframe')
-    iframe.id = '_dl_iframe'
-    iframe.style.display = 'none'
-    document.body.appendChild(iframe)
-  }
-  iframe.src = url
-}
-
-function forceDownload(url: string, filename: string) {
-  const token = localStorage.getItem('auth_token') || ''
-  if (url.startsWith('data:') || url.startsWith('blob:')) {
-    fetch(url)
-      .then(r => r.blob())
-      .then(blob => new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onloadend = () => resolve((reader.result as string).split(',')[1])
-        reader.onerror = reject
-        reader.readAsDataURL(blob)
-      }))
-      .then(b64 => {
-        const fd = new FormData()
-        fd.append('data', b64)
-        fd.append('fn', filename)
-        return fetch(`/v1/user/image-download?token=${encodeURIComponent(token)}`, { method: 'POST', body: fd })
-      })
-      .then(r => r.json())
-      .then(j => { if (j.url) iframeDownload(j.url) })
-      .catch(() => {})
-    return
-  }
-  iframeDownload(`/v1/user/image-proxy?url=${encodeURIComponent(url)}&fn=${encodeURIComponent(filename)}&token=${encodeURIComponent(token)}`)
+function clickDownload(blobUrl: string, filename: string) {
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
 }
 
 function downloadImage(task: GenerationTask, index: number) {
   const url = task.urls[index]
   if (!url) return
-  forceDownload(url, `image_${index + 1}.png`)
+  if (url.startsWith('blob:')) {
+    clickDownload(url, `image_${index + 1}.png`)
+    return
+  }
+  if (url.startsWith('data:')) {
+    const commaIdx = url.indexOf(',')
+    const b64 = url.slice(commaIdx + 1)
+    const meta = url.slice(0, commaIdx)
+    const mime = meta.replace('data:', '').replace(';base64', '') || 'image/png'
+    const bin = atob(b64)
+    const arr = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+    const blob = new Blob([arr], { type: mime })
+    const blobUrl = URL.createObjectURL(blob)
+    clickDownload(blobUrl, `image_${index + 1}.png`)
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 3000)
+    return
+  }
+  const token = localStorage.getItem('auth_token') || ''
+  const a = document.createElement('a')
+  a.href = `/v1/user/image-proxy?url=${encodeURIComponent(url)}&fn=${encodeURIComponent(`image_${index + 1}.png`)}&token=${encodeURIComponent(token)}`
+  a.download = `image_${index + 1}.png`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
 }
 </script>

@@ -117,40 +117,27 @@ async function deleteSelected() {
   load(true)
 }
 
-function iframeDownload(url: string) {
-  let iframe = document.getElementById('_dl_iframe') as HTMLIFrameElement
-  if (!iframe) {
-    iframe = document.createElement('iframe')
-    iframe.id = '_dl_iframe'
-    iframe.style.display = 'none'
-    document.body.appendChild(iframe)
+function clickDownload(url: string, filename: string) {
+  let blobUrl = url
+  let needRevoke = false
+  if (url.startsWith('data:')) {
+    const commaIdx = url.indexOf(',')
+    const b64 = url.slice(commaIdx + 1)
+    const meta = url.slice(0, commaIdx)
+    const mime = meta.replace('data:', '').replace(';base64', '') || 'image/png'
+    const bin = atob(b64)
+    const arr = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+    blobUrl = URL.createObjectURL(new Blob([arr], { type: mime }))
+    needRevoke = true
   }
-  iframe.src = url
-}
-
-function forceDownload(url: string, filename: string) {
-  const token = localStorage.getItem('auth_token') || ''
-  if (url.startsWith('data:') || url.startsWith('blob:')) {
-    fetch(url)
-      .then(r => r.blob())
-      .then(blob => new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onloadend = () => resolve((reader.result as string).split(',')[1])
-        reader.onerror = reject
-        reader.readAsDataURL(blob)
-      }))
-      .then(b64 => {
-        const fd = new FormData()
-        fd.append('data', b64)
-        fd.append('fn', filename)
-        return fetch(`/v1/user/image-download?token=${encodeURIComponent(token)}`, { method: 'POST', body: fd })
-      })
-      .then(r => r.json())
-      .then(j => { if (j.url) iframeDownload(j.url) })
-      .catch(() => {})
-    return
-  }
-  iframeDownload(`/v1/user/image-proxy?url=${encodeURIComponent(url)}&fn=${encodeURIComponent(filename)}&token=${encodeURIComponent(token)}`)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  if (needRevoke) setTimeout(() => URL.revokeObjectURL(blobUrl), 3000)
 }
 
 function sanitizeFilename(prompt: string): string {
@@ -158,42 +145,12 @@ function sanitizeFilename(prompt: string): string {
   return clean.slice(0, 30) || 'image'
 }
 
-async function urlToBlob(url: string): Promise<Blob> {
-  if (url.startsWith('data:')) {
-    const commaIdx = url.indexOf(',')
-    const b64 = url.slice(commaIdx + 1)
-    const bin = atob(b64)
-    const arr = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-    return new Blob([arr], { type: 'image/png' })
-  }
-  const r = await fetch(url)
-  return r.blob()
-}
-
 async function downloadSelected() {
   const sel = images.value.filter(i => selectedIds.value.has(i.id))
   if (!sel.length) return
-  if (sel.length === 1) {
-    forceDownload(sel[0].imageUrl, `${sanitizeFilename(sel[0].prompt)}.png`)
-    return
-  }
-  try {
-    const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' })
-    for (const img of sel) {
-      const blob = await urlToBlob(img.imageUrl)
-      const name = `${sanitizeFilename(img.prompt)}_${img.id.slice(0, 6)}.png`
-      const fileHandle = await dirHandle.getFileHandle(name, { create: true })
-      const writable = await fileHandle.createWritable()
-      await writable.write(blob)
-      await writable.close()
-    }
-  } catch (e: any) {
-    if (e.name === 'AbortError') return
-    for (const img of sel) {
-      forceDownload(img.imageUrl, `${sanitizeFilename(img.prompt)}.png`)
-      await new Promise(r => setTimeout(r, 300))
-    }
+  for (const img of sel) {
+    clickDownload(img.imageUrl, `${sanitizeFilename(img.prompt)}_${img.id.slice(0, 6)}.png`)
+    if (sel.length > 1) await new Promise(r => setTimeout(r, 300))
   }
 }
 
