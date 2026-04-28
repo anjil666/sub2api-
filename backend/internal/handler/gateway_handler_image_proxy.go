@@ -1,9 +1,13 @@
 package handler
 
 import (
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -32,22 +36,48 @@ func (h *GatewayHandler) ImageProxy(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "upstream returned " + resp.Status})
 		return
 	}
-	contentType := resp.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
 	fn := c.Query("fn")
 	if fn == "" {
 		fn = "image.png"
 	}
-	c.Header("Content-Disposition", "attachment; filename=\""+fn+"\"")
+	imgData, err := io.ReadAll(io.LimitReader(resp.Body, 50<<20))
+	if err != nil || len(imgData) == 0 {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to read image"})
+		return
+	}
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fn))
 	c.Header("Cache-Control", "no-cache")
-	c.Status(http.StatusOK)
-	c.Header("Content-Type", contentType)
-	io.Copy(c.Writer, io.LimitReader(resp.Body, 20<<20))
+	c.Data(http.StatusOK, "application/octet-stream", imgData)
 }
 
-func (h *GatewayHandler) ImageDownload(c *gin.Context) {
+type dlEntry struct {
+	data    []byte
+	name    string
+	created time.Time
+}
+
+var (
+	dlStore   sync.Map
+	dlCleanup sync.Once
+)
+
+func cleanupDLStore() {
+	go func() {
+		for {
+			time.Sleep(60 * time.Second)
+			now := time.Now()
+			dlStore.Range(func(key, value any) bool {
+				if e, ok := value.(*dlEntry); ok && now.Sub(e.created) > 5*time.Minute {
+					dlStore.Delete(key)
+				}
+				return true
+			})
+		}
+	}()
+}
+
+func (h *GatewayHandler) ImageDownloadPrepare(c *gin.Context) {
+	dlCleanup.Do(cleanupDLStore)
 	data := c.PostForm("data")
 	fn := c.PostForm("fn")
 	if fn == "" {
@@ -62,7 +92,23 @@ func (h *GatewayHandler) ImageDownload(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid base64"})
 		return
 	}
-	c.Header("Content-Disposition", "attachment; filename=\""+fn+"\"")
+	b := make([]byte, 16)
+	rand.Read(b)
+	id := hex.EncodeToString(b)
+	dlStore.Store(id, &dlEntry{data: imgData, name: fn, created: time.Now()})
+	token := c.Query("token")
+	c.Redirect(http.StatusFound, fmt.Sprintf("/v1/user/image-download/%s?token=%s", id, token))
+}
+
+func (h *GatewayHandler) ImageDownloadGet(c *gin.Context) {
+	id := c.Param("id")
+	val, ok := dlStore.LoadAndDelete(id)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "download expired"})
+		return
+	}
+	e := val.(*dlEntry)
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", e.name))
 	c.Header("Cache-Control", "no-cache")
-	c.Data(http.StatusOK, "application/octet-stream", imgData)
+	c.Data(http.StatusOK, "application/octet-stream", e.data)
 }

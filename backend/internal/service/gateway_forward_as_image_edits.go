@@ -117,7 +117,7 @@ func (s *GatewayService) ForwardAsImageEdits(
 		return nil, fmt.Errorf("upstream error: %d %s", resp.StatusCode, upstreamMsg)
 	}
 
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 50<<20))
 	if err != nil {
 		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "Failed to read upstream response")
 		return nil, fmt.Errorf("read upstream response: %w", err)
