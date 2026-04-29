@@ -61,6 +61,12 @@ func (s *GatewayService) ForwardAsImageEdits(
 		forwardBody = replaceMultipartField(body, contentType, "model", mappedModel)
 	}
 
+	originalSize := c.Request.FormValue("size")
+	needsUpscale := NeedsUpscale(originalSize)
+	if needsUpscale {
+		forwardBody = replaceMultipartField(forwardBody, contentType, "size", "1024x1024")
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "POST", targetURL, bytes.NewReader(forwardBody))
 	if err != nil {
 		return nil, fmt.Errorf("build upstream request: %w", err)
@@ -125,6 +131,13 @@ func (s *GatewayService) ForwardAsImageEdits(
 
 	respBody = convertImageURLsToBase64(respBody)
 
+	if needsUpscale {
+		targetW, targetH := ParseSizeDimensions(originalSize)
+		if targetW > 0 && targetH > 0 {
+			respBody = UpscaleResponseImages(respBody, targetW, targetH)
+		}
+	}
+
 	c.Data(resp.StatusCode, "application/json", respBody)
 
 	// Extract billing fields from multipart form values
@@ -134,7 +147,7 @@ func (s *GatewayService) ForwardAsImageEdits(
 			imageCount = n
 		}
 	}
-	imageSize := parseOpenAIImageSize(c.Request.FormValue("size"))
+	imageSize := parseOpenAIImageSize(originalSize)
 
 	upstreamModel := ""
 	if mappedModel != model {
