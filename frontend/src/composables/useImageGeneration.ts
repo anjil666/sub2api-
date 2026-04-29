@@ -93,7 +93,6 @@ export const STYLE_PRESETS: StylePreset[] = [
 ]
 
 const TIER_BASE: Record<string, number> = { '1K': 1024, '2K': 2048, '4K': 3840 }
-const TIER_QUALITY: Record<string, string> = { '1K': 'standard', '2K': 'hd', '4K': '4k' }
 
 export function computeSize(tier: ResolutionTier, ratioW: number, ratioH: number, customW?: number, customH?: number): string {
   if (tier === 'AUTO') return 'auto'
@@ -256,8 +255,7 @@ export function useImageGeneration() {
   )
 
   const qualityString = computed(() => {
-    if (qualityOverride.value) return qualityOverride.value
-    return TIER_QUALITY[resolutionTier.value] || undefined
+    return qualityOverride.value || undefined
   })
 
   const fullPrompt = computed(() => stylePreset.value.prefix + prompt.value)

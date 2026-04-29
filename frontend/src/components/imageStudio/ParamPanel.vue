@@ -33,13 +33,13 @@
         <input type="number" :value="customH" @input="$emit('update:customH', clamp($event))" step="16" min="256" max="3840" class="input !py-1 !text-xs" />
       </div>
     </div>
-    <div v-if="resolutionTier === 'custom' || resolutionTier === 'AUTO'">
-      <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400">质量</label>
+    <div>
+      <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400">思考强度</label>
       <select :value="qualityOverride" @change="$emit('update:qualityOverride', ($event.target as HTMLSelectElement).value)" class="input !py-1 !text-xs">
         <option value="">自动</option>
-        <option value="standard">标准 (1K)</option>
-        <option value="hd">高清 (2K)</option>
-        <option value="4k">超清 (4K)</option>
+        <option value="low">低</option>
+        <option value="medium">标准</option>
+        <option value="high">进阶</option>
       </select>
     </div>
     <div class="grid grid-cols-2 gap-2">

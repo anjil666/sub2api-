@@ -14,7 +14,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
-	"github.com/tidwall/sjson"
 	"go.uber.org/zap"
 )
 
@@ -33,12 +32,6 @@ func (s *GatewayService) ForwardAsImageGenerations(
 	}
 
 	originalModel := gjson.GetBytes(body, "model").String()
-
-	originalSize := gjson.GetBytes(body, "size").String()
-	needsUpscale := NeedsUpscale(originalSize)
-	if needsUpscale {
-		body, _ = sjson.SetBytes(body, "size", "1024x1024")
-	}
 
 	mappedModel := account.GetMappedModel(originalModel)
 	if mappedModel != originalModel {
@@ -120,13 +113,6 @@ func (s *GatewayService) ForwardAsImageGenerations(
 
 	respBody = convertImageURLsToBase64(respBody)
 
-	if needsUpscale {
-		targetW, targetH := ParseSizeDimensions(originalSize)
-		if targetW > 0 && targetH > 0 {
-			respBody = UpscaleResponseImages(respBody, targetW, targetH)
-		}
-	}
-
 	c.Data(resp.StatusCode, "application/json", respBody)
 
 	imageCount := int(gjson.GetBytes(body, "n").Int())
@@ -134,7 +120,7 @@ func (s *GatewayService) ForwardAsImageGenerations(
 		imageCount = 1
 	}
 
-	imageSize := parseOpenAIImageSize(originalSize)
+	imageSize := parseOpenAIImageSize(gjson.GetBytes(body, "size").String())
 
 	upstreamModel := ""
 	if mappedModel != originalModel {
