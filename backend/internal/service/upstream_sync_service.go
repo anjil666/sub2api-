@@ -1276,6 +1276,18 @@ func maskAPIKey(key string) string {
 
 // buildModelPricing 根据上游模型列表和倍率构建定价
 func (s *UpstreamSyncService) buildModelPricing(models []UpstreamModelInfo, multiplier float64) []ChannelModelPricing {
+	// Deduplicate models by ID before processing
+	seen := make(map[string]struct{}, len(models))
+	dedupModels := make([]UpstreamModelInfo, 0, len(models))
+	for _, m := range models {
+		if _, ok := seen[m.ID]; ok {
+			continue
+		}
+		seen[m.ID] = struct{}{}
+		dedupModels = append(dedupModels, m)
+	}
+	models = dedupModels
+
 	// 分离图片模型和文本模型
 	var imageModels []UpstreamModelInfo
 	var textModels []UpstreamModelInfo
@@ -1448,8 +1460,13 @@ func groupModelsByPricing(modelNames []string, multiplier float64) []pricingGrou
 
 	groups := make(map[priceKey]*pricingGroup)
 	var unknownModels []string
+	seen := make(map[string]struct{}, len(modelNames))
 
 	for _, name := range modelNames {
+		if _, dup := seen[name]; dup {
+			continue
+		}
+		seen[name] = struct{}{}
 		price, known := lookupModelPrice(name)
 		if !known {
 			unknownModels = append(unknownModels, name)
