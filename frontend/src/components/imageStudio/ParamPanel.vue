@@ -33,14 +33,24 @@
         <input type="number" :value="customH" @input="$emit('update:customH', clamp($event))" step="16" min="256" max="3840" class="input !py-1 !text-xs" />
       </div>
     </div>
-    <div>
-      <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400">思考强度</label>
-      <select :value="qualityOverride" @change="$emit('update:qualityOverride', ($event.target as HTMLSelectElement).value)" class="input !py-1 !text-xs">
-        <option value="">自动</option>
-        <option value="low">低</option>
-        <option value="medium">标准</option>
-        <option value="high">进阶</option>
-      </select>
+    <div class="grid grid-cols-2 gap-2">
+      <div>
+        <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400">思考强度</label>
+        <select :value="qualityOverride" @change="$emit('update:qualityOverride', ($event.target as HTMLSelectElement).value)" class="input !py-1 !text-xs">
+          <option value="">自动</option>
+          <option value="low">低</option>
+          <option value="medium">标准</option>
+          <option value="high">进阶</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400">放大锐化</label>
+        <select :value="upscaleMode" @change="$emit('update:upscaleMode', ($event.target as HTMLSelectElement).value)" class="input !py-1 !text-xs">
+          <option value="">原图</option>
+          <option value="2K">2K</option>
+          <option value="4K">4K</option>
+        </select>
+      </div>
     </div>
     <div class="grid grid-cols-2 gap-2">
       <div>
@@ -76,6 +86,7 @@ const props = defineProps<{
   stylePreset: StylePreset
   imageCount: number
   qualityOverride: string
+  upscaleMode: string
   compact?: boolean
   disabled4K?: boolean
 }>()
@@ -90,6 +101,7 @@ const emit = defineEmits<{
   'update:stylePreset': [v: StylePreset]
   'update:imageCount': [v: number]
   'update:qualityOverride': [v: string]
+  'update:upscaleMode': [v: string]
 }>()
 
 interface Preset { tier: ResolutionTier; ratio: AspectRatio; pixels: string }

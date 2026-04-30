@@ -40,7 +40,7 @@
         <div class="card p-3">
           <ParamPanel v-bind="paramBindings" @update:resolutionTier="resolutionTier = $event" @update:selectedRatio="selectedRatio = $event"
             @update:customW="customW = $event" @update:customH="customH = $event" @update:outputFormat="outputFormat = $event as any"
-            @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" @update:qualityOverride="qualityOverride = $event" />
+            @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" @update:qualityOverride="qualityOverride = $event" @update:upscaleMode="upscaleMode = $event" />
         </div>
         <div class="card flex min-w-0 flex-col gap-2 p-3">
           <div class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">创意描述提示词</div>
@@ -72,7 +72,7 @@
         <div class="card p-3">
           <ParamPanel v-bind="paramBindings" @update:resolutionTier="resolutionTier = $event" @update:selectedRatio="selectedRatio = $event"
             @update:customW="customW = $event" @update:customH="customH = $event" @update:outputFormat="outputFormat = $event as any"
-            @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" @update:qualityOverride="qualityOverride = $event" />
+            @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" @update:qualityOverride="qualityOverride = $event" @update:upscaleMode="upscaleMode = $event" />
         </div>
         <div class="card flex min-w-0 flex-col gap-2 p-3">
           <div class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">创意描述提示词</div>
@@ -109,7 +109,7 @@
           <div v-if="batchParamOpen" class="mt-3 border-t pt-3 dark:border-dark-600">
             <ParamPanel v-bind="paramBindings" @update:resolutionTier="resolutionTier = $event" @update:selectedRatio="selectedRatio = $event"
               @update:customW="customW = $event" @update:customH="customH = $event" @update:outputFormat="outputFormat = $event as any"
-              @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" @update:qualityOverride="qualityOverride = $event" />
+              @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" @update:qualityOverride="qualityOverride = $event" @update:upscaleMode="upscaleMode = $event" />
           </div>
         </div>
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -146,7 +146,7 @@
           <div v-if="storyParamOpen" class="mt-3 grid grid-cols-1 gap-3 border-t pt-3 dark:border-dark-600 lg:grid-cols-2">
             <ParamPanel v-bind="paramBindings" @update:resolutionTier="resolutionTier = $event" @update:selectedRatio="selectedRatio = $event"
               @update:customW="customW = $event" @update:customH="customH = $event" @update:outputFormat="outputFormat = $event as any"
-              @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" @update:qualityOverride="qualityOverride = $event" />
+              @update:outputCompression="outputCompression = $event" @update:stylePreset="stylePreset = $event" @update:imageCount="imageCount = $event" @update:qualityOverride="qualityOverride = $event" @update:upscaleMode="upscaleMode = $event" />
             <div class="space-y-1.5">
               <label class="text-xs font-medium text-gray-600 dark:text-gray-400">角色参考图 ({{ storyCharacterFiles.length }}/4张，所有场景共用)</label>
               <FileDropZone :files="storyCharacterFiles" :max="4" accept="image/*" @update="storyCharacterFiles = $event" :compact="true" />
@@ -188,7 +188,7 @@ const {
   activeTab, loading, loadingGroups, error, elapsed,
   groups, selectedGroupId, selectedModel, imageModels, groupApiKey,
   resolutionTier, selectedRatio, customW, customH, outputFormat, outputCompression,
-  stylePreset, imageCount, prompt, is4KEnabled, qualityOverride,
+  stylePreset, imageCount, prompt, is4KEnabled, qualityOverride, upscaleMode,
   maskFile, multiFiles,
   generationTasks,
   batchTasks, batchProgress,
@@ -219,6 +219,7 @@ const paramBindings = computed(() => ({
   imageCount: imageCount.value,
   disabled4K: !is4KEnabled.value,
   qualityOverride: qualityOverride.value,
+  upscaleMode: upscaleMode.value,
 }))
 
 function statusClass(s: string) {

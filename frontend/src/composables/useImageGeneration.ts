@@ -94,6 +94,53 @@ export const STYLE_PRESETS: StylePreset[] = [
 
 const TIER_BASE: Record<string, number> = { '1K': 1024, '2K': 2048, '4K': 3840 }
 
+const UPSCALE_LONG_SIDE: Record<string, number> = { '2K': 2560, '4K': 3840 }
+
+function upscaleAndSharpen(dataUrl: string, mode: string): Promise<string> {
+  const longSide = UPSCALE_LONG_SIDE[mode]
+  if (!longSide) return Promise.resolve(dataUrl)
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const { naturalWidth: sw, naturalHeight: sh } = img
+      const maxDim = Math.max(sw, sh)
+      if (maxDim >= longSide) { resolve(dataUrl); return }
+      const scale = longSide / maxDim
+      const tw = Math.round(sw * scale)
+      const th = Math.round(sh * scale)
+      const c = document.createElement('canvas')
+      c.width = tw; c.height = th
+      const ctx = c.getContext('2d')!
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(img, 0, 0, tw, th)
+      const id = ctx.getImageData(0, 0, tw, th)
+      applySharpen(id, 0.6)
+      ctx.putImageData(id, 0, 0)
+      resolve(c.toDataURL('image/png'))
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
+
+function applySharpen(id: ImageData, amount: number) {
+  const { data, width: w, height: h } = id
+  const copy = new Uint8ClampedArray(data)
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = (y * w + x) * 4
+      for (let c = 0; c < 3; c++) {
+        const center = copy[i + c] * 5
+        const neighbors = copy[((y - 1) * w + x) * 4 + c] + copy[((y + 1) * w + x) * 4 + c]
+          + copy[(y * w + x - 1) * 4 + c] + copy[(y * w + x + 1) * 4 + c]
+        const sharp = center - neighbors
+        data[i + c] = Math.max(0, Math.min(255, Math.round(copy[i + c] + amount * (sharp - copy[i + c]) / 4)))
+      }
+    }
+  }
+}
+
 export function computeSize(tier: ResolutionTier, ratioW: number, ratioH: number, customW?: number, customH?: number): string {
   if (tier === 'AUTO') return 'auto'
   if (tier === 'custom') {
@@ -210,6 +257,7 @@ export function useImageGeneration() {
   const imageCount = ref(1)
   const prompt = ref('')
   const qualityOverride = ref('')
+  const upscaleMode = ref('')
 
   // single edit (legacy)
   const maskFile = ref<File | null>(null)
@@ -374,6 +422,13 @@ export function useImageGeneration() {
         }
       }
       task.urls = extracted.map(e => e.display)
+      if (upscaleMode.value && task.urls.length) {
+        task.urls = await Promise.all(task.urls.map(u => upscaleAndSharpen(u, upscaleMode.value)))
+        for (let i = 0; i < extracted.length; i++) {
+          extracted[i].display = task.urls[i]
+          extracted[i].storage = task.urls[i]
+        }
+      }
       task.status = task.urls.length ? 'success' : 'failed'
       if (!task.urls.length) task.error = '未返回有效图片数据'
       for (const img of extracted) {
@@ -623,7 +678,7 @@ export function useImageGeneration() {
     activeTab, loading, loadingGroups, error, elapsed,
     groups: imageGroups, selectedGroupId, selectedGroup, selectedModel, imageModels, groupApiKey,
     resolutionTier, selectedRatio, customW, customH, outputFormat, outputCompression,
-    stylePreset, imageCount, prompt, fullPrompt, sizeString, is4KEnabled, qualityOverride,
+    stylePreset, imageCount, prompt, fullPrompt, sizeString, is4KEnabled, qualityOverride, upscaleMode,
     maskFile, multiFiles,
     resultUrls, generationTasks,
     batchTasks, batchProgress,
