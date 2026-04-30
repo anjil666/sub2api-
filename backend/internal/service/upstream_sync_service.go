@@ -936,7 +936,8 @@ func (s *UpstreamSyncService) ensureGroup(ctx context.Context, site *UpstreamSit
 				g.RateMultiplier = effectiveMultiplier
 				needUpdate = true
 			}
-			if g.Name != groupName {
+			// Don't overwrite group name if user has customized it
+			if g.Name == "" {
 				g.Name = groupName
 				needUpdate = true
 			}
@@ -1156,7 +1157,17 @@ func (s *UpstreamSyncService) fetchModelsWithKey(ctx context.Context, site *Upst
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
-	return result.Data, nil
+	// Deduplicate models by ID (some upstreams return duplicates)
+	seen := make(map[string]struct{}, len(result.Data))
+	deduped := make([]UpstreamModelInfo, 0, len(result.Data))
+	for _, m := range result.Data {
+		if _, ok := seen[m.ID]; ok {
+			continue
+		}
+		seen[m.ID] = struct{}{}
+		deduped = append(deduped, m)
+	}
+	return deduped, nil
 }
 
 // fetchGrsaiModels grsai 没有 /v1/models 端点，通过验证 API Key 有效性来确认，返回已知模型列表
