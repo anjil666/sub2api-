@@ -863,8 +863,17 @@ func toModelEntry(pattern string) modelEntry {
 // 冲突包括：精确重复、通配符之间的前缀包含、通配符与精确名的前缀匹配。
 func validateNoConflictingModels(pricingList []ChannelModelPricing) error {
 	byPlatform := make(map[string][]modelEntry)
+	seenByPlatform := make(map[string]map[string]struct{})
 	for _, p := range pricingList {
+		if seenByPlatform[p.Platform] == nil {
+			seenByPlatform[p.Platform] = make(map[string]struct{})
+		}
 		for _, model := range p.Models {
+			lower := strings.ToLower(model)
+			if _, dup := seenByPlatform[p.Platform][lower]; dup {
+				continue
+			}
+			seenByPlatform[p.Platform][lower] = struct{}{}
 			byPlatform[p.Platform] = append(byPlatform[p.Platform], toModelEntry(model))
 		}
 	}
