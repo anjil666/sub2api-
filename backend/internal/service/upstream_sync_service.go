@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 )
 
 // UpstreamSyncService 上游站点同步服务
@@ -190,22 +192,37 @@ func (s *UpstreamSyncService) DeleteSiteWithResources(ctx context.Context, siteI
 	}
 
 	// 2. 逐个删除本地资源（渠道 → 账号 → 分组 顺序，避免外键冲突）
+	deletedAccountIDs := make(map[int64]bool)
+	deletedGroupIDs := make(map[int64]bool)
+	deletedChannelIDs := make(map[int64]bool)
 	for _, res := range resources {
 		if res.ManagedChannelID != nil {
 			if err := s.channelService.Delete(ctx, *res.ManagedChannelID); err != nil {
 				log.Printf("[UpstreamSync] Warning: failed to delete channel %d: %v", *res.ManagedChannelID, err)
+			} else {
+				deletedChannelIDs[*res.ManagedChannelID] = true
 			}
 		}
 		if res.ManagedAccountID != nil {
 			if err := s.adminService.DeleteAccount(ctx, *res.ManagedAccountID); err != nil {
 				log.Printf("[UpstreamSync] Warning: failed to delete account %d: %v", *res.ManagedAccountID, err)
+			} else {
+				deletedAccountIDs[*res.ManagedAccountID] = true
 			}
 		}
 		if res.ManagedGroupID != nil {
 			if err := s.adminService.DeleteGroup(ctx, *res.ManagedGroupID); err != nil {
 				log.Printf("[UpstreamSync] Warning: failed to delete group %d: %v", *res.ManagedGroupID, err)
+			} else {
+				deletedGroupIDs[*res.ManagedGroupID] = true
 			}
 		}
+	}
+
+	// 2.5 兜底：按命名规则清理 managed_resources 未跟踪的孤儿资源
+	site, _ := s.siteRepo.GetByID(ctx, siteID)
+	if site != nil {
+		s.cleanupOrphanedResources(ctx, site.Name, deletedChannelIDs, deletedAccountIDs, deletedGroupIDs)
 	}
 
 	// 3. 删除 managed resources 记录
@@ -215,6 +232,58 @@ func (s *UpstreamSyncService) DeleteSiteWithResources(ctx context.Context, siteI
 
 	// 4. 删除站点
 	return s.siteRepo.Delete(ctx, siteID)
+}
+
+// cleanupOrphanedResources 按命名规则兜底清理未被 managed_resources 跟踪的孤儿资源
+func (s *UpstreamSyncService) cleanupOrphanedResources(ctx context.Context, siteName string, deletedChannels, deletedAccounts, deletedGroups map[int64]bool) {
+	exactPrefix := fmt.Sprintf("上游: %s", siteName)
+	suffix := fmt.Sprintf("(%s)", siteName)
+
+	matchName := func(name string) bool {
+		return name == exactPrefix || strings.HasSuffix(name, suffix)
+	}
+
+	// 清理孤儿 channels
+	channels, _, err := s.channelService.List(ctx, pagination.PaginationParams{Page: 1, PageSize: 500}, "", siteName)
+	if err == nil {
+		for _, ch := range channels {
+			if matchName(ch.Name) && !deletedChannels[ch.ID] {
+				if err := s.channelService.Delete(ctx, ch.ID); err != nil {
+					log.Printf("[UpstreamSync] Warning: failed to cleanup orphaned channel %d (%s): %v", ch.ID, ch.Name, err)
+				} else {
+					log.Printf("[UpstreamSync] Cleaned up orphaned channel %d (%s)", ch.ID, ch.Name)
+				}
+			}
+		}
+	}
+
+	// 清理孤儿 accounts
+	accounts, _, err := s.adminService.ListAccounts(ctx, 1, 500, "", "", "", siteName, 0, "", "", "")
+	if err == nil {
+		for _, acc := range accounts {
+			if matchName(acc.Name) && !deletedAccounts[acc.ID] {
+				if err := s.adminService.DeleteAccount(ctx, acc.ID); err != nil {
+					log.Printf("[UpstreamSync] Warning: failed to cleanup orphaned account %d (%s): %v", acc.ID, acc.Name, err)
+				} else {
+					log.Printf("[UpstreamSync] Cleaned up orphaned account %d (%s)", acc.ID, acc.Name)
+				}
+			}
+		}
+	}
+
+	// 清理孤儿 groups
+	groups, _, err := s.adminService.ListGroups(ctx, 1, 500, "", "", siteName, nil, "", "")
+	if err == nil {
+		for _, g := range groups {
+			if matchName(g.Name) && !deletedGroups[g.ID] {
+				if err := s.adminService.DeleteGroup(ctx, g.ID); err != nil {
+					log.Printf("[UpstreamSync] Warning: failed to cleanup orphaned group %d (%s): %v", g.ID, g.Name, err)
+				} else {
+					log.Printf("[UpstreamSync] Cleaned up orphaned group %d (%s)", g.ID, g.Name)
+				}
+			}
+		}
+	}
 }
 
 // ListManagedResources 列出站点的托管资源
