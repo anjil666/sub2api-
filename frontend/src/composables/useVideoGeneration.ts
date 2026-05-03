@@ -21,7 +21,7 @@ function translateError(msg: string): string {
     [/network error/i, '网络错误，请检查连接'],
     [/content policy/i, '内容违反安全策略，请修改提示词'],
     [/billing/i, '账户余额不足'],
-    [/unauthorized|401/i, '认证失败，请检查密钥'],
+    [/unauthorized|401/i, '认证已过期，请重新登录'],
     [/forbidden|403/i, '无权限访问'],
     [/bad gateway|502/i, '当前分组维护中，请更换分组重试'],
     [/service unavailable|503/i, '当前分组维护中，请更换分组重试'],

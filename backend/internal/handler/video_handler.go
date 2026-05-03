@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -69,8 +70,8 @@ func (h *VideoHandler) Generate(c *gin.Context) {
 		return
 	}
 
-	userID, exists := c.Get("user_id")
-	if !exists {
+	authSubject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok {
 		response.Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -78,8 +79,7 @@ func (h *VideoHandler) Generate(c *gin.Context) {
 	settings, _ := h.settingService.GetAllSettings(c.Request.Context())
 	price := settings.VideoDefaultPrice
 	if price > 0 {
-		uid, _ := userID.(int64)
-		balance, err := h.billingCacheService.GetUserBalance(c.Request.Context(), uid)
+		balance, err := h.billingCacheService.GetUserBalance(c.Request.Context(), authSubject.UserID)
 		if err != nil || balance < price {
 			response.Error(c, http.StatusPaymentRequired, "insufficient balance")
 			return
@@ -110,10 +110,9 @@ func (h *VideoHandler) Generate(c *gin.Context) {
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 && price > 0 {
-		uid, _ := userID.(int64)
 		go func() {
 			_, _ = h.usageService.Create(c.Request.Context(), service.CreateUsageLogRequest{
-				UserID:         uid,
+				UserID:         authSubject.UserID,
 				RequestID:      uuid.New().String(),
 				Model:          req.Model,
 				TotalCost:      price,
@@ -231,8 +230,8 @@ func (h *VideoHandler) GenerateFromImage(c *gin.Context) {
 		return
 	}
 
-	userID, exists := c.Get("user_id")
-	if !exists {
+	authSubject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok {
 		response.Error(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -240,8 +239,7 @@ func (h *VideoHandler) GenerateFromImage(c *gin.Context) {
 	settings, _ := h.settingService.GetAllSettings(c.Request.Context())
 	price := settings.VideoDefaultPrice
 	if price > 0 {
-		uid, _ := userID.(int64)
-		balance, err := h.billingCacheService.GetUserBalance(c.Request.Context(), uid)
+		balance, err := h.billingCacheService.GetUserBalance(c.Request.Context(), authSubject.UserID)
 		if err != nil || balance < price {
 			response.Error(c, http.StatusPaymentRequired, "insufficient balance")
 			return
@@ -281,10 +279,9 @@ func (h *VideoHandler) GenerateFromImage(c *gin.Context) {
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 && price > 0 {
-		uid, _ := userID.(int64)
 		go func() {
 			_, _ = h.usageService.Create(c.Request.Context(), service.CreateUsageLogRequest{
-				UserID:         uid,
+				UserID:         authSubject.UserID,
 				RequestID:      uuid.New().String(),
 				Model:          "img2video",
 				TotalCost:      price,
