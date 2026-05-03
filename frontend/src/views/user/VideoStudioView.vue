@@ -3,27 +3,13 @@
     <div class="space-y-3">
       <!-- Header -->
       <div class="card flex flex-wrap items-center gap-3 p-3">
-        <div class="flex items-center gap-2">
-          <label class="text-sm font-medium text-gray-700 dark:text-gray-300">分组</label>
-          <select v-model="selectedGroupId" class="input !w-auto !py-1.5 !text-sm">
-            <option v-for="g in groups" :key="g.group_id" :value="g.group_id">
-              {{ cleanGroupName(g.group_name) }}
-            </option>
-          </select>
-          <button @click="loadGroupsAndKeys" class="btn-secondary !rounded-lg !px-2 !py-1" title="刷新">
-            <svg class="h-4 w-4" :class="{ 'animate-spin': loadingGroups }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          </button>
-        </div>
         <div v-if="price" class="text-xs text-gray-500 dark:text-gray-400">
           单次: <span class="font-medium text-emerald-600 dark:text-emerald-400">${{ price }}</span>
         </div>
         <div v-if="error" class="text-sm text-red-500">{{ error }}</div>
-        <div v-else-if="!groupApiKey && groups.length" class="text-xs text-amber-600 dark:text-amber-400">
-          提示：请先在「API密钥」页面创建密钥并绑定视频分组
-        </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
         <!-- Left: Input -->
         <div class="lg:col-span-2 card p-4 space-y-4">
           <!-- Tab -->
@@ -97,7 +83,7 @@
               </button>
             </div>
             <textarea v-model="prompt" rows="4" :placeholder="activeTab === 'text' ? '描述你想生成的视频内容...' : '描述视频动作（可选）...'"
-              class="input !text-sm w-full resize-none"></textarea>
+              class="input !text-sm w-full resize-y"></textarea>
           </div>
 
           <!-- Submit -->
@@ -110,8 +96,9 @@
         </div>
 
         <!-- Right: Tasks -->
-        <div class="card p-4 space-y-3">
+        <div class="lg:col-span-3 card p-4 space-y-3">
           <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">生成任务</h3>
+          <p class="text-xs text-amber-600 dark:text-amber-400">视频及时下载，避免重要资源丢失</p>
           <div v-if="!tasks.length" class="text-center py-8 text-sm text-gray-400">暂无任务</div>
           <div v-for="task in tasks" :key="task.id" class="border rounded-lg p-3 space-y-2 border-gray-200 dark:border-dark-600">
             <div class="flex items-center justify-between">
@@ -145,21 +132,16 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import { useVideoGeneration } from '@/composables/useVideoGeneration'
 
 const {
-  loadingGroups, submitting, enhancing, error,
-  groups, selectedGroupId, groupApiKey,
+  submitting, enhancing, error,
   price, videoModels, selectedModel,
   prompt, aspectRatio, generateCount, imageFile, activeTab,
   tasks,
-  loadGroupsAndKeys, enhancePrompt,
+  fetchPrice, enhancePrompt,
   submitTextGeneration, submitImg2Video,
   removeTask,
 } = useVideoGeneration()
 
 const fileInput = ref<HTMLInputElement | null>(null)
-
-function cleanGroupName(name: string): string {
-  return name.replace(/\[.*?\]/g, '').trim() || name
-}
 
 function onImageChange(e: Event) {
   const input = e.target as HTMLInputElement
@@ -169,6 +151,6 @@ function onImageChange(e: Event) {
 }
 
 onMounted(() => {
-  loadGroupsAndKeys()
+  fetchPrice()
 })
 </script>

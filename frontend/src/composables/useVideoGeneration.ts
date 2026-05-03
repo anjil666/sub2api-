@@ -1,7 +1,5 @@
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { apiClient } from '@/api/client'
-import { keysAPI } from '@/api/keys'
-import { modelsAPI, type GroupModels } from '@/api/models'
 
 export interface VideoTask {
   id: string
@@ -40,14 +38,9 @@ function extractApiError(e: any): string {
 }
 
 export function useVideoGeneration() {
-  const loadingGroups = ref(false)
   const submitting = ref(false)
   const enhancing = ref(false)
   const error = ref('')
-
-  const groups = ref<GroupModels[]>([])
-  const apiKeys = ref<{ key: string; group_id: number | null }[]>([])
-  const selectedGroupId = ref<number | null>(null)
 
   const prompt = ref('')
   const aspectRatio = ref('9:16')
@@ -61,38 +54,6 @@ export function useVideoGeneration() {
   const tasks = ref<VideoTask[]>([])
   const pollTimers = new Map<string, ReturnType<typeof setInterval>>()
 
-  const videoGroups = computed(() =>
-    groups.value.filter(g => g.video_studio_enabled)
-  )
-  const selectedGroup = computed(() =>
-    videoGroups.value.find(g => g.group_id === selectedGroupId.value) || null
-  )
-  const groupApiKey = computed(() => {
-    if (!selectedGroupId.value) return ''
-    const k = apiKeys.value.find(k => k.group_id === selectedGroupId.value)
-    return k?.key || ''
-  })
-
-  async function loadGroupsAndKeys() {
-    loadingGroups.value = true
-    error.value = ''
-    try {
-      const [gData, kData] = await Promise.all([
-        modelsAPI.getGroupedModels(),
-        keysAPI.list(1, 200),
-      ])
-      groups.value = gData
-      apiKeys.value = kData.items.filter(k => k.status === 'active').map(k => ({ key: k.key, group_id: k.group_id }))
-      if (!selectedGroupId.value && videoGroups.value.length) {
-        selectedGroupId.value = videoGroups.value[0].group_id
-      }
-    } catch (e: any) {
-      error.value = extractApiError(e) || '加载分组失败'
-    } finally {
-      loadingGroups.value = false
-    }
-  }
-
   async function fetchPrice() {
     try {
       const { data } = await apiClient.get('/user/video/models')
@@ -104,10 +65,6 @@ export function useVideoGeneration() {
       }
     } catch { /* ignore */ }
   }
-
-  watch(selectedGroupId, () => {
-    fetchPrice()
-  })
 
   async function enhancePrompt() {
     if (!prompt.value.trim()) return
@@ -222,12 +179,11 @@ export function useVideoGeneration() {
   })
 
   return {
-    loadingGroups, submitting, enhancing, error,
-    groups: videoGroups, selectedGroupId, selectedGroup, groupApiKey,
+    submitting, enhancing, error,
     price, videoModels, selectedModel,
     prompt, aspectRatio, generateCount, imageFile, activeTab,
     tasks,
-    loadGroupsAndKeys, enhancePrompt,
+    fetchPrice, enhancePrompt,
     submitTextGeneration, submitImg2Video,
     removeTask,
   }
