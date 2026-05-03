@@ -56,7 +56,7 @@ export function useVideoGeneration() {
 
   async function fetchPrice() {
     try {
-      const { data } = await apiClient.get('/user/video/models')
+      const { data } = await apiClient.get('/video/models')
       const resp = data.data || data
       price.value = resp.price || 0
       videoModels.value = resp.models || []
@@ -71,7 +71,7 @@ export function useVideoGeneration() {
     enhancing.value = true
     error.value = ''
     try {
-      const { data } = await apiClient.post('/user/video/prompt/enhance', {
+      const { data } = await apiClient.post('/video/prompt/enhance', {
         prompt: prompt.value,
       })
       const resp = data.data || data
@@ -89,7 +89,7 @@ export function useVideoGeneration() {
     error.value = ''
     try {
       for (let i = 0; i < generateCount.value; i++) {
-        const { data } = await apiClient.post('/user/video/generations', {
+        const { data } = await apiClient.post('/video/generations', {
           model: selectedModel.value || 'veo-3.1',
           prompt: prompt.value,
           aspect_ratio: aspectRatio.value,
@@ -123,7 +123,7 @@ export function useVideoGeneration() {
       formData.append('image', imageFile.value)
       formData.append('prompt', prompt.value)
       formData.append('aspect_ratio', aspectRatio.value)
-      const { data } = await apiClient.post('/user/video/img2video', formData, {
+      const { data } = await apiClient.post('/video/img2video', formData, {
         timeout: 600000,
       })
       const resp = data.data || data
@@ -149,7 +149,7 @@ export function useVideoGeneration() {
     if (pollTimers.has(taskId)) return
     const timer = setInterval(async () => {
       try {
-        const { data } = await apiClient.get(`/user/video/generations/${taskId}`)
+        const { data } = await apiClient.get(`/video/generations/${taskId}`)
         const resp = data.data || data
         const task = tasks.value.find(t => t.id === taskId)
         if (!task) { stopPolling(taskId); return }
