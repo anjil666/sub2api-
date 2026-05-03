@@ -306,6 +306,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/video-studio',
+    name: 'VideoStudio',
+    component: () => import('@/views/user/VideoStudioView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Video Studio',
+      titleKey: 'videoStudio.title',
+      descriptionKey: 'videoStudio.description'
+    }
+  },
+  {
     path: '/referral',
     name: 'Referral',
     component: () => import('@/views/user/ReferralView.vue'),

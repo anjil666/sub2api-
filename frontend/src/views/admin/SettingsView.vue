@@ -1691,6 +1691,69 @@
             </div>
           </div>
         </div>
+
+        <!-- Video Studio -->
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">视频工作室</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">控制视频工作室的功能开关和代理配置</p>
+          </div>
+          <div class="space-y-4 p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="font-medium text-gray-900 dark:text-white">启用视频工作室</label>
+                <p class="text-sm text-gray-500 dark:text-gray-400">全局开关，关闭后所有用户不可见</p>
+              </div>
+              <Toggle v-model="form.video_studio_enabled" />
+            </div>
+            <div>
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">veo-proxy 地址</label>
+              <input
+                v-model="form.video_proxy_url"
+                type="text"
+                class="input"
+                placeholder="https://evo.eeeapi.com"
+              />
+            </div>
+            <div>
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">veo-proxy Token</label>
+              <input
+                v-model="form.video_proxy_token"
+                type="password"
+                class="input"
+                placeholder="输入 veo-proxy 认证 Token"
+              />
+            </div>
+            <div class="flex items-center justify-between">
+              <label class="font-medium text-gray-900 dark:text-white">VEO 3.1</label>
+              <Toggle v-model="form.video_model_veo31_enabled" />
+            </div>
+            <div class="flex items-center justify-between">
+              <label class="font-medium text-gray-900 dark:text-white">VEO 2.0</label>
+              <Toggle v-model="form.video_model_veo20_enabled" />
+            </div>
+            <div class="flex items-center justify-between">
+              <label class="font-medium text-gray-900 dark:text-white">Seedance 2.0</label>
+              <Toggle v-model="form.video_model_seedance_enabled" />
+            </div>
+            <div class="flex items-center justify-between">
+              <label class="font-medium text-gray-900 dark:text-white">Grok Video</label>
+              <Toggle v-model="form.video_model_grok_enabled" />
+            </div>
+            <div>
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">默认单次价格 (USD)</label>
+              <input
+                v-model.number="form.video_default_price"
+                type="number"
+                step="0.01"
+                min="0"
+                class="input max-w-xs"
+                placeholder="0.50"
+              />
+              <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">每次视频生成的默认扣费金额</p>
+            </div>
+          </div>
+        </div>
         </div><!-- /Tab: Users -->
 
         <!-- Tab: Gateway — Claude Code, Scheduling -->
@@ -2856,7 +2919,16 @@ const form = reactive<SettingsForm>({
   referral_enabled: false,
   referral_commission_rate: 10,
   // Image Studio
-  image_studio_4k_enabled: true
+  image_studio_4k_enabled: true,
+  // Video Studio
+  video_studio_enabled: false,
+  video_proxy_url: '',
+  video_proxy_token: '',
+  video_model_veo31_enabled: false,
+  video_model_veo20_enabled: false,
+  video_model_seedance_enabled: false,
+  video_model_grok_enabled: false,
+  video_default_price: 0
 })
 
 const defaultSubscriptionGroupOptions = computed<DefaultSubscriptionGroupOption[]>(() =>
@@ -3069,6 +3141,7 @@ async function loadSettings() {
     )
     registrationEmailSuffixWhitelistDraft.value = ''
     form.smtp_password = ''
+    form.video_proxy_token = ''
     smtpPasswordManuallyEdited.value = false
     form.turnstile_secret_key = ''
     form.linuxdo_connect_client_secret = ''
@@ -3263,6 +3336,15 @@ async function saveSettings() {
       referral_commission_rate: form.referral_commission_rate,
       // Image Studio
       image_studio_4k_enabled: form.image_studio_4k_enabled,
+      // Video Studio
+      video_studio_enabled: form.video_studio_enabled,
+      video_proxy_url: form.video_proxy_url,
+      video_proxy_token: form.video_proxy_token,
+      video_model_veo31_enabled: form.video_model_veo31_enabled,
+      video_model_veo20_enabled: form.video_model_veo20_enabled,
+      video_model_seedance_enabled: form.video_model_seedance_enabled,
+      video_model_grok_enabled: form.video_model_grok_enabled,
+      video_default_price: Number(form.video_default_price) || 0,
       // Payment configuration
       payment_enabled: form.payment_enabled,
       payment_min_amount: Number(form.payment_min_amount) || 0,
@@ -3298,6 +3380,7 @@ async function saveSettings() {
     )
     registrationEmailSuffixWhitelistDraft.value = ''
     form.smtp_password = ''
+    form.video_proxy_token = ''
     smtpPasswordManuallyEdited.value = false
     form.turnstile_secret_key = ''
     form.linuxdo_connect_client_secret = ''

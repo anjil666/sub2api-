@@ -594,6 +594,21 @@ const ImageStudioIcon = {
     )
 }
 
+const VideoStudioIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'm15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z'
+        })
+      ]
+    )
+}
+
 const HealthStatusIcon = {
   render: () =>
     h(
@@ -616,6 +631,7 @@ const userNavItems = computed((): NavItem[] => {
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/model-square', label: t('nav.modelSquare'), icon: ModelSquareIcon },
     { path: '/image-studio', label: t('nav.imageStudio'), icon: ImageStudioIcon },
+    { path: '/video-studio', label: t('nav.videoStudio', '视频工坊'), icon: VideoStudioIcon },
     { path: '/health-status', label: t('nav.healthStatus'), icon: HealthStatusIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
@@ -660,6 +676,7 @@ const personalNavItems = computed((): NavItem[] => {
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/model-square', label: t('nav.modelSquare'), icon: ModelSquareIcon },
     { path: '/image-studio', label: t('nav.imageStudio'), icon: ImageStudioIcon },
+    { path: '/video-studio', label: t('nav.videoStudio', '视频工坊'), icon: VideoStudioIcon },
     { path: '/health-status', label: t('nav.healthStatus'), icon: HealthStatusIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },

@@ -98,9 +98,11 @@ type Group struct {
 	AllowMessagesDispatch bool `json:"allow_messages_dispatch"`
 
 	// 账号过滤控制（仅 OpenAI/Antigravity 平台有效）
-	RequireOAuthOnly  bool `json:"require_oauth_only"`
+	RequireOAuthOnly   bool `json:"require_oauth_only"`
 	RequirePrivacySet  bool `json:"require_privacy_set"`
 	ImageStudioEnabled bool `json:"image_studio_enabled"`
+	VideoStudioEnabled bool `json:"video_studio_enabled"`
+	VideoPrice         *float64 `json:"video_price"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

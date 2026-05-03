@@ -409,6 +409,8 @@ export interface Group {
   require_oauth_only: boolean
   require_privacy_set: boolean
   image_studio_enabled: boolean
+  video_studio_enabled: boolean
+  video_price: number | null
   billing_display?: string
   created_at: string
   updated_at: string

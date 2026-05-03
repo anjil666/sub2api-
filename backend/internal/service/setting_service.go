@@ -174,6 +174,11 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyCheckinEnabled,
 		SettingKeyReferralEnabled,
 		SettingKeyImageStudio4KEnabled,
+		SettingKeyVideoStudioEnabled,
+		SettingKeyVideoModelVeo31Enabled,
+		SettingKeyVideoModelVeo20Enabled,
+		SettingKeyVideoModelSeedance,
+		SettingKeyVideoModelGrok,
 	}
 
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)
@@ -241,6 +246,11 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		CheckinEnabled:                   settings[SettingKeyCheckinEnabled] == "true",
 		ReferralEnabled:                  settings[SettingKeyReferralEnabled] == "true",
 		ImageStudio4KEnabled:             settings[SettingKeyImageStudio4KEnabled] != "false",
+		VideoStudioEnabled:               settings[SettingKeyVideoStudioEnabled] == "true",
+		VideoModelVeo31Enabled:           settings[SettingKeyVideoModelVeo31Enabled] == "true",
+		VideoModelVeo20Enabled:           settings[SettingKeyVideoModelVeo20Enabled] == "true",
+		VideoModelSeedance:               settings[SettingKeyVideoModelSeedance] == "true",
+		VideoModelGrok:                   settings[SettingKeyVideoModelGrok] == "true",
 		OIDCOAuthEnabled:                 oidcEnabled,
 		OIDCOAuthProviderName:            oidcProviderName,
 		PaymentEnabled:                   settings[SettingPaymentEnabled] == "true",
@@ -299,6 +309,11 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		OIDCOAuthProviderName            string          `json:"oidc_oauth_provider_name"`
 		PaymentEnabled                   bool            `json:"payment_enabled"`
 		ImageStudio4KEnabled             bool            `json:"image_studio_4k_enabled"`
+		VideoStudioEnabled               bool            `json:"video_studio_enabled"`
+		VideoModelVeo31Enabled           bool            `json:"video_model_veo31_enabled"`
+		VideoModelVeo20Enabled           bool            `json:"video_model_veo20_enabled"`
+		VideoModelSeedance               bool            `json:"video_model_seedance_enabled"`
+		VideoModelGrok                   bool            `json:"video_model_grok_enabled"`
 		Version                          string          `json:"version,omitempty"`
 	}{
 		RegistrationEnabled:              settings.RegistrationEnabled,
@@ -332,6 +347,11 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		OIDCOAuthProviderName:            settings.OIDCOAuthProviderName,
 		PaymentEnabled:                   settings.PaymentEnabled,
 		ImageStudio4KEnabled:             settings.ImageStudio4KEnabled,
+		VideoStudioEnabled:               settings.VideoStudioEnabled,
+		VideoModelVeo31Enabled:           settings.VideoModelVeo31Enabled,
+		VideoModelVeo20Enabled:           settings.VideoModelVeo20Enabled,
+		VideoModelSeedance:               settings.VideoModelSeedance,
+		VideoModelGrok:                   settings.VideoModelGrok,
 		Version:                          s.version,
 	}, nil
 }
@@ -612,6 +632,16 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 
 	// 做图工作室
 	updates[SettingKeyImageStudio4KEnabled] = strconv.FormatBool(settings.ImageStudio4KEnabled)
+
+	// 视频工作室
+	updates[SettingKeyVideoStudioEnabled] = strconv.FormatBool(settings.VideoStudioEnabled)
+	updates[SettingKeyVideoProxyURL] = settings.VideoProxyURL
+	updates[SettingKeyVideoProxyToken] = settings.VideoProxyToken
+	updates[SettingKeyVideoModelVeo31Enabled] = strconv.FormatBool(settings.VideoModelVeo31Enabled)
+	updates[SettingKeyVideoModelVeo20Enabled] = strconv.FormatBool(settings.VideoModelVeo20Enabled)
+	updates[SettingKeyVideoModelSeedance] = strconv.FormatBool(settings.VideoModelSeedance)
+	updates[SettingKeyVideoModelGrok] = strconv.FormatBool(settings.VideoModelGrok)
+	updates[SettingKeyVideoDefaultPrice] = strconv.FormatFloat(settings.VideoDefaultPrice, 'f', -1, 64)
 
 	// Gateway forwarding behavior
 	updates[SettingKeyEnableFingerprintUnification] = strconv.FormatBool(settings.EnableFingerprintUnification)
@@ -1041,6 +1071,18 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 
 	// 做图工作室
 	result.ImageStudio4KEnabled = settings[SettingKeyImageStudio4KEnabled] != "false" // 默认启用
+
+	// 视频工作室
+	result.VideoStudioEnabled = settings[SettingKeyVideoStudioEnabled] == "true"
+	result.VideoProxyURL = settings[SettingKeyVideoProxyURL]
+	result.VideoProxyToken = settings[SettingKeyVideoProxyToken]
+	result.VideoModelVeo31Enabled = settings[SettingKeyVideoModelVeo31Enabled] == "true"
+	result.VideoModelVeo20Enabled = settings[SettingKeyVideoModelVeo20Enabled] == "true"
+	result.VideoModelSeedance = settings[SettingKeyVideoModelSeedance] == "true"
+	result.VideoModelGrok = settings[SettingKeyVideoModelGrok] == "true"
+	if price, err := strconv.ParseFloat(settings[SettingKeyVideoDefaultPrice], 64); err == nil {
+		result.VideoDefaultPrice = price
+	}
 
 	result.DefaultSubscriptions = parseDefaultSubscriptions(settings[SettingKeyDefaultSubscriptions])
 

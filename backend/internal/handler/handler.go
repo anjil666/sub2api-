@@ -56,6 +56,7 @@ type Handlers struct {
 	Referral       *ReferralHandler
 	ModelSquare    *ModelSquareHandler
 	HealthStatus   *HealthStatusHandler
+	Video          *VideoHandler
 }
 
 // BuildInfo contains build-time information

@@ -8256,6 +8256,9 @@ type GroupMutation struct {
 	default_mapped_model                    *string
 	messages_dispatch_model_config          *domain.OpenAIMessagesDispatchModelConfig
 	image_studio_enabled                    *bool
+	video_studio_enabled                    *bool
+	video_price                             *float64
+	addvideo_price                          *float64
 	clearedFields                           map[string]struct{}
 	api_keys                                map[int64]struct{}
 	removedapi_keys                         map[int64]struct{}
@@ -9880,6 +9883,112 @@ func (m *GroupMutation) ResetImageStudioEnabled() {
 	m.image_studio_enabled = nil
 }
 
+// SetVideoStudioEnabled sets the "video_studio_enabled" field.
+func (m *GroupMutation) SetVideoStudioEnabled(b bool) {
+	m.video_studio_enabled = &b
+}
+
+// VideoStudioEnabled returns the value of the "video_studio_enabled" field in the mutation.
+func (m *GroupMutation) VideoStudioEnabled() (r bool, exists bool) {
+	v := m.video_studio_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVideoStudioEnabled returns the old "video_studio_enabled" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldVideoStudioEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVideoStudioEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVideoStudioEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVideoStudioEnabled: %w", err)
+	}
+	return oldValue.VideoStudioEnabled, nil
+}
+
+// ResetVideoStudioEnabled resets all changes to the "video_studio_enabled" field.
+func (m *GroupMutation) ResetVideoStudioEnabled() {
+	m.video_studio_enabled = nil
+}
+
+// SetVideoPrice sets the "video_price" field.
+func (m *GroupMutation) SetVideoPrice(f float64) {
+	m.video_price = &f
+	m.addvideo_price = nil
+}
+
+// VideoPrice returns the value of the "video_price" field in the mutation.
+func (m *GroupMutation) VideoPrice() (r float64, exists bool) {
+	v := m.video_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVideoPrice returns the old "video_price" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldVideoPrice(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVideoPrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVideoPrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVideoPrice: %w", err)
+	}
+	return oldValue.VideoPrice, nil
+}
+
+// AddVideoPrice adds f to the "video_price" field.
+func (m *GroupMutation) AddVideoPrice(f float64) {
+	if m.addvideo_price != nil {
+		*m.addvideo_price += f
+	} else {
+		m.addvideo_price = &f
+	}
+}
+
+// AddedVideoPrice returns the value that was added to the "video_price" field in this mutation.
+func (m *GroupMutation) AddedVideoPrice() (r float64, exists bool) {
+	v := m.addvideo_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearVideoPrice clears the value of the "video_price" field.
+func (m *GroupMutation) ClearVideoPrice() {
+	m.video_price = nil
+	m.addvideo_price = nil
+	m.clearedFields[group.FieldVideoPrice] = struct{}{}
+}
+
+// VideoPriceCleared returns if the "video_price" field was cleared in this mutation.
+func (m *GroupMutation) VideoPriceCleared() bool {
+	_, ok := m.clearedFields[group.FieldVideoPrice]
+	return ok
+}
+
+// ResetVideoPrice resets all changes to the "video_price" field.
+func (m *GroupMutation) ResetVideoPrice() {
+	m.video_price = nil
+	m.addvideo_price = nil
+	delete(m.clearedFields, group.FieldVideoPrice)
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by ids.
 func (m *GroupMutation) AddAPIKeyIDs(ids ...int64) {
 	if m.api_keys == nil {
@@ -10238,7 +10347,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 31)
+	fields := make([]string, 0, 33)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -10332,6 +10441,12 @@ func (m *GroupMutation) Fields() []string {
 	if m.image_studio_enabled != nil {
 		fields = append(fields, group.FieldImageStudioEnabled)
 	}
+	if m.video_studio_enabled != nil {
+		fields = append(fields, group.FieldVideoStudioEnabled)
+	}
+	if m.video_price != nil {
+		fields = append(fields, group.FieldVideoPrice)
+	}
 	return fields
 }
 
@@ -10402,6 +10517,10 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.MessagesDispatchModelConfig()
 	case group.FieldImageStudioEnabled:
 		return m.ImageStudioEnabled()
+	case group.FieldVideoStudioEnabled:
+		return m.VideoStudioEnabled()
+	case group.FieldVideoPrice:
+		return m.VideoPrice()
 	}
 	return nil, false
 }
@@ -10473,6 +10592,10 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldMessagesDispatchModelConfig(ctx)
 	case group.FieldImageStudioEnabled:
 		return m.OldImageStudioEnabled(ctx)
+	case group.FieldVideoStudioEnabled:
+		return m.OldVideoStudioEnabled(ctx)
+	case group.FieldVideoPrice:
+		return m.OldVideoPrice(ctx)
 	}
 	return nil, fmt.Errorf("unknown Group field %s", name)
 }
@@ -10699,6 +10822,20 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetImageStudioEnabled(v)
 		return nil
+	case group.FieldVideoStudioEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVideoStudioEnabled(v)
+		return nil
+	case group.FieldVideoPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVideoPrice(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Group field %s", name)
 }
@@ -10740,6 +10877,9 @@ func (m *GroupMutation) AddedFields() []string {
 	if m.addsort_order != nil {
 		fields = append(fields, group.FieldSortOrder)
 	}
+	if m.addvideo_price != nil {
+		fields = append(fields, group.FieldVideoPrice)
+	}
 	return fields
 }
 
@@ -10770,6 +10910,8 @@ func (m *GroupMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedFallbackGroupIDOnInvalidRequest()
 	case group.FieldSortOrder:
 		return m.AddedSortOrder()
+	case group.FieldVideoPrice:
+		return m.AddedVideoPrice()
 	}
 	return nil, false
 }
@@ -10856,6 +10998,13 @@ func (m *GroupMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddSortOrder(v)
 		return nil
+	case group.FieldVideoPrice:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVideoPrice(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Group numeric field %s", name)
 }
@@ -10896,6 +11045,9 @@ func (m *GroupMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(group.FieldModelRouting) {
 		fields = append(fields, group.FieldModelRouting)
+	}
+	if m.FieldCleared(group.FieldVideoPrice) {
+		fields = append(fields, group.FieldVideoPrice)
 	}
 	return fields
 }
@@ -10943,6 +11095,9 @@ func (m *GroupMutation) ClearField(name string) error {
 		return nil
 	case group.FieldModelRouting:
 		m.ClearModelRouting()
+		return nil
+	case group.FieldVideoPrice:
+		m.ClearVideoPrice()
 		return nil
 	}
 	return fmt.Errorf("unknown Group nullable field %s", name)
@@ -11044,6 +11199,12 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldImageStudioEnabled:
 		m.ResetImageStudioEnabled()
+		return nil
+	case group.FieldVideoStudioEnabled:
+		m.ResetVideoStudioEnabled()
+		return nil
+	case group.FieldVideoPrice:
+		m.ResetVideoPrice()
 		return nil
 	}
 	return fmt.Errorf("unknown Group field %s", name)

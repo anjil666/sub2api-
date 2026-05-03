@@ -126,6 +126,16 @@ export interface SystemSettings {
   // Image Studio
   image_studio_4k_enabled: boolean
 
+  // Video Studio
+  video_studio_enabled: boolean
+  video_proxy_url: string
+  video_proxy_token: string
+  video_model_veo31_enabled: boolean
+  video_model_veo20_enabled: boolean
+  video_model_seedance_enabled: boolean
+  video_model_grok_enabled: boolean
+  video_default_price: number
+
   // Payment configuration
   payment_enabled: boolean
   payment_min_amount: number
@@ -233,6 +243,15 @@ export interface UpdateSettingsRequest {
   referral_commission_rate?: number
   // Image Studio
   image_studio_4k_enabled?: boolean
+  // Video Studio
+  video_studio_enabled?: boolean
+  video_proxy_url?: string
+  video_proxy_token?: string
+  video_model_veo31_enabled?: boolean
+  video_model_veo20_enabled?: boolean
+  video_model_seedance_enabled?: boolean
+  video_model_grok_enabled?: boolean
+  video_default_price?: number
   // Payment configuration
   payment_enabled?: boolean
   payment_min_amount?: number

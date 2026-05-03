@@ -29,6 +29,7 @@ export interface GroupModels {
   image_price_2k?: number | null
   image_price_4k?: number | null
   image_studio_enabled?: boolean
+  video_studio_enabled?: boolean
   models: ModelInfo[]
 }
 

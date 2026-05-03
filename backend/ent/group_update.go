@@ -581,6 +581,47 @@ func (_u *GroupUpdate) SetNillableImageStudioEnabled(v *bool) *GroupUpdate {
 	return _u
 }
 
+// SetVideoStudioEnabled sets the "video_studio_enabled" field.
+func (_u *GroupUpdate) SetVideoStudioEnabled(v bool) *GroupUpdate {
+	_u.mutation.SetVideoStudioEnabled(v)
+	return _u
+}
+
+// SetNillableVideoStudioEnabled sets the "video_studio_enabled" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableVideoStudioEnabled(v *bool) *GroupUpdate {
+	if v != nil {
+		_u.SetVideoStudioEnabled(*v)
+	}
+	return _u
+}
+
+// SetVideoPrice sets the "video_price" field.
+func (_u *GroupUpdate) SetVideoPrice(v float64) *GroupUpdate {
+	_u.mutation.ResetVideoPrice()
+	_u.mutation.SetVideoPrice(v)
+	return _u
+}
+
+// SetNillableVideoPrice sets the "video_price" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableVideoPrice(v *float64) *GroupUpdate {
+	if v != nil {
+		_u.SetVideoPrice(*v)
+	}
+	return _u
+}
+
+// AddVideoPrice adds value to the "video_price" field.
+func (_u *GroupUpdate) AddVideoPrice(v float64) *GroupUpdate {
+	_u.mutation.AddVideoPrice(v)
+	return _u
+}
+
+// ClearVideoPrice clears the value of the "video_price" field.
+func (_u *GroupUpdate) ClearVideoPrice() *GroupUpdate {
+	_u.mutation.ClearVideoPrice()
+	return _u
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *GroupUpdate) AddAPIKeyIDs(ids ...int64) *GroupUpdate {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -1046,6 +1087,18 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.ImageStudioEnabled(); ok {
 		_spec.SetField(group.FieldImageStudioEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.VideoStudioEnabled(); ok {
+		_spec.SetField(group.FieldVideoStudioEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.VideoPrice(); ok {
+		_spec.SetField(group.FieldVideoPrice, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedVideoPrice(); ok {
+		_spec.AddField(group.FieldVideoPrice, field.TypeFloat64, value)
+	}
+	if _u.mutation.VideoPriceCleared() {
+		_spec.ClearField(group.FieldVideoPrice, field.TypeFloat64)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1906,6 +1959,47 @@ func (_u *GroupUpdateOne) SetNillableImageStudioEnabled(v *bool) *GroupUpdateOne
 	return _u
 }
 
+// SetVideoStudioEnabled sets the "video_studio_enabled" field.
+func (_u *GroupUpdateOne) SetVideoStudioEnabled(v bool) *GroupUpdateOne {
+	_u.mutation.SetVideoStudioEnabled(v)
+	return _u
+}
+
+// SetNillableVideoStudioEnabled sets the "video_studio_enabled" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableVideoStudioEnabled(v *bool) *GroupUpdateOne {
+	if v != nil {
+		_u.SetVideoStudioEnabled(*v)
+	}
+	return _u
+}
+
+// SetVideoPrice sets the "video_price" field.
+func (_u *GroupUpdateOne) SetVideoPrice(v float64) *GroupUpdateOne {
+	_u.mutation.ResetVideoPrice()
+	_u.mutation.SetVideoPrice(v)
+	return _u
+}
+
+// SetNillableVideoPrice sets the "video_price" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableVideoPrice(v *float64) *GroupUpdateOne {
+	if v != nil {
+		_u.SetVideoPrice(*v)
+	}
+	return _u
+}
+
+// AddVideoPrice adds value to the "video_price" field.
+func (_u *GroupUpdateOne) AddVideoPrice(v float64) *GroupUpdateOne {
+	_u.mutation.AddVideoPrice(v)
+	return _u
+}
+
+// ClearVideoPrice clears the value of the "video_price" field.
+func (_u *GroupUpdateOne) ClearVideoPrice() *GroupUpdateOne {
+	_u.mutation.ClearVideoPrice()
+	return _u
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *GroupUpdateOne) AddAPIKeyIDs(ids ...int64) *GroupUpdateOne {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -2401,6 +2495,18 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.ImageStudioEnabled(); ok {
 		_spec.SetField(group.FieldImageStudioEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.VideoStudioEnabled(); ok {
+		_spec.SetField(group.FieldVideoStudioEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.VideoPrice(); ok {
+		_spec.SetField(group.FieldVideoPrice, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedVideoPrice(); ok {
+		_spec.AddField(group.FieldVideoPrice, field.TypeFloat64, value)
+	}
+	if _u.mutation.VideoPriceCleared() {
+		_spec.ClearField(group.FieldVideoPrice, field.TypeFloat64)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{

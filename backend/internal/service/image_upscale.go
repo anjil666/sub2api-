@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"math"
 	"strconv"
 	"strings"
 
@@ -54,6 +55,8 @@ func UpscaleImageBase64(b64 string, targetW, targetH int) (string, error) {
 
 	dst := image.NewRGBA(image.Rect(0, 0, targetW, targetH))
 	draw.CatmullRom.Scale(dst, dst.Bounds(), src, bounds, draw.Over, nil)
+
+	sharpen(dst, 1.2, 1)
 
 	var buf bytes.Buffer
 	enc := &png.Encoder{CompressionLevel: png.BestSpeed}
@@ -107,4 +110,107 @@ func UpscaleResponseImages(respBody []byte, targetW, targetH int) []byte {
 		return respBody
 	}
 	return out
+}
+
+func sharpen(img *image.RGBA, amount float64, radius int) {
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	kernel := makeGaussianKernel(radius)
+	ksize := len(kernel)
+	khalf := ksize / 2
+
+	tmp := make([]uint8, len(img.Pix))
+	copy(tmp, img.Pix)
+
+	blurred := make([]uint8, len(img.Pix))
+
+	// horizontal pass
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			var r, g, b0 float64
+			for k := 0; k < ksize; k++ {
+				sx := x + k - khalf
+				if sx < 0 {
+					sx = 0
+				} else if sx >= w {
+					sx = w - 1
+				}
+				off := (y*w + sx) * 4
+				wt := kernel[k]
+				r += float64(tmp[off]) * wt
+				g += float64(tmp[off+1]) * wt
+				b0 += float64(tmp[off+2]) * wt
+			}
+			off := (y*w + x) * 4
+			blurred[off] = uint8(math.Round(r))
+			blurred[off+1] = uint8(math.Round(g))
+			blurred[off+2] = uint8(math.Round(b0))
+			blurred[off+3] = tmp[off+3]
+		}
+	}
+
+	// vertical pass
+	copy(tmp, blurred)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			var r, g, b0 float64
+			for k := 0; k < ksize; k++ {
+				sy := y + k - khalf
+				if sy < 0 {
+					sy = 0
+				} else if sy >= h {
+					sy = h - 1
+				}
+				off := (sy*w + x) * 4
+				wt := kernel[k]
+				r += float64(tmp[off]) * wt
+				g += float64(tmp[off+1]) * wt
+				b0 += float64(tmp[off+2]) * wt
+			}
+			off := (y*w + x) * 4
+			blurred[off] = uint8(math.Round(r))
+			blurred[off+1] = uint8(math.Round(g))
+			blurred[off+2] = uint8(math.Round(b0))
+			blurred[off+3] = tmp[off+3]
+		}
+	}
+
+	// unsharp mask: result = original + amount * (original - blurred)
+	for i := 0; i < len(img.Pix); i += 4 {
+		for c := 0; c < 3; c++ {
+			orig := float64(img.Pix[i+c])
+			blur := float64(blurred[i+c])
+			v := orig + amount*(orig-blur)
+			img.Pix[i+c] = clampU8(v)
+		}
+	}
+}
+
+func makeGaussianKernel(radius int) []float64 {
+	size := radius*2 + 1
+	sigma := float64(radius) * 0.5
+	if sigma < 0.5 {
+		sigma = 0.5
+	}
+	k := make([]float64, size)
+	var sum float64
+	for i := 0; i < size; i++ {
+		x := float64(i - radius)
+		k[i] = math.Exp(-(x * x) / (2 * sigma * sigma))
+		sum += k[i]
+	}
+	for i := range k {
+		k[i] /= sum
+	}
+	return k
+}
+
+func clampU8(v float64) uint8 {
+	if v < 0 {
+		return 0
+	}
+	if v > 255 {
+		return 255
+	}
+	return uint8(math.Round(v))
 }

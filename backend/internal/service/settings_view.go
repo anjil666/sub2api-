@@ -113,6 +113,16 @@ type SystemSettings struct {
 	// 做图工作室
 	ImageStudio4KEnabled bool
 
+	// 视频工作室
+	VideoStudioEnabled     bool
+	VideoProxyURL          string
+	VideoProxyToken        string
+	VideoModelVeo31Enabled bool
+	VideoModelVeo20Enabled bool
+	VideoModelSeedance     bool
+	VideoModelGrok         bool
+	VideoDefaultPrice      float64
+
 	// Gateway forwarding behavior
 	EnableFingerprintUnification bool // 是否统一 OAuth 账号的指纹头（默认 true）
 	EnableMetadataPassthrough    bool // 是否透传客户端原始 metadata（默认 false）
@@ -158,6 +168,11 @@ type PublicSettings struct {
 	OIDCOAuthProviderName string
 	PaymentEnabled        bool
 	ImageStudio4KEnabled  bool
+	VideoStudioEnabled       bool
+	VideoModelVeo31Enabled   bool
+	VideoModelVeo20Enabled   bool
+	VideoModelSeedance       bool
+	VideoModelGrok           bool
 	Version               string
 }
 

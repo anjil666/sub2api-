@@ -180,6 +180,14 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		ReferralEnabled:                      settings.ReferralEnabled,
 		ReferralCommissionRate:               settings.ReferralCommissionRate,
 		ImageStudio4KEnabled:                 settings.ImageStudio4KEnabled,
+		VideoStudioEnabled:                   settings.VideoStudioEnabled,
+		VideoProxyURL:                        settings.VideoProxyURL,
+		VideoProxyToken:                      settings.VideoProxyToken,
+		VideoModelVeo31Enabled:               settings.VideoModelVeo31Enabled,
+		VideoModelVeo20Enabled:               settings.VideoModelVeo20Enabled,
+		VideoModelSeedance:                   settings.VideoModelSeedance,
+		VideoModelGrok:                       settings.VideoModelGrok,
+		VideoDefaultPrice:                    settings.VideoDefaultPrice,
 		PaymentEnabled:                       paymentCfg.Enabled,
 		PaymentMinAmount:                     paymentCfg.MinAmount,
 		PaymentMaxAmount:                     paymentCfg.MaxAmount,
@@ -337,6 +345,14 @@ type UpdateSettingsRequest struct {
 	ReferralEnabled        bool    `json:"referral_enabled"`
 	ReferralCommissionRate float64 `json:"referral_commission_rate"`
 	ImageStudio4KEnabled   bool    `json:"image_studio_4k_enabled"`
+	VideoStudioEnabled     bool    `json:"video_studio_enabled"`
+	VideoProxyURL          string  `json:"video_proxy_url"`
+	VideoProxyToken        string  `json:"video_proxy_token"`
+	VideoModelVeo31Enabled bool    `json:"video_model_veo31_enabled"`
+	VideoModelVeo20Enabled bool    `json:"video_model_veo20_enabled"`
+	VideoModelSeedance     bool    `json:"video_model_seedance_enabled"`
+	VideoModelGrok         bool    `json:"video_model_grok_enabled"`
+	VideoDefaultPrice      float64 `json:"video_default_price"`
 }
 
 // UpdateSettings 更新系统设置
@@ -898,6 +914,14 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ReferralEnabled:        req.ReferralEnabled,
 		ReferralCommissionRate: req.ReferralCommissionRate,
 		ImageStudio4KEnabled:   req.ImageStudio4KEnabled,
+		VideoStudioEnabled:     req.VideoStudioEnabled,
+		VideoProxyURL:          req.VideoProxyURL,
+		VideoProxyToken:        req.VideoProxyToken,
+		VideoModelVeo31Enabled: req.VideoModelVeo31Enabled,
+		VideoModelVeo20Enabled: req.VideoModelVeo20Enabled,
+		VideoModelSeedance:     req.VideoModelSeedance,
+		VideoModelGrok:         req.VideoModelGrok,
+		VideoDefaultPrice:      req.VideoDefaultPrice,
 	}
 
 	if err := h.settingService.UpdateSettings(c.Request.Context(), settings); err != nil {
@@ -1049,6 +1073,14 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ReferralEnabled:                      updatedSettings.ReferralEnabled,
 		ReferralCommissionRate:               updatedSettings.ReferralCommissionRate,
 		ImageStudio4KEnabled:                 updatedSettings.ImageStudio4KEnabled,
+		VideoStudioEnabled:                   updatedSettings.VideoStudioEnabled,
+		VideoProxyURL:                        updatedSettings.VideoProxyURL,
+		VideoProxyToken:                      updatedSettings.VideoProxyToken,
+		VideoModelVeo31Enabled:               updatedSettings.VideoModelVeo31Enabled,
+		VideoModelVeo20Enabled:               updatedSettings.VideoModelVeo20Enabled,
+		VideoModelSeedance:                   updatedSettings.VideoModelSeedance,
+		VideoModelGrok:                       updatedSettings.VideoModelGrok,
+		VideoDefaultPrice:                    updatedSettings.VideoDefaultPrice,
 		PaymentEnabled:                       updatedPaymentCfg.Enabled,
 		PaymentMinAmount:                     updatedPaymentCfg.MinAmount,
 		PaymentMaxAmount:                     updatedPaymentCfg.MaxAmount,

@@ -135,6 +135,16 @@ type SystemSettings struct {
 	// Image Studio
 	ImageStudio4KEnabled bool `json:"image_studio_4k_enabled"`
 
+	// Video Studio
+	VideoStudioEnabled     bool    `json:"video_studio_enabled"`
+	VideoProxyURL          string  `json:"video_proxy_url"`
+	VideoProxyToken        string  `json:"video_proxy_token"`
+	VideoModelVeo31Enabled bool    `json:"video_model_veo31_enabled"`
+	VideoModelVeo20Enabled bool    `json:"video_model_veo20_enabled"`
+	VideoModelSeedance     bool    `json:"video_model_seedance_enabled"`
+	VideoModelGrok         bool    `json:"video_model_grok_enabled"`
+	VideoDefaultPrice      float64 `json:"video_default_price"`
+
 	// Payment configuration
 	PaymentEnabled           bool     `json:"payment_enabled"`
 	PaymentMinAmount         float64  `json:"payment_min_amount"`
@@ -195,6 +205,11 @@ type PublicSettings struct {
 	ReferralEnabled                  bool             `json:"referral_enabled"`
 	PaymentEnabled                   bool             `json:"payment_enabled"`
 	ImageStudio4KEnabled             bool             `json:"image_studio_4k_enabled"`
+	VideoStudioEnabled               bool             `json:"video_studio_enabled"`
+	VideoModelVeo31Enabled           bool             `json:"video_model_veo31_enabled"`
+	VideoModelVeo20Enabled           bool             `json:"video_model_veo20_enabled"`
+	VideoModelSeedance               bool             `json:"video_model_seedance_enabled"`
+	VideoModelGrok                   bool             `json:"video_model_grok_enabled"`
 	Version                          string           `json:"version"`
 }
 

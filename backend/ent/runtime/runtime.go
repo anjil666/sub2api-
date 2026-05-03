@@ -481,6 +481,10 @@ func init() {
 	groupDescImageStudioEnabled := groupFields[27].Descriptor()
 	// group.DefaultImageStudioEnabled holds the default value on creation for the image_studio_enabled field.
 	group.DefaultImageStudioEnabled = groupDescImageStudioEnabled.Default.(bool)
+	// groupDescVideoStudioEnabled is the schema descriptor for video_studio_enabled field.
+	groupDescVideoStudioEnabled := groupFields[28].Descriptor()
+	// group.DefaultVideoStudioEnabled holds the default value on creation for the video_studio_enabled field.
+	group.DefaultVideoStudioEnabled = groupDescVideoStudioEnabled.Default.(bool)
 	idempotencyrecordMixin := schema.IdempotencyRecord{}.Mixin()
 	idempotencyrecordMixinFields0 := idempotencyrecordMixin[0].Fields()
 	_ = idempotencyrecordMixinFields0

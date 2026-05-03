@@ -829,6 +829,31 @@
           </div>
         </div>
 
+        <!-- 视频工作室开关 -->
+        <div class="border-t pt-4">
+          <div class="mb-1.5 flex items-center gap-1">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">视频工作室</label>
+          </div>
+          <div class="flex items-center gap-3">
+            <button type="button" @click="createForm.video_studio_enabled = !createForm.video_studio_enabled"
+              :class="['relative inline-flex h-6 w-11 items-center rounded-full transition-colors', createForm.video_studio_enabled ? 'bg-primary-500' : 'bg-gray-300 dark:bg-dark-600']">
+              <span :class="['inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform', createForm.video_studio_enabled ? 'translate-x-6' : 'translate-x-1']" />
+            </button>
+            <span class="text-sm text-gray-500 dark:text-gray-400">{{ createForm.video_studio_enabled ? '已启用 - 用户视频页面可见' : '已禁用' }}</span>
+          </div>
+          <div class="mt-3">
+            <label class="input-label">视频价格 ($)</label>
+            <input
+              v-model.number="createForm.video_price"
+              type="number"
+              step="0.01"
+              min="0"
+              class="input"
+              placeholder="使用全局默认"
+            />
+          </div>
+        </div>
+
         <!-- Claude Code 客户端限制（仅 anthropic 平台） -->
         <div v-if="createForm.platform === 'anthropic'" class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
@@ -1965,6 +1990,31 @@
           </div>
         </div>
 
+        <!-- 视频工作室开关 (edit) -->
+        <div class="border-t pt-4">
+          <div class="mb-1.5 flex items-center gap-1">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">视频工作室</label>
+          </div>
+          <div class="flex items-center gap-3">
+            <button type="button" @click="editForm.video_studio_enabled = !editForm.video_studio_enabled"
+              :class="['relative inline-flex h-6 w-11 items-center rounded-full transition-colors', editForm.video_studio_enabled ? 'bg-primary-500' : 'bg-gray-300 dark:bg-dark-600']">
+              <span :class="['inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform', editForm.video_studio_enabled ? 'translate-x-6' : 'translate-x-1']" />
+            </button>
+            <span class="text-sm text-gray-500 dark:text-gray-400">{{ editForm.video_studio_enabled ? '已启用 - 用户视频页面可见' : '已禁用' }}</span>
+          </div>
+          <div class="mt-3">
+            <label class="input-label">视频价格 ($)</label>
+            <input
+              v-model.number="editForm.video_price"
+              type="number"
+              step="0.01"
+              min="0"
+              class="input"
+              placeholder="使用全局默认"
+            />
+          </div>
+        </div>
+
         <!-- Claude Code 客户端限制（仅 anthropic 平台） -->
         <div v-if="editForm.platform === 'anthropic'" class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
@@ -3019,6 +3069,9 @@ const createForm = reactive({
   mcp_xml_inject: true,
   // 做图工作室开关
   image_studio_enabled: false,
+  // 视频工作室开关
+  video_studio_enabled: false,
+  video_price: null as number | null,
   // 从分组复制账号
   copy_accounts_from_group_ids: [] as number[],
 });
@@ -3301,6 +3354,9 @@ const editForm = reactive({
   mcp_xml_inject: true,
   // 做图工作室开关
   image_studio_enabled: false,
+  // 视频工作室开关
+  video_studio_enabled: false,
+  video_price: null as number | null,
   // 从分组复制账号
   copy_accounts_from_group_ids: [] as number[],
 });
@@ -3466,6 +3522,8 @@ const closeCreateModal = () => {
   createForm.image_price_1k = null;
   createForm.image_price_2k = null;
   createForm.image_price_4k = null;
+  createForm.video_studio_enabled = false;
+  createForm.video_price = null;
   createForm.claude_code_only = false;
   createForm.fallback_group_id = null;
   createForm.fallback_group_id_on_invalid_request = null;
@@ -3535,6 +3593,7 @@ const handleCreateGroup = async () => {
     requestData.daily_limit_usd = emptyToNull(requestData.daily_limit_usd);
     requestData.weekly_limit_usd = emptyToNull(requestData.weekly_limit_usd);
     requestData.monthly_limit_usd = emptyToNull(requestData.monthly_limit_usd);
+    requestData.video_price = emptyToNull(requestData.video_price);
     await adminAPI.groups.create(requestData);
     appStore.showSuccess(t("admin.groups.groupCreated"));
     closeCreateModal();
@@ -3594,6 +3653,8 @@ const handleEdit = async (group: AdminGroup) => {
   ];
   editForm.mcp_xml_inject = group.mcp_xml_inject ?? true;
   editForm.image_studio_enabled = group.image_studio_enabled ?? false;
+  editForm.video_studio_enabled = group.video_studio_enabled ?? false;
+  editForm.video_price = group.video_price ?? null;
   editForm.copy_accounts_from_group_ids = []; // 复制账号字段每次编辑时重置为空
   // 加载模型路由规则（异步加载账号名称）
   editModelRoutingRules.value = await convertApiFormatToRoutingRules(
@@ -3660,6 +3721,7 @@ const handleUpdateGroup = async () => {
     payload.daily_limit_usd = emptyToNull(payload.daily_limit_usd);
     payload.weekly_limit_usd = emptyToNull(payload.weekly_limit_usd);
     payload.monthly_limit_usd = emptyToNull(payload.monthly_limit_usd);
+    payload.video_price = emptyToNull(payload.video_price);
     await adminAPI.groups.update(editingGroup.value.id, payload);
     appStore.showSuccess(t("admin.groups.groupUpdated"));
     closeEditModal();

@@ -81,6 +81,10 @@ type Group struct {
 	MessagesDispatchModelConfig domain.OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config,omitempty"`
 	// 是否在用户做图工作室中显示此分组
 	ImageStudioEnabled bool `json:"image_studio_enabled,omitempty"`
+	// 是否在用户视频工作室中显示此分组
+	VideoStudioEnabled bool `json:"video_studio_enabled,omitempty"`
+	// 视频生成单次价格（USD），NULL 使用全局默认
+	VideoPrice *float64 `json:"video_price,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the GroupQuery when eager-loading is set.
 	Edges        GroupEdges `json:"edges"`
@@ -189,9 +193,9 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case group.FieldModelRouting, group.FieldSupportedModelScopes, group.FieldMessagesDispatchModelConfig:
 			values[i] = new([]byte)
-		case group.FieldIsExclusive, group.FieldClaudeCodeOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet, group.FieldImageStudioEnabled:
+		case group.FieldIsExclusive, group.FieldClaudeCodeOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet, group.FieldImageStudioEnabled, group.FieldVideoStudioEnabled:
 			values[i] = new(sql.NullBool)
-		case group.FieldRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd, group.FieldImagePrice1k, group.FieldImagePrice2k, group.FieldImagePrice4k:
+		case group.FieldRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd, group.FieldImagePrice1k, group.FieldImagePrice2k, group.FieldImagePrice4k, group.FieldVideoPrice:
 			values[i] = new(sql.NullFloat64)
 		case group.FieldID, group.FieldDefaultValidityDays, group.FieldFallbackGroupID, group.FieldFallbackGroupIDOnInvalidRequest, group.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
@@ -422,6 +426,19 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ImageStudioEnabled = value.Bool
 			}
+		case group.FieldVideoStudioEnabled:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field video_studio_enabled", values[i])
+			} else if value.Valid {
+				_m.VideoStudioEnabled = value.Bool
+			}
+		case group.FieldVideoPrice:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field video_price", values[i])
+			} else if value.Valid {
+				_m.VideoPrice = new(float64)
+				*_m.VideoPrice = value.Float64
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -610,6 +627,14 @@ func (_m *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("image_studio_enabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ImageStudioEnabled))
+	builder.WriteString(", ")
+	builder.WriteString("video_studio_enabled=")
+	builder.WriteString(fmt.Sprintf("%v", _m.VideoStudioEnabled))
+	builder.WriteString(", ")
+	if v := _m.VideoPrice; v != nil {
+		builder.WriteString("video_price=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

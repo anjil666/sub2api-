@@ -148,6 +148,16 @@ func (Group) Fields() []ent.Field {
 		field.Bool("image_studio_enabled").
 			Default(false).
 			Comment("是否在用户做图工作室中显示此分组"),
+
+		// 视频工作室 (added by migration 107)
+		field.Bool("video_studio_enabled").
+			Default(false).
+			Comment("是否在用户视频工作室中显示此分组"),
+		field.Float("video_price").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
+			Comment("视频生成单次价格（USD），NULL 使用全局默认"),
 	}
 }
 

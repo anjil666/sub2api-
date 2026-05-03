@@ -439,6 +439,34 @@ func (_c *GroupCreate) SetNillableImageStudioEnabled(v *bool) *GroupCreate {
 	return _c
 }
 
+// SetVideoStudioEnabled sets the "video_studio_enabled" field.
+func (_c *GroupCreate) SetVideoStudioEnabled(v bool) *GroupCreate {
+	_c.mutation.SetVideoStudioEnabled(v)
+	return _c
+}
+
+// SetNillableVideoStudioEnabled sets the "video_studio_enabled" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableVideoStudioEnabled(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetVideoStudioEnabled(*v)
+	}
+	return _c
+}
+
+// SetVideoPrice sets the "video_price" field.
+func (_c *GroupCreate) SetVideoPrice(v float64) *GroupCreate {
+	_c.mutation.SetVideoPrice(v)
+	return _c
+}
+
+// SetNillableVideoPrice sets the "video_price" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableVideoPrice(v *float64) *GroupCreate {
+	if v != nil {
+		_c.SetVideoPrice(*v)
+	}
+	return _c
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_c *GroupCreate) AddAPIKeyIDs(ids ...int64) *GroupCreate {
 	_c.mutation.AddAPIKeyIDs(ids...)
@@ -648,6 +676,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultImageStudioEnabled
 		_c.mutation.SetImageStudioEnabled(v)
 	}
+	if _, ok := _c.mutation.VideoStudioEnabled(); !ok {
+		v := group.DefaultVideoStudioEnabled
+		_c.mutation.SetVideoStudioEnabled(v)
+	}
 	return nil
 }
 
@@ -737,6 +769,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.ImageStudioEnabled(); !ok {
 		return &ValidationError{Name: "image_studio_enabled", err: errors.New(`ent: missing required field "Group.image_studio_enabled"`)}
+	}
+	if _, ok := _c.mutation.VideoStudioEnabled(); !ok {
+		return &ValidationError{Name: "video_studio_enabled", err: errors.New(`ent: missing required field "Group.video_studio_enabled"`)}
 	}
 	return nil
 }
@@ -888,6 +923,14 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ImageStudioEnabled(); ok {
 		_spec.SetField(group.FieldImageStudioEnabled, field.TypeBool, value)
 		_node.ImageStudioEnabled = value
+	}
+	if value, ok := _c.mutation.VideoStudioEnabled(); ok {
+		_spec.SetField(group.FieldVideoStudioEnabled, field.TypeBool, value)
+		_node.VideoStudioEnabled = value
+	}
+	if value, ok := _c.mutation.VideoPrice(); ok {
+		_spec.SetField(group.FieldVideoPrice, field.TypeFloat64, value)
+		_node.VideoPrice = &value
 	}
 	if nodes := _c.mutation.APIKeysIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -1537,6 +1580,42 @@ func (u *GroupUpsert) UpdateImageStudioEnabled() *GroupUpsert {
 	return u
 }
 
+// SetVideoStudioEnabled sets the "video_studio_enabled" field.
+func (u *GroupUpsert) SetVideoStudioEnabled(v bool) *GroupUpsert {
+	u.Set(group.FieldVideoStudioEnabled, v)
+	return u
+}
+
+// UpdateVideoStudioEnabled sets the "video_studio_enabled" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateVideoStudioEnabled() *GroupUpsert {
+	u.SetExcluded(group.FieldVideoStudioEnabled)
+	return u
+}
+
+// SetVideoPrice sets the "video_price" field.
+func (u *GroupUpsert) SetVideoPrice(v float64) *GroupUpsert {
+	u.Set(group.FieldVideoPrice, v)
+	return u
+}
+
+// UpdateVideoPrice sets the "video_price" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateVideoPrice() *GroupUpsert {
+	u.SetExcluded(group.FieldVideoPrice)
+	return u
+}
+
+// AddVideoPrice adds v to the "video_price" field.
+func (u *GroupUpsert) AddVideoPrice(v float64) *GroupUpsert {
+	u.Add(group.FieldVideoPrice, v)
+	return u
+}
+
+// ClearVideoPrice clears the value of the "video_price" field.
+func (u *GroupUpsert) ClearVideoPrice() *GroupUpsert {
+	u.SetNull(group.FieldVideoPrice)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -2153,6 +2232,48 @@ func (u *GroupUpsertOne) SetImageStudioEnabled(v bool) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateImageStudioEnabled() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateImageStudioEnabled()
+	})
+}
+
+// SetVideoStudioEnabled sets the "video_studio_enabled" field.
+func (u *GroupUpsertOne) SetVideoStudioEnabled(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetVideoStudioEnabled(v)
+	})
+}
+
+// UpdateVideoStudioEnabled sets the "video_studio_enabled" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateVideoStudioEnabled() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateVideoStudioEnabled()
+	})
+}
+
+// SetVideoPrice sets the "video_price" field.
+func (u *GroupUpsertOne) SetVideoPrice(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetVideoPrice(v)
+	})
+}
+
+// AddVideoPrice adds v to the "video_price" field.
+func (u *GroupUpsertOne) AddVideoPrice(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddVideoPrice(v)
+	})
+}
+
+// UpdateVideoPrice sets the "video_price" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateVideoPrice() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateVideoPrice()
+	})
+}
+
+// ClearVideoPrice clears the value of the "video_price" field.
+func (u *GroupUpsertOne) ClearVideoPrice() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearVideoPrice()
 	})
 }
 
@@ -2938,6 +3059,48 @@ func (u *GroupUpsertBulk) SetImageStudioEnabled(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateImageStudioEnabled() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateImageStudioEnabled()
+	})
+}
+
+// SetVideoStudioEnabled sets the "video_studio_enabled" field.
+func (u *GroupUpsertBulk) SetVideoStudioEnabled(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetVideoStudioEnabled(v)
+	})
+}
+
+// UpdateVideoStudioEnabled sets the "video_studio_enabled" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateVideoStudioEnabled() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateVideoStudioEnabled()
+	})
+}
+
+// SetVideoPrice sets the "video_price" field.
+func (u *GroupUpsertBulk) SetVideoPrice(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetVideoPrice(v)
+	})
+}
+
+// AddVideoPrice adds v to the "video_price" field.
+func (u *GroupUpsertBulk) AddVideoPrice(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddVideoPrice(v)
+	})
+}
+
+// UpdateVideoPrice sets the "video_price" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateVideoPrice() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateVideoPrice()
+	})
+}
+
+// ClearVideoPrice clears the value of the "video_price" field.
+func (u *GroupUpsertBulk) ClearVideoPrice() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearVideoPrice()
 	})
 }
 

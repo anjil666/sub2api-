@@ -61,6 +61,9 @@ type Group struct {
 
 	ImageStudioEnabled bool
 
+	VideoStudioEnabled bool
+	VideoPrice         *float64
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 

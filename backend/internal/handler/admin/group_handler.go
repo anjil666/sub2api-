@@ -111,6 +111,8 @@ type CreateGroupRequest struct {
 	DefaultMappedModel          string                                    `json:"default_mapped_model"`
 	MessagesDispatchModelConfig service.OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config"`
 	ImageStudioEnabled          bool                                      `json:"image_studio_enabled"`
+	VideoStudioEnabled          bool                                      `json:"video_studio_enabled"`
+	VideoPrice                  *float64                                  `json:"video_price"`
 	// 从指定分组复制账号（创建后自动绑定）
 	CopyAccountsFromGroupIDs []int64 `json:"copy_accounts_from_group_ids"`
 }
@@ -147,6 +149,8 @@ type UpdateGroupRequest struct {
 	DefaultMappedModel          *string                                    `json:"default_mapped_model"`
 	MessagesDispatchModelConfig *service.OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config"`
 	ImageStudioEnabled          *bool                                      `json:"image_studio_enabled"`
+	VideoStudioEnabled          *bool                                      `json:"video_studio_enabled"`
+	VideoPrice                  *float64                                   `json:"video_price"`
 	// 从指定分组复制账号（同步操作：先清空当前分组的账号绑定，再绑定源分组的账号）
 	CopyAccountsFromGroupIDs []int64 `json:"copy_accounts_from_group_ids"`
 }
@@ -265,6 +269,8 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		DefaultMappedModel:              req.DefaultMappedModel,
 		MessagesDispatchModelConfig:     req.MessagesDispatchModelConfig,
 		ImageStudioEnabled:              req.ImageStudioEnabled,
+		VideoStudioEnabled:              req.VideoStudioEnabled,
+		VideoPrice:                      req.VideoPrice,
 		CopyAccountsFromGroupIDs:        req.CopyAccountsFromGroupIDs,
 	})
 	if err != nil {
@@ -317,6 +323,8 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		DefaultMappedModel:              req.DefaultMappedModel,
 		MessagesDispatchModelConfig:     req.MessagesDispatchModelConfig,
 		ImageStudioEnabled:              req.ImageStudioEnabled,
+		VideoStudioEnabled:              req.VideoStudioEnabled,
+		VideoPrice:                      req.VideoPrice,
 		CopyAccountsFromGroupIDs:        req.CopyAccountsFromGroupIDs,
 	})
 	if err != nil {

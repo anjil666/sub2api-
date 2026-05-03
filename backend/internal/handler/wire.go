@@ -101,6 +101,7 @@ func ProvideHandlers(
 	referralHandler *ReferralHandler,
 	modelSquareHandler *ModelSquareHandler,
 	healthStatusHandler *HealthStatusHandler,
+	videoHandler *VideoHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
@@ -122,6 +123,7 @@ func ProvideHandlers(
 		Referral:       referralHandler,
 		ModelSquare:    modelSquareHandler,
 		HealthStatus:   healthStatusHandler,
+		Video:          videoHandler,
 	}
 }
 
@@ -141,6 +143,7 @@ var ProviderSet = wire.NewSet(
 	NewModelSquareHandler,
 	NewReferralHandler,
 	NewHealthStatusHandler,
+	NewVideoHandler,
 	ProvideSettingHandler,
 	NewPaymentHandler,
 	NewPaymentWebhookHandler,

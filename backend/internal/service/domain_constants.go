@@ -253,6 +253,16 @@ const (
 	// 做图工作室
 	SettingKeyImageStudio4KEnabled = "image_studio_4k_enabled" // 是否启用4K分辨率
 
+	// 视频工作室
+	SettingKeyVideoStudioEnabled      = "video_studio_enabled"        // 全局开关
+	SettingKeyVideoProxyURL           = "video_proxy_url"             // veo-proxy 地址
+	SettingKeyVideoProxyToken         = "video_proxy_token"           // veo-proxy 认证 token
+	SettingKeyVideoModelVeo31Enabled  = "video_model_veo31_enabled"   // VEO 3.1 开关
+	SettingKeyVideoModelVeo20Enabled  = "video_model_veo20_enabled"   // VEO 2.0 开关
+	SettingKeyVideoModelSeedance      = "video_model_seedance_enabled" // Seedance 开关
+	SettingKeyVideoModelGrok          = "video_model_grok_enabled"    // Grok 开关
+	SettingKeyVideoDefaultPrice       = "video_default_price"         // 默认单次价格（USD）
+
 	// Gateway Forwarding Behavior
 	// SettingKeyEnableFingerprintUnification 是否统一 OAuth 账号的 X-Stainless-* 指纹头（默认 true）
 	SettingKeyEnableFingerprintUnification = "enable_fingerprint_unification"

@@ -199,6 +199,8 @@ func groupFromServiceBase(g *service.Group) Group {
 		RequireOAuthOnly:                g.RequireOAuthOnly,
 		RequirePrivacySet:               g.RequirePrivacySet,
 		ImageStudioEnabled:              g.ImageStudioEnabled,
+		VideoStudioEnabled:              g.VideoStudioEnabled,
+		VideoPrice:                      g.VideoPrice,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
 		BillingDisplay:                  billingDisplay,

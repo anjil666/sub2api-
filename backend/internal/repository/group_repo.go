@@ -64,7 +64,9 @@ func (r *groupRepository) Create(ctx context.Context, groupIn *service.Group) er
 		SetRequirePrivacySet(groupIn.RequirePrivacySet).
 		SetDefaultMappedModel(groupIn.DefaultMappedModel).
 		SetMessagesDispatchModelConfig(groupIn.MessagesDispatchModelConfig).
-		SetImageStudioEnabled(groupIn.ImageStudioEnabled)
+		SetImageStudioEnabled(groupIn.ImageStudioEnabled).
+		SetVideoStudioEnabled(groupIn.VideoStudioEnabled).
+		SetNillableVideoPrice(groupIn.VideoPrice)
 
 	// 设置模型路由配置
 	if groupIn.ModelRouting != nil {
@@ -132,7 +134,8 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		SetRequirePrivacySet(groupIn.RequirePrivacySet).
 		SetDefaultMappedModel(groupIn.DefaultMappedModel).
 		SetMessagesDispatchModelConfig(groupIn.MessagesDispatchModelConfig).
-		SetImageStudioEnabled(groupIn.ImageStudioEnabled)
+		SetImageStudioEnabled(groupIn.ImageStudioEnabled).
+		SetVideoStudioEnabled(groupIn.VideoStudioEnabled)
 
 	// 显式处理可空字段：nil 需要 clear，非 nil 需要 set。
 	if groupIn.DailyLimitUSD != nil {
@@ -164,6 +167,11 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		builder = builder.SetImagePrice4k(*groupIn.ImagePrice4K)
 	} else {
 		builder = builder.ClearImagePrice4k()
+	}
+	if groupIn.VideoPrice != nil {
+		builder = builder.SetVideoPrice(*groupIn.VideoPrice)
+	} else {
+		builder = builder.ClearVideoPrice()
 	}
 
 	// 处理 FallbackGroupID：nil 时清除，否则设置

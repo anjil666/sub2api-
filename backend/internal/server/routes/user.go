@@ -109,6 +109,14 @@ func RegisterUserRoutes(
 			models.GET("", h.ModelSquare.List)
 		}
 
+		// 视频工作室
+		video := authenticated.Group("/video")
+		{
+			video.POST("/generations", h.Video.Generate)
+			video.GET("/generations/:id", h.Video.GetStatus)
+			video.GET("/models", h.Video.GetModels)
+		}
+
 		// 健康状态（用户可见）
 		healthStatus := authenticated.Group("/health-status")
 		{

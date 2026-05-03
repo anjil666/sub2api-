@@ -693,6 +693,8 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		DefaultMappedModel:              g.DefaultMappedModel,
 		MessagesDispatchModelConfig:     g.MessagesDispatchModelConfig,
 		ImageStudioEnabled:              g.ImageStudioEnabled,
+		VideoStudioEnabled:              g.VideoStudioEnabled,
+		VideoPrice:                      g.VideoPrice,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
 	}

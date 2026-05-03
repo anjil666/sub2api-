@@ -78,6 +78,10 @@ const (
 	FieldMessagesDispatchModelConfig = "messages_dispatch_model_config"
 	// FieldImageStudioEnabled holds the string denoting the image_studio_enabled field in the database.
 	FieldImageStudioEnabled = "image_studio_enabled"
+	// FieldVideoStudioEnabled holds the string denoting the video_studio_enabled field in the database.
+	FieldVideoStudioEnabled = "video_studio_enabled"
+	// FieldVideoPrice holds the string denoting the video_price field in the database.
+	FieldVideoPrice = "video_price"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
 	EdgeAPIKeys = "api_keys"
 	// EdgeRedeemCodes holds the string denoting the redeem_codes edge name in mutations.
@@ -184,6 +188,8 @@ var Columns = []string{
 	FieldDefaultMappedModel,
 	FieldMessagesDispatchModelConfig,
 	FieldImageStudioEnabled,
+	FieldVideoStudioEnabled,
+	FieldVideoPrice,
 }
 
 var (
@@ -263,6 +269,8 @@ var (
 	DefaultMessagesDispatchModelConfig domain.OpenAIMessagesDispatchModelConfig
 	// DefaultImageStudioEnabled holds the default value on creation for the "image_studio_enabled" field.
 	DefaultImageStudioEnabled bool
+	// DefaultVideoStudioEnabled holds the default value on creation for the "video_studio_enabled" field.
+	DefaultVideoStudioEnabled bool
 )
 
 // OrderOption defines the ordering options for the Group queries.
@@ -411,6 +419,16 @@ func ByDefaultMappedModel(opts ...sql.OrderTermOption) OrderOption {
 // ByImageStudioEnabled orders the results by the image_studio_enabled field.
 func ByImageStudioEnabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldImageStudioEnabled, opts...).ToFunc()
+}
+
+// ByVideoStudioEnabled orders the results by the video_studio_enabled field.
+func ByVideoStudioEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVideoStudioEnabled, opts...).ToFunc()
+}
+
+// ByVideoPrice orders the results by the video_price field.
+func ByVideoPrice(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVideoPrice, opts...).ToFunc()
 }
 
 // ByAPIKeysCount orders the results by api_keys count.
