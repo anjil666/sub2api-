@@ -1,5 +1,5 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
-import axios, { type AxiosInstance } from 'axios'
+import { apiClient } from '@/api/client'
 import { keysAPI } from '@/api/keys'
 import { modelsAPI, type GroupModels } from '@/api/models'
 
@@ -55,6 +55,8 @@ export function useVideoGeneration() {
   const imageFile = ref<File | null>(null)
   const activeTab = ref<'text' | 'image'>('text')
   const price = ref<number>(0)
+  const videoModels = ref<{ id: string; name: string }[]>([])
+  const selectedModel = ref('')
 
   const tasks = ref<VideoTask[]>([])
   const pollTimers = new Map<string, ReturnType<typeof setInterval>>()
@@ -70,14 +72,6 @@ export function useVideoGeneration() {
     const k = apiKeys.value.find(k => k.group_id === selectedGroupId.value)
     return k?.key || ''
   })
-
-  function createAxios(): AxiosInstance {
-    return axios.create({
-      baseURL: window.location.origin,
-      timeout: 600000,
-      headers: { Authorization: `Bearer ${groupApiKey.value}` },
-    })
-  }
 
   async function loadGroupsAndKeys() {
     loadingGroups.value = true
@@ -100,26 +94,27 @@ export function useVideoGeneration() {
   }
 
   async function fetchPrice() {
-    if (!groupApiKey.value) return
     try {
-      const api = createAxios()
-      const { data } = await api.get('/api/v1/user/video/models')
+      const { data } = await apiClient.get('/user/video/models')
       const resp = data.data || data
       price.value = resp.price || 0
+      videoModels.value = resp.models || []
+      if (videoModels.value.length && !selectedModel.value) {
+        selectedModel.value = videoModels.value[0].id
+      }
     } catch { /* ignore */ }
   }
 
   watch(selectedGroupId, () => {
-    if (groupApiKey.value) fetchPrice()
+    fetchPrice()
   })
 
   async function enhancePrompt() {
-    if (!prompt.value.trim() || !groupApiKey.value) return
+    if (!prompt.value.trim()) return
     enhancing.value = true
     error.value = ''
     try {
-      const api = createAxios()
-      const { data } = await api.post('/api/v1/user/video/prompt/enhance', {
+      const { data } = await apiClient.post('/user/video/prompt/enhance', {
         prompt: prompt.value,
       })
       const resp = data.data || data
@@ -132,14 +127,13 @@ export function useVideoGeneration() {
   }
 
   async function submitTextGeneration() {
-    if (!prompt.value.trim() || !groupApiKey.value) return
+    if (!prompt.value.trim()) return
     submitting.value = true
     error.value = ''
     try {
-      const api = createAxios()
       for (let i = 0; i < generateCount.value; i++) {
-        const { data } = await api.post('/api/v1/user/video/generations', {
-          model: 'veo-3.1',
+        const { data } = await apiClient.post('/user/video/generations', {
+          model: selectedModel.value || 'veo-3.1',
           prompt: prompt.value,
           aspect_ratio: aspectRatio.value,
         })
@@ -164,16 +158,17 @@ export function useVideoGeneration() {
   }
 
   async function submitImg2Video() {
-    if (!imageFile.value || !groupApiKey.value) return
+    if (!imageFile.value) return
     submitting.value = true
     error.value = ''
     try {
-      const api = createAxios()
       const formData = new FormData()
       formData.append('image', imageFile.value)
       formData.append('prompt', prompt.value)
       formData.append('aspect_ratio', aspectRatio.value)
-      const { data } = await api.post('/api/v1/user/video/img2video', formData)
+      const { data } = await apiClient.post('/user/video/img2video', formData, {
+        timeout: 600000,
+      })
       const resp = data.data || data
       const task: VideoTask = {
         id: resp.id,
@@ -197,8 +192,7 @@ export function useVideoGeneration() {
     if (pollTimers.has(taskId)) return
     const timer = setInterval(async () => {
       try {
-        const api = createAxios()
-        const { data } = await api.get(`/api/v1/user/video/generations/${taskId}`)
+        const { data } = await apiClient.get(`/user/video/generations/${taskId}`)
         const resp = data.data || data
         const task = tasks.value.find(t => t.id === taskId)
         if (!task) { stopPolling(taskId); return }
@@ -230,7 +224,8 @@ export function useVideoGeneration() {
   return {
     loadingGroups, submitting, enhancing, error,
     groups: videoGroups, selectedGroupId, selectedGroup, groupApiKey,
-    price, prompt, aspectRatio, generateCount, imageFile, activeTab,
+    price, videoModels, selectedModel,
+    prompt, aspectRatio, generateCount, imageFile, activeTab,
     tasks,
     loadGroupsAndKeys, enhancePrompt,
     submitTextGeneration, submitImg2Video,

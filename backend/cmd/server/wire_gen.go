@@ -252,7 +252,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	handlerReferralHandler := handler.NewReferralHandler(referralService, settingService)
 	modelSquareHandler := handler.NewModelSquareHandler(gatewayService, pricingService, apiKeyService)
 	healthStatusHandler := handler.NewHealthStatusHandler(healthProbeService)
-	videoHandler := handler.NewVideoHandler(settingService, billingCacheService)
+	videoHandler := handler.NewVideoHandler(settingService, billingCacheService, usageService)
 	handlers := handler.ProvideHandlers(authHandler, userHandler, apiKeyHandler, usageHandler, redeemHandler, subscriptionHandler, announcementHandler, adminHandlers, gatewayHandler, openAIGatewayHandler, handlerSettingHandler, totpHandler, handlerPaymentHandler, paymentWebhookHandler, handlerReferralHandler, modelSquareHandler, healthStatusHandler, videoHandler, idempotencyCoordinator, idempotencyCleanupService)
 	jwtAuthMiddleware := middleware.NewJWTAuthMiddleware(authService, userService)
 	adminAuthMiddleware := middleware.NewAdminAuthMiddleware(authService, userService, settingService)

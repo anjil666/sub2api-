@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -17,12 +19,14 @@ import (
 type VideoHandler struct {
 	settingService      *service.SettingService
 	billingCacheService *service.BillingCacheService
+	usageService        *service.UsageService
 }
 
-func NewVideoHandler(settingService *service.SettingService, billingCacheService *service.BillingCacheService) *VideoHandler {
+func NewVideoHandler(settingService *service.SettingService, billingCacheService *service.BillingCacheService, usageService *service.UsageService) *VideoHandler {
 	return &VideoHandler{
 		settingService:      settingService,
 		billingCacheService: billingCacheService,
+		usageService:        usageService,
 	}
 }
 
@@ -80,7 +84,6 @@ func (h *VideoHandler) Generate(c *gin.Context) {
 			response.Error(c, http.StatusPaymentRequired, "insufficient balance")
 			return
 		}
-		h.billingCacheService.QueueDeductBalance(uid, price)
 	}
 
 	body, _ := json.Marshal(map[string]string{
@@ -105,6 +108,21 @@ func (h *VideoHandler) Generate(c *gin.Context) {
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 && price > 0 {
+		uid, _ := userID.(int64)
+		go func() {
+			_, _ = h.usageService.Create(c.Request.Context(), service.CreateUsageLogRequest{
+				UserID:         uid,
+				RequestID:      uuid.New().String(),
+				Model:          req.Model,
+				TotalCost:      price,
+				ActualCost:     price,
+				RateMultiplier: 1.0,
+			})
+		}()
+	}
+
 	c.Data(resp.StatusCode, "application/json", respBody)
 }
 
@@ -228,7 +246,6 @@ func (h *VideoHandler) GenerateFromImage(c *gin.Context) {
 			response.Error(c, http.StatusPaymentRequired, "insufficient balance")
 			return
 		}
-		h.billingCacheService.QueueDeductBalance(uid, price)
 	}
 
 	file, header, err := c.Request.FormFile("image")
@@ -262,5 +279,20 @@ func (h *VideoHandler) GenerateFromImage(c *gin.Context) {
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 && price > 0 {
+		uid, _ := userID.(int64)
+		go func() {
+			_, _ = h.usageService.Create(c.Request.Context(), service.CreateUsageLogRequest{
+				UserID:         uid,
+				RequestID:      uuid.New().String(),
+				Model:          "img2video",
+				TotalCost:      price,
+				ActualCost:     price,
+				RateMultiplier: 1.0,
+			})
+		}()
+	}
+
 	c.Data(resp.StatusCode, "application/json", respBody)
 }

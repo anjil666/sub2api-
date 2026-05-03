@@ -60,6 +60,16 @@
 
           <!-- Options row -->
           <div class="flex flex-wrap items-center gap-4">
+            <div v-if="videoModels.length > 1" class="flex items-center gap-2">
+              <label class="text-sm text-gray-600 dark:text-gray-400">模型</label>
+              <select v-model="selectedModel" class="input !w-auto !py-1 !text-sm">
+                <option v-for="m in videoModels" :key="m.id" :value="m.id">{{ m.name }}</option>
+              </select>
+            </div>
+            <div v-else-if="videoModels.length === 1" class="flex items-center gap-2">
+              <label class="text-sm text-gray-600 dark:text-gray-400">模型</label>
+              <span class="text-sm font-medium text-primary-600 dark:text-primary-400">{{ videoModels[0].name }}</span>
+            </div>
             <div class="flex items-center gap-2">
               <label class="text-sm text-gray-600 dark:text-gray-400">画面比例</label>
               <select v-model="aspectRatio" class="input !w-auto !py-1 !text-sm">
@@ -80,10 +90,10 @@
           <div class="space-y-2">
             <div class="flex items-center justify-between">
               <label class="text-sm font-medium text-gray-700 dark:text-gray-300">提示词</label>
-              <button @click="enhancePrompt" :disabled="enhancing || !prompt.trim() || !groupApiKey"
-                class="text-xs px-2 py-1 rounded-md transition-colors bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 disabled:opacity-40">
+              <button @click="enhancePrompt" :disabled="enhancing || !prompt.trim()"
+                class="text-xs px-3 py-1 rounded-md font-medium transition-colors bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">
                 <span v-if="enhancing">优化中...</span>
-                <span v-else>AI 优化</span>
+                <span v-else>AI 优化提示词</span>
               </button>
             </div>
             <textarea v-model="prompt" rows="4" :placeholder="activeTab === 'text' ? '描述你想生成的视频内容...' : '描述视频动作（可选）...'"
@@ -92,7 +102,7 @@
 
           <!-- Submit -->
           <button @click="activeTab === 'text' ? submitTextGeneration() : submitImg2Video()"
-            :disabled="submitting || !groupApiKey || (activeTab === 'text' ? !prompt.trim() : !imageFile)"
+            :disabled="submitting || (activeTab === 'text' ? !prompt.trim() : !imageFile)"
             class="btn-primary w-full !py-2.5">
             <span v-if="submitting">提交中...</span>
             <span v-else>{{ activeTab === 'text' ? '生成视频' : '图片生成视频' }}</span>
@@ -137,7 +147,8 @@ import { useVideoGeneration } from '@/composables/useVideoGeneration'
 const {
   loadingGroups, submitting, enhancing, error,
   groups, selectedGroupId, groupApiKey,
-  price, prompt, aspectRatio, generateCount, imageFile, activeTab,
+  price, videoModels, selectedModel,
+  prompt, aspectRatio, generateCount, imageFile, activeTab,
   tasks,
   loadGroupsAndKeys, enhancePrompt,
   submitTextGeneration, submitImg2Video,
