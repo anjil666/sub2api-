@@ -293,3 +293,52 @@ func (h *VideoHandler) GenerateFromImage(c *gin.Context) {
 
 	c.Data(resp.StatusCode, "application/json", respBody)
 }
+
+// VideoProxy handles GET /api/v1/video/proxy — streaming proxy for video playback/download
+func (h *VideoHandler) VideoProxy(c *gin.Context) {
+	videoURL := c.Query("url")
+	if videoURL == "" {
+		response.Error(c, http.StatusBadRequest, "url parameter required")
+		return
+	}
+
+	req, err := http.NewRequestWithContext(c.Request.Context(), "GET", videoURL, nil)
+	if err != nil {
+		response.Error(c, http.StatusBadGateway, "invalid url")
+		return
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+	client := &http.Client{Timeout: 10 * time.Minute}
+	resp, err := client.Do(req)
+	if err != nil {
+		response.Error(c, http.StatusBadGateway, "failed to fetch video")
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		response.Error(c, http.StatusBadGateway, "upstream returned "+resp.Status)
+		return
+	}
+
+	fn := c.Query("fn")
+	if fn == "" {
+		fn = "video.mp4"
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "video/mp4"
+	}
+
+	if c.Query("dl") == "1" {
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fn))
+	}
+	if resp.ContentLength > 0 {
+		c.Header("Content-Length", fmt.Sprintf("%d", resp.ContentLength))
+	}
+	c.Status(http.StatusOK)
+	c.Header("Content-Type", ct)
+	io.Copy(c.Writer, resp.Body)
+}

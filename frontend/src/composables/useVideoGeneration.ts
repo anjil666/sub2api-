@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { apiClient } from '@/api/client'
 
 export interface VideoTask {
@@ -10,6 +10,19 @@ export interface VideoTask {
   video_url: string
   error?: string
   created_at: number
+}
+
+const STORAGE_KEY = 'video_tasks'
+
+function loadTasks(): VideoTask[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function saveTasks(list: VideoTask[]) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)) } catch {}
 }
 
 function translateError(msg: string): string {
@@ -32,9 +45,18 @@ function translateError(msg: string): string {
   }
   return msg
 }
+
 function extractApiError(e: any): string {
   const msg = e?.response?.data?.error?.message || e?.response?.data?.message || e?.message || ''
   return translateError(msg)
+}
+
+function getProxyUrl(url: string, dl = false): string {
+  const token = localStorage.getItem('auth_token') || ''
+  const base = (import.meta.env.VITE_API_BASE_URL || '/api/v1')
+  let proxyUrl = `${base}/video/proxy?url=${encodeURIComponent(url)}&token=${encodeURIComponent(token)}`
+  if (dl) proxyUrl += '&dl=1&fn=video.mp4'
+  return proxyUrl
 }
 
 export function useVideoGeneration() {
@@ -51,8 +73,12 @@ export function useVideoGeneration() {
   const videoModels = ref<{ id: string; name: string }[]>([])
   const selectedModel = ref('')
 
-  const tasks = ref<VideoTask[]>([])
+  const tasks = ref<VideoTask[]>(loadTasks())
   const pollTimers = new Map<string, ReturnType<typeof setInterval>>()
+
+  watch(tasks, (val) => saveTasks(val), { deep: true })
+
+  // PLACEHOLDER_FUNCTIONS
 
   async function fetchPrice() {
     try {
@@ -114,6 +140,8 @@ export function useVideoGeneration() {
     }
   }
 
+  // PLACEHOLDER_MORE
+
   async function submitImg2Video() {
     if (!imageFile.value) return
     submitting.value = true
@@ -174,6 +202,27 @@ export function useVideoGeneration() {
     tasks.value = tasks.value.filter(t => t.id !== taskId)
   }
 
+  function getVideoProxyUrl(url: string): string {
+    return getProxyUrl(url, false)
+  }
+
+  function downloadVideo(url: string) {
+    const a = document.createElement('a')
+    a.href = getProxyUrl(url, true)
+    a.download = 'video.mp4'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+
+  function resumePolling() {
+    for (const task of tasks.value) {
+      if (task.status === 'pending' || task.status === 'processing') {
+        startPolling(task.id)
+      }
+    }
+  }
+
   onUnmounted(() => {
     for (const [id] of pollTimers) stopPolling(id)
   })
@@ -185,6 +234,6 @@ export function useVideoGeneration() {
     tasks,
     fetchPrice, enhancePrompt,
     submitTextGeneration, submitImg2Video,
-    removeTask,
+    removeTask, getVideoProxyUrl, downloadVideo, resumePolling,
   }
 }

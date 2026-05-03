@@ -117,6 +117,7 @@ func RegisterUserRoutes(
 			video.GET("/models", h.Video.GetModels)
 			video.POST("/prompt/enhance", h.Video.EnhancePrompt)
 			video.POST("/img2video", h.Video.GenerateFromImage)
+			video.GET("/proxy", h.Video.VideoProxy)
 		}
 
 		// 健康状态（用户可见）
