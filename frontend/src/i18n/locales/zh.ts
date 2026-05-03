@@ -359,6 +359,7 @@ export default {
     docs: '文档',
     modelSquare: '模型广场',
     imageStudio: '做图工作室',
+    videoStudio: '视频工坊',
     upstreamSync: '上游同步',
     myOrders: '我的订单',
     orderManagement: '订单管理',
@@ -452,6 +453,11 @@ export default {
   imageStudio: {
     title: '做图工作室',
     description: 'AI 图片生成与编辑',
+  },
+
+  videoStudio: {
+    title: '视频工坊',
+    description: 'AI 视频生成',
   },
 
   // Auth

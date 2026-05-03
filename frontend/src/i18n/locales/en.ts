@@ -359,6 +359,7 @@ export default {
     docs: 'Docs',
     modelSquare: 'Model Square',
     imageStudio: 'Image Studio',
+    videoStudio: 'Video Studio',
     upstreamSync: 'Upstream Sync',
     myOrders: 'My Orders',
     orderManagement: 'Orders',
@@ -450,6 +451,11 @@ export default {
   imageStudio: {
     title: 'Image Studio',
     description: 'AI image generation and editing',
+  },
+
+  videoStudio: {
+    title: 'Video Studio',
+    description: 'AI video generation',
   },
 
   // Auth

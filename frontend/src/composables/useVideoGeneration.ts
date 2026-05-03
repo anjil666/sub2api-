@@ -3,21 +3,15 @@ import axios, { type AxiosInstance } from 'axios'
 import { keysAPI } from '@/api/keys'
 import { modelsAPI, type GroupModels } from '@/api/models'
 
-export interface VideoModel {
-  id: string
-  name: string
-}
-
 export interface VideoTask {
   id: string
-  model: string
   prompt: string
   aspect_ratio: string
+  mode: 'text' | 'image'
   status: 'pending' | 'processing' | 'completed' | 'failed'
   video_url: string
   error?: string
   created_at: number
-  _pollTimer?: ReturnType<typeof setInterval>
 }
 
 function translateError(msg: string): string {
@@ -46,27 +40,22 @@ function extractApiError(e: any): string {
 }
 
 export function useVideoGeneration() {
-  const loading = ref(false)
   const loadingGroups = ref(false)
-  const loadingModels = ref(false)
   const submitting = ref(false)
+  const enhancing = ref(false)
   const error = ref('')
 
-  // group & key
   const groups = ref<GroupModels[]>([])
   const apiKeys = ref<{ key: string; group_id: number | null }[]>([])
   const selectedGroupId = ref<number | null>(null)
 
-  // video models & price
-  const videoModels = ref<VideoModel[]>([])
-  const selectedModel = ref('')
+  const prompt = ref('')
+  const aspectRatio = ref('9:16')
+  const generateCount = ref(1)
+  const imageFile = ref<File | null>(null)
+  const activeTab = ref<'text' | 'image'>('text')
   const price = ref<number>(0)
 
-  // generation params
-  const prompt = ref('')
-  const aspectRatio = ref('16:9')
-
-  // tasks
   const tasks = ref<VideoTask[]>([])
   const pollTimers = new Map<string, ReturnType<typeof setInterval>>()
 
@@ -76,7 +65,6 @@ export function useVideoGeneration() {
   const selectedGroup = computed(() =>
     videoGroups.value.find(g => g.group_id === selectedGroupId.value) || null
   )
-
   const groupApiKey = computed(() => {
     if (!selectedGroupId.value) return ''
     const k = apiKeys.value.find(k => k.group_id === selectedGroupId.value)
@@ -110,48 +98,88 @@ export function useVideoGeneration() {
       loadingGroups.value = false
     }
   }
-  async function fetchVideoModels() {
+
+  async function fetchPrice() {
     if (!groupApiKey.value) return
-    loadingModels.value = true
     try {
       const api = createAxios()
       const { data } = await api.get('/api/v1/user/video/models')
       const resp = data.data || data
-      videoModels.value = resp.models || []
       price.value = resp.price || 0
-      if (videoModels.value.length && !videoModels.value.find(m => m.id === selectedModel.value)) {
-        selectedModel.value = videoModels.value[0].id
-      }
-    } catch (e: any) {
-      error.value = extractApiError(e) || '加载视频模型失败'
-    } finally {
-      loadingModels.value = false
-    }
+    } catch { /* ignore */ }
   }
 
   watch(selectedGroupId, () => {
-    if (groupApiKey.value) {
-      fetchVideoModels()
-    }
+    if (groupApiKey.value) fetchPrice()
   })
 
-  async function submitGeneration() {
-    if (!prompt.value.trim() || !groupApiKey.value || !selectedModel.value) return
+  async function enhancePrompt() {
+    if (!prompt.value.trim() || !groupApiKey.value) return
+    enhancing.value = true
+    error.value = ''
+    try {
+      const api = createAxios()
+      const { data } = await api.post('/api/v1/user/video/prompt/enhance', {
+        prompt: prompt.value,
+      })
+      const resp = data.data || data
+      if (resp.enhanced) prompt.value = resp.enhanced
+    } catch (e: any) {
+      error.value = extractApiError(e) || '提示词优化失败'
+    } finally {
+      enhancing.value = false
+    }
+  }
+
+  async function submitTextGeneration() {
+    if (!prompt.value.trim() || !groupApiKey.value) return
     submitting.value = true
     error.value = ''
     try {
       const api = createAxios()
-      const { data } = await api.post('/api/v1/user/video/generations', {
-        model: selectedModel.value,
-        prompt: prompt.value,
-        aspect_ratio: aspectRatio.value,
-      })
+      for (let i = 0; i < generateCount.value; i++) {
+        const { data } = await api.post('/api/v1/user/video/generations', {
+          model: 'veo-3.1',
+          prompt: prompt.value,
+          aspect_ratio: aspectRatio.value,
+        })
+        const resp = data.data || data
+        const task: VideoTask = {
+          id: resp.id,
+          prompt: prompt.value,
+          aspect_ratio: aspectRatio.value,
+          mode: 'text',
+          status: resp.status || 'pending',
+          video_url: '',
+          created_at: Date.now(),
+        }
+        tasks.value.unshift(task)
+        startPolling(task.id)
+      }
+    } catch (e: any) {
+      error.value = extractApiError(e) || '提交视频生成失败'
+    } finally {
+      submitting.value = false
+    }
+  }
+
+  async function submitImg2Video() {
+    if (!imageFile.value || !groupApiKey.value) return
+    submitting.value = true
+    error.value = ''
+    try {
+      const api = createAxios()
+      const formData = new FormData()
+      formData.append('image', imageFile.value)
+      formData.append('prompt', prompt.value)
+      formData.append('aspect_ratio', aspectRatio.value)
+      const { data } = await api.post('/api/v1/user/video/img2video', formData)
       const resp = data.data || data
       const task: VideoTask = {
         id: resp.id,
-        model: selectedModel.value,
-        prompt: prompt.value,
+        prompt: prompt.value || '图生视频',
         aspect_ratio: aspectRatio.value,
+        mode: 'image',
         status: resp.status || 'pending',
         video_url: '',
         created_at: Date.now(),
@@ -159,11 +187,12 @@ export function useVideoGeneration() {
       tasks.value.unshift(task)
       startPolling(task.id)
     } catch (e: any) {
-      error.value = extractApiError(e) || '提交视频生成失败'
+      error.value = extractApiError(e) || '提交图生视频失败'
     } finally {
       submitting.value = false
     }
   }
+
   function startPolling(taskId: string) {
     if (pollTimers.has(taskId)) return
     const timer = setInterval(async () => {
@@ -179,25 +208,14 @@ export function useVideoGeneration() {
         if (task.status === 'completed' || task.status === 'failed') {
           stopPolling(taskId)
         }
-      } catch {
-        // keep polling on transient errors
-      }
+      } catch { /* keep polling */ }
     }, 10000)
     pollTimers.set(taskId, timer)
   }
 
   function stopPolling(taskId: string) {
     const timer = pollTimers.get(taskId)
-    if (timer) {
-      clearInterval(timer)
-      pollTimers.delete(taskId)
-    }
-  }
-
-  function stopAllPolling() {
-    for (const [id] of pollTimers) {
-      stopPolling(id)
-    }
+    if (timer) { clearInterval(timer); pollTimers.delete(taskId) }
   }
 
   function removeTask(taskId: string) {
@@ -206,16 +224,16 @@ export function useVideoGeneration() {
   }
 
   onUnmounted(() => {
-    stopAllPolling()
+    for (const [id] of pollTimers) stopPolling(id)
   })
 
   return {
-    loading, loadingGroups, loadingModels, submitting, error,
+    loadingGroups, submitting, enhancing, error,
     groups: videoGroups, selectedGroupId, selectedGroup, groupApiKey,
-    videoModels, selectedModel, price,
-    prompt, aspectRatio,
+    price, prompt, aspectRatio, generateCount, imageFile, activeTab,
     tasks,
-    loadGroupsAndKeys, fetchVideoModels, submitGeneration,
-    removeTask, stopAllPolling,
+    loadGroupsAndKeys, enhancePrompt,
+    submitTextGeneration, submitImg2Video,
+    removeTask,
   }
 }

@@ -63,6 +63,7 @@ type modelSquareGroup struct {
 	ImagePrice2K   *float64          `json:"image_price_2k,omitempty"`
 	ImagePrice4K        *float64          `json:"image_price_4k,omitempty"`
 	ImageStudioEnabled  bool              `json:"image_studio_enabled"`
+	VideoStudioEnabled  bool              `json:"video_studio_enabled"`
 	Models              []modelSquareItem `json:"models"`
 }
 
@@ -112,6 +113,7 @@ func (h *ModelSquareHandler) List(c *gin.Context) {
 				ImagePrice2K:       group.ImagePrice2K,
 				ImagePrice4K:       group.ImagePrice4K,
 				ImageStudioEnabled: group.ImageStudioEnabled,
+				VideoStudioEnabled: group.VideoStudioEnabled,
 				Models:             []modelSquareItem{},
 			})
 			continue
@@ -171,6 +173,7 @@ func (h *ModelSquareHandler) List(c *gin.Context) {
 			ImagePrice2K:       group.ImagePrice2K,
 			ImagePrice4K:       group.ImagePrice4K,
 			ImageStudioEnabled: group.ImageStudioEnabled,
+			VideoStudioEnabled: group.VideoStudioEnabled,
 			Models:             modelInfos,
 		})
 	}

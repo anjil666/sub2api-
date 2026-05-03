@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"time"
 
@@ -166,4 +167,100 @@ func (h *VideoHandler) GetModels(c *gin.Context) {
 		"models": models,
 		"price":  settings.VideoDefaultPrice,
 	})
+}
+
+// EnhancePrompt handles POST /api/v1/user/video/prompt/enhance
+func (h *VideoHandler) EnhancePrompt(c *gin.Context) {
+	var req struct {
+		Prompt string `json:"prompt" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid request: "+err.Error())
+		return
+	}
+
+	proxyURL, proxyToken, err := h.getVideoSettings(c)
+	if err != nil {
+		response.Error(c, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+
+	body, _ := json.Marshal(map[string]string{"prompt": req.Prompt})
+	proxyReq, _ := http.NewRequestWithContext(c.Request.Context(), "POST",
+		proxyURL+"/v1/prompt/enhance", bytes.NewReader(body))
+	proxyReq.Header.Set("Content-Type", "application/json")
+	if proxyToken != "" {
+		proxyReq.Header.Set("Authorization", "Bearer "+proxyToken)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(proxyReq)
+	if err != nil {
+		response.Error(c, http.StatusBadGateway, "proxy error: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	c.Data(resp.StatusCode, "application/json", respBody)
+}
+
+// GenerateFromImage handles POST /api/v1/user/video/img2video
+func (h *VideoHandler) GenerateFromImage(c *gin.Context) {
+	proxyURL, proxyToken, err := h.getVideoSettings(c)
+	if err != nil {
+		response.Error(c, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+
+	userID, exists := c.Get("user_id")
+	if !exists {
+		response.Error(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	settings, _ := h.settingService.GetAllSettings(c.Request.Context())
+	price := settings.VideoDefaultPrice
+	if price > 0 {
+		uid, _ := userID.(int64)
+		balance, err := h.billingCacheService.GetUserBalance(c.Request.Context(), uid)
+		if err != nil || balance < price {
+			response.Error(c, http.StatusPaymentRequired, "insufficient balance")
+			return
+		}
+		h.billingCacheService.QueueDeductBalance(uid, price)
+	}
+
+	file, header, err := c.Request.FormFile("image")
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "image file is required")
+		return
+	}
+	defer file.Close()
+
+	var proxyBuf bytes.Buffer
+	proxyWriter := multipart.NewWriter(&proxyBuf)
+	proxyWriter.WriteField("prompt", c.PostForm("prompt"))
+	proxyWriter.WriteField("aspect_ratio", c.PostForm("aspect_ratio"))
+	imgPart, _ := proxyWriter.CreateFormFile("image", header.Filename)
+	io.Copy(imgPart, file)
+	proxyWriter.Close()
+
+	proxyReq, _ := http.NewRequestWithContext(c.Request.Context(), "POST",
+		proxyURL+"/v1/video/img2video", &proxyBuf)
+	proxyReq.Header.Set("Content-Type", proxyWriter.FormDataContentType())
+	if proxyToken != "" {
+		proxyReq.Header.Set("Authorization", "Bearer "+proxyToken)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(proxyReq)
+	if err != nil {
+		response.Error(c, http.StatusBadGateway, "proxy error: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	c.Data(resp.StatusCode, "application/json", respBody)
 }

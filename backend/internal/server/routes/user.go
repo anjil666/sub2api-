@@ -115,6 +115,8 @@ func RegisterUserRoutes(
 			video.POST("/generations", h.Video.Generate)
 			video.GET("/generations/:id", h.Video.GetStatus)
 			video.GET("/models", h.Video.GetModels)
+			video.POST("/prompt/enhance", h.Video.EnhancePrompt)
+			video.POST("/img2video", h.Video.GenerateFromImage)
 		}
 
 		// 健康状态（用户可见）
