@@ -8,7 +8,6 @@ export interface VideoTask {
   mode: 'text' | 'image'
   status: 'pending' | 'processing' | 'completed' | 'failed'
   video_url: string
-  blob_url?: string
   error?: string
   created_at: number
 }
@@ -23,10 +22,7 @@ function loadTasks(): VideoTask[] {
 }
 
 function saveTasks(list: VideoTask[]) {
-  try {
-    const toSave = list.map(t => ({ ...t, blob_url: undefined }))
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
-  } catch {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)) } catch {}
 }
 
 function translateError(msg: string): string {
@@ -55,7 +51,7 @@ function extractApiError(e: any): string {
   return translateError(msg)
 }
 
-async function fetchVideoBlob(videoUrl: string): Promise<string | null> {
+async function fetchVideoBlob(videoUrl: string): Promise<boolean> {
   try {
     const resp = await apiClient.get('/video/proxy', {
       params: { url: videoUrl },
@@ -63,9 +59,17 @@ async function fetchVideoBlob(videoUrl: string): Promise<string | null> {
       timeout: 600000,
     })
     const blob = new Blob([resp.data], { type: 'video/mp4' })
-    return URL.createObjectURL(blob)
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = 'video.mp4'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 3000)
+    return true
   } catch {
-    return null
+    return false
   }
 }
 
@@ -196,9 +200,6 @@ export function useVideoGeneration() {
         if (resp.error) task.error = resp.error
         if (task.status === 'completed' || task.status === 'failed') {
           stopPolling(taskId)
-          if (task.status === 'completed' && task.video_url && !task.blob_url) {
-            task.blob_url = await fetchVideoBlob(task.video_url) || undefined
-          }
         }
       } catch { /* keep polling */ }
     }, 10000)
@@ -212,33 +213,29 @@ export function useVideoGeneration() {
 
   function removeTask(taskId: string) {
     stopPolling(taskId)
-    const task = tasks.value.find(t => t.id === taskId)
-    if (task?.blob_url) URL.revokeObjectURL(task.blob_url)
     tasks.value = tasks.value.filter(t => t.id !== taskId)
   }
 
-  async function loadVideoBlob(task: VideoTask) {
-    if (task.blob_url || !task.video_url) return
-    task.blob_url = await fetchVideoBlob(task.video_url) || undefined
+  const downloading = ref<Set<string>>(new Set())
+
+  async function downloadVideo(task: VideoTask) {
+    if (!task.video_url || downloading.value.has(task.id)) return
+    downloading.value.add(task.id)
+    const ok = await fetchVideoBlob(task.video_url)
+    downloading.value.delete(task.id)
+    if (!ok) {
+      error.value = '下载失败，视频链接可能已过期'
+    }
   }
 
-  function downloadVideo(task: VideoTask) {
-    const url = task.blob_url
-    if (!url) return
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'video.mp4'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+  function isDownloading(taskId: string): boolean {
+    return downloading.value.has(taskId)
   }
 
   function resumePolling() {
     for (const task of tasks.value) {
       if (task.status === 'pending' || task.status === 'processing') {
         startPolling(task.id)
-      } else if (task.status === 'completed' && task.video_url && !task.blob_url) {
-        loadVideoBlob(task)
       }
     }
   }
@@ -254,6 +251,6 @@ export function useVideoGeneration() {
     tasks,
     fetchPrice, enhancePrompt,
     submitTextGeneration, submitImg2Video,
-    removeTask, downloadVideo, resumePolling,
+    removeTask, downloadVideo, isDownloading, resumePolling,
   }
 }
