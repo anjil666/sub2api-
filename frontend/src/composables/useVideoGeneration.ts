@@ -8,6 +8,7 @@ export interface VideoTask {
   mode: 'text' | 'image'
   status: 'pending' | 'processing' | 'completed' | 'failed'
   video_url: string
+  blob_url?: string
   error?: string
   created_at: number
 }
@@ -22,7 +23,10 @@ function loadTasks(): VideoTask[] {
 }
 
 function saveTasks(list: VideoTask[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)) } catch {}
+  try {
+    const toSave = list.map(t => ({ ...t, blob_url: undefined }))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
+  } catch {}
 }
 
 function translateError(msg: string): string {
@@ -51,12 +55,18 @@ function extractApiError(e: any): string {
   return translateError(msg)
 }
 
-function getProxyUrl(url: string, dl = false): string {
-  const token = localStorage.getItem('auth_token') || ''
-  const base = (import.meta.env.VITE_API_BASE_URL || '/api/v1')
-  let proxyUrl = `${base}/video/proxy?url=${encodeURIComponent(url)}&token=${encodeURIComponent(token)}`
-  if (dl) proxyUrl += '&dl=1&fn=video.mp4'
-  return proxyUrl
+async function fetchVideoBlob(videoUrl: string): Promise<string | null> {
+  try {
+    const resp = await apiClient.get('/video/proxy', {
+      params: { url: videoUrl },
+      responseType: 'blob',
+      timeout: 600000,
+    })
+    const blob = new Blob([resp.data], { type: 'video/mp4' })
+    return URL.createObjectURL(blob)
+  } catch {
+    return null
+  }
 }
 
 export function useVideoGeneration() {
@@ -186,6 +196,9 @@ export function useVideoGeneration() {
         if (resp.error) task.error = resp.error
         if (task.status === 'completed' || task.status === 'failed') {
           stopPolling(taskId)
+          if (task.status === 'completed' && task.video_url && !task.blob_url) {
+            task.blob_url = await fetchVideoBlob(task.video_url) || undefined
+          }
         }
       } catch { /* keep polling */ }
     }, 10000)
@@ -199,16 +212,21 @@ export function useVideoGeneration() {
 
   function removeTask(taskId: string) {
     stopPolling(taskId)
+    const task = tasks.value.find(t => t.id === taskId)
+    if (task?.blob_url) URL.revokeObjectURL(task.blob_url)
     tasks.value = tasks.value.filter(t => t.id !== taskId)
   }
 
-  function getVideoProxyUrl(url: string): string {
-    return getProxyUrl(url, false)
+  async function loadVideoBlob(task: VideoTask) {
+    if (task.blob_url || !task.video_url) return
+    task.blob_url = await fetchVideoBlob(task.video_url) || undefined
   }
 
-  function downloadVideo(url: string) {
+  function downloadVideo(task: VideoTask) {
+    const url = task.blob_url
+    if (!url) return
     const a = document.createElement('a')
-    a.href = getProxyUrl(url, true)
+    a.href = url
     a.download = 'video.mp4'
     document.body.appendChild(a)
     a.click()
@@ -219,6 +237,8 @@ export function useVideoGeneration() {
     for (const task of tasks.value) {
       if (task.status === 'pending' || task.status === 'processing') {
         startPolling(task.id)
+      } else if (task.status === 'completed' && task.video_url && !task.blob_url) {
+        loadVideoBlob(task)
       }
     }
   }
@@ -234,6 +254,6 @@ export function useVideoGeneration() {
     tasks,
     fetchPrice, enhancePrompt,
     submitTextGeneration, submitImg2Video,
-    removeTask, getVideoProxyUrl, downloadVideo, resumePolling,
+    removeTask, downloadVideo, resumePolling,
   }
 }

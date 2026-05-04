@@ -115,8 +115,11 @@
             </div>
             <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{{ task.prompt }}</p>
             <div v-if="task.status === 'completed' && task.video_url" class="space-y-2">
-              <video :src="getVideoProxyUrl(task.video_url)" controls class="w-full rounded-md" preload="metadata"></video>
-              <button @click="downloadVideo(task.video_url)" class="block w-full text-center text-xs text-primary-500 hover:underline cursor-pointer">下载视频</button>
+              <div v-if="task.blob_url">
+                <video :src="task.blob_url" controls class="w-full rounded-md" preload="metadata"></video>
+                <button @click="downloadVideo(task)" class="block w-full text-center text-xs text-primary-500 hover:underline cursor-pointer mt-2">下载视频</button>
+              </div>
+              <p v-else class="text-xs text-gray-400 text-center py-2">视频加载中...</p>
             </div>
             <p v-if="task.status === 'failed' && task.error" class="text-xs text-red-500">{{ task.error }}</p>
           </div>
@@ -138,7 +141,7 @@ const {
   tasks,
   fetchPrice, enhancePrompt,
   submitTextGeneration, submitImg2Video,
-  removeTask, getVideoProxyUrl, downloadVideo, resumePolling,
+  removeTask, downloadVideo, resumePolling,
 } = useVideoGeneration()
 
 const fileInput = ref<HTMLInputElement | null>(null)
