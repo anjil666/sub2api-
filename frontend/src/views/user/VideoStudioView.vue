@@ -30,7 +30,7 @@
             <div class="relative">
               <input type="file" accept="image/*" @change="onImageChange" class="hidden" ref="fileInput" />
               <div @click="($refs.fileInput as HTMLInputElement)?.click()"
-                class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
+                class="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors
                   border-gray-300 dark:border-dark-600 hover:border-primary-400 dark:hover:border-primary-500">
                 <div v-if="imageFile" class="space-y-1">
                   <p class="text-sm text-gray-600 dark:text-gray-400">{{ imageFile.name }}</p>
@@ -95,44 +95,73 @@
           </button>
         </div>
 
-        <!-- Right: Tasks -->
+        <!-- Right: Tasks Grid -->
         <div class="lg:col-span-3 card p-4 space-y-3">
-          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">生成任务</h3>
-          <p class="text-xs text-amber-600 dark:text-amber-400">视频及时下载，避免重要资源丢失</p>
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">生成任务</h3>
+            <button v-if="tasks.length" @click="clearCompleted"
+              class="text-xs text-gray-400 hover:text-red-500 transition-colors">清空已完成</button>
+          </div>
+          <p class="text-xs text-amber-600 dark:text-amber-400">视频及时下载，链接会过期</p>
           <div v-if="!tasks.length" class="text-center py-8 text-sm text-gray-400">暂无任务</div>
-          <div v-for="task in tasks" :key="task.id" class="border rounded-lg p-3 space-y-2 border-gray-200 dark:border-dark-600">
-            <div class="flex items-center justify-between">
-              <span class="text-xs px-2 py-0.5 rounded-full"
-                :class="{
-                  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400': task.status === 'pending',
-                  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400': task.status === 'processing',
-                  'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400': task.status === 'completed',
-                  'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400': task.status === 'failed',
-                }">
-                {{ { pending: '排队中', processing: '生成中', completed: '已完成', failed: '失败' }[task.status] }}
-              </span>
-              <button @click="removeTask(task.id)" class="text-gray-400 hover:text-red-500 text-xs">删除</button>
+          <div class="grid grid-cols-2 gap-3">
+            <div v-for="task in tasks" :key="task.id"
+              class="border rounded-lg p-2 space-y-1.5 border-gray-200 dark:border-dark-600">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] px-1.5 py-0.5 rounded-full"
+                  :class="{
+                    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400': task.status === 'pending',
+                    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400': task.status === 'processing',
+                    'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400': task.status === 'completed',
+                    'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400': task.status === 'failed',
+                  }">
+                  {{ { pending: '排队中', processing: '生成中', completed: '已完成', failed: '失败' }[task.status] }}
+                </span>
+                <button @click="removeTask(task.id)" class="text-gray-400 hover:text-red-500 text-[10px]">删除</button>
+              </div>
+              <p class="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">{{ task.prompt }}</p>
+              <div v-if="task.status === 'completed' && task.video_url" class="space-y-1">
+                <div class="relative cursor-pointer group" @click="openPlayer(task)">
+                  <video :src="proxyVideoUrl(task.video_url)" class="w-full aspect-video rounded object-cover" preload="metadata" muted></video>
+                  <div class="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                    <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                  </div>
+                </div>
+                <button @click="downloadVideo(task)" :disabled="isDownloading(task.id)"
+                  class="block w-full text-center text-[10px] text-primary-500 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-wait">
+                  {{ isDownloading(task.id) ? '下载中...' : '下载视频' }}
+                </button>
+              </div>
+              <p v-if="task.status === 'failed' && task.error" class="text-[10px] text-red-500 line-clamp-2">{{ task.error }}</p>
             </div>
-            <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{{ task.prompt }}</p>
-            <div v-if="task.status === 'completed' && task.video_url" class="space-y-2">
-              <video :src="proxyVideoUrl(task.video_url)" controls class="w-full rounded-md" preload="metadata"></video>
-              <button @click="downloadVideo(task)" :disabled="isDownloading(task.id)"
-                class="block w-full text-center text-xs text-primary-500 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-wait">
-                {{ isDownloading(task.id) ? '下载中...' : '下载视频' }}
-              </button>
-            </div>
-            <p v-if="task.status === 'failed' && task.error" class="text-xs text-red-500">{{ task.error }}</p>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Fullscreen Player Modal -->
+    <Teleport to="body">
+      <div v-if="playerTask" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80" @click.self="playerTask = null">
+        <div class="relative w-full max-w-3xl mx-4">
+          <button @click="playerTask = null" class="absolute -top-10 right-0 text-white text-sm hover:text-gray-300">关闭</button>
+          <video :src="proxyVideoUrl(playerTask.video_url)" controls autoplay class="w-full rounded-lg shadow-2xl"></video>
+          <div class="mt-2 flex items-center justify-between">
+            <p class="text-xs text-gray-300 line-clamp-1 flex-1 mr-4">{{ playerTask.prompt }}</p>
+            <button @click="downloadVideo(playerTask!)" :disabled="isDownloading(playerTask!.id)"
+              class="text-xs text-primary-400 hover:underline whitespace-nowrap disabled:opacity-50">
+              {{ isDownloading(playerTask!.id) ? '下载中...' : '下载视频' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { useVideoGeneration } from '@/composables/useVideoGeneration'
+import { useVideoGeneration, type VideoTask } from '@/composables/useVideoGeneration'
 
 const {
   submitting, enhancing, error,
@@ -141,10 +170,11 @@ const {
   tasks,
   fetchPrice, enhancePrompt,
   submitTextGeneration, submitImg2Video,
-  removeTask, downloadVideo, isDownloading, resumePolling,
+  removeTask, clearCompleted, downloadVideo, isDownloading, resumePolling,
 } = useVideoGeneration()
 
 const fileInput = ref<HTMLInputElement | null>(null)
+const playerTask = ref<VideoTask | null>(null)
 
 function proxyVideoUrl(url: string): string {
   if (!url) return ''
@@ -157,6 +187,10 @@ function onImageChange(e: Event) {
   if (input.files?.length) {
     imageFile.value = input.files[0]
   }
+}
+
+function openPlayer(task: VideoTask) {
+  playerTask.value = task
 }
 
 onMounted(() => {

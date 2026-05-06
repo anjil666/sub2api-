@@ -216,6 +216,10 @@ export function useVideoGeneration() {
     tasks.value = tasks.value.filter(t => t.id !== taskId)
   }
 
+  function clearCompleted() {
+    tasks.value = tasks.value.filter(t => t.status !== 'completed' && t.status !== 'failed')
+  }
+
   const downloading = ref<Set<string>>(new Set())
 
   async function downloadVideo(task: VideoTask) {
@@ -251,6 +255,6 @@ export function useVideoGeneration() {
     tasks,
     fetchPrice, enhancePrompt,
     submitTextGeneration, submitImg2Video,
-    removeTask, downloadVideo, isDownloading, resumePolling,
+    removeTask, clearCompleted, downloadVideo, isDownloading, resumePolling,
   }
 }

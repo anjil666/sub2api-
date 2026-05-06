@@ -52,7 +52,7 @@
         </select>
       </div>
     </div>
-    <div class="grid grid-cols-3 gap-2">
+    <div class="grid grid-cols-2 gap-2">
       <div>
         <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400">格式</label>
         <select :value="outputFormat" @change="$emit('update:outputFormat', ($event.target as HTMLSelectElement).value)" class="input !py-1 !text-xs">
