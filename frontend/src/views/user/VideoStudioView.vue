@@ -115,7 +115,7 @@
             </div>
             <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{{ task.prompt }}</p>
             <div v-if="task.status === 'completed' && task.video_url" class="space-y-2">
-              <video :src="task.video_url" controls class="w-full rounded-md" preload="metadata"></video>
+              <video :src="proxyVideoUrl(task.video_url)" controls class="w-full rounded-md" preload="metadata"></video>
               <button @click="downloadVideo(task)" :disabled="isDownloading(task.id)"
                 class="block w-full text-center text-xs text-primary-500 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-wait">
                 {{ isDownloading(task.id) ? '下载中...' : '下载视频' }}
@@ -145,6 +145,12 @@ const {
 } = useVideoGeneration()
 
 const fileInput = ref<HTMLInputElement | null>(null)
+
+function proxyVideoUrl(url: string): string {
+  if (!url) return ''
+  const token = localStorage.getItem('auth_token') || ''
+  return `/api/v1/video/proxy?url=${encodeURIComponent(url)}&token=${encodeURIComponent(token)}`
+}
 
 function onImageChange(e: Event) {
   const input = e.target as HTMLInputElement

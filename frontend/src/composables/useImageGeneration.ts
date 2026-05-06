@@ -37,6 +37,7 @@ export interface GenerationTask {
   _abort?: AbortController
   outputFormat: 'png' | 'jpeg' | 'webp'
   outputCompression: number
+  background: string
   quality?: string
 }
 
@@ -253,6 +254,7 @@ export function useImageGeneration() {
   const customH = ref(1024)
   const outputFormat = ref<'png' | 'jpeg' | 'webp'>('png')
   const outputCompression = ref(90)
+  const background = ref('auto')
   const stylePreset = ref(STYLE_PRESETS[0])
   const imageCount = ref(1)
   const prompt = ref('')
@@ -388,6 +390,7 @@ export function useImageGeneration() {
         }
         if (task.size !== 'auto') body.size = task.size
         if (task.quality) body.quality = task.quality
+        if (task.background && task.background !== 'auto') body.background = task.background
         if ((task.outputFormat === 'jpeg' || task.outputFormat === 'webp') && task.outputCompression < 100) {
           body.output_compression = task.outputCompression
         }
@@ -399,6 +402,7 @@ export function useImageGeneration() {
         fd.append('prompt', task.prompt)
         if (task.size !== 'auto') fd.append('size', task.size)
         if (task.quality) fd.append('quality', task.quality)
+        if (task.background && task.background !== 'auto') fd.append('background', task.background)
         fd.append('output_format', task.outputFormat)
         if ((task.outputFormat === 'jpeg' || task.outputFormat === 'webp') && task.outputCompression < 100) {
           fd.append('output_compression', String(task.outputCompression))
@@ -472,6 +476,7 @@ export function useImageGeneration() {
       status: 'pending', urls: [], model: selectedModel.value, size: sizeString.value,
       style: stylePreset.value.label, imageCount: imageCount.value,
       outputFormat: outputFormat.value, outputCompression: outputCompression.value,
+      background: background.value,
       quality: qualityString.value,
     })
     scheduleQueue()
@@ -485,6 +490,7 @@ export function useImageGeneration() {
       status: 'pending', urls: [], model: selectedModel.value, size: sizeString.value,
       style: stylePreset.value.label, imageCount: imageCount.value,
       outputFormat: outputFormat.value, outputCompression: outputCompression.value,
+      background: background.value,
       quality: qualityString.value,
       editFiles: [...multiFiles.value], maskFile: maskFile.value,
     })
@@ -535,6 +541,7 @@ export function useImageGeneration() {
           fd.append('prompt', (stylePreset.value.prefix + task.prompt))
           if (sizeString.value !== 'auto') fd.append('size', sizeString.value)
           if (qualityString.value) fd.append('quality', qualityString.value)
+          if (background.value !== 'auto') fd.append('background', background.value)
           fd.append('output_format', outputFormat.value)
           for (const f of task.referenceFiles) {
             const c = await compressImageIfNeeded(f)
@@ -554,6 +561,7 @@ export function useImageGeneration() {
           }
           if (sizeString.value !== 'auto') body.size = sizeString.value
           if (qualityString.value) body.quality = qualityString.value
+          if (background.value !== 'auto') body.background = background.value
           const resp = await api.post('/v1/images/generations', body, { signal: abortController!.signal })
           data = resp.data
         }
@@ -611,6 +619,7 @@ export function useImageGeneration() {
         fd.append('prompt', (stylePreset.value.prefix + scene.prompt))
         if (sizeString.value !== 'auto') fd.append('size', sizeString.value)
         if (qualityString.value) fd.append('quality', qualityString.value)
+        if (background.value !== 'auto') fd.append('background', background.value)
         fd.append('output_format', outputFormat.value)
         for (const f of storyCharacterFiles.value) {
           const c = await compressImageIfNeeded(f)
@@ -677,7 +686,7 @@ export function useImageGeneration() {
   return {
     activeTab, loading, loadingGroups, error, elapsed,
     groups: imageGroups, selectedGroupId, selectedGroup, selectedModel, imageModels, groupApiKey,
-    resolutionTier, selectedRatio, customW, customH, outputFormat, outputCompression,
+    resolutionTier, selectedRatio, customW, customH, outputFormat, outputCompression, background,
     stylePreset, imageCount, prompt, fullPrompt, sizeString, is4KEnabled, qualityOverride, upscaleMode,
     maskFile, multiFiles,
     resultUrls, generationTasks,

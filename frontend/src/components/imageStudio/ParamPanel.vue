@@ -52,11 +52,19 @@
         </select>
       </div>
     </div>
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid grid-cols-3 gap-2">
       <div>
         <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400">格式</label>
         <select :value="outputFormat" @change="$emit('update:outputFormat', ($event.target as HTMLSelectElement).value)" class="input !py-1 !text-xs">
           <option value="png">PNG</option><option value="jpeg">JPEG</option><option value="webp">WebP</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400">背景</label>
+        <select :value="background" @change="onBackgroundChange" class="input !py-1 !text-xs">
+          <option value="auto">自动</option>
+          <option value="transparent">透明</option>
+          <option value="opaque">不透明</option>
         </select>
       </div>
       <div>
@@ -83,6 +91,7 @@ const props = defineProps<{
   customH: number
   outputFormat: string
   outputCompression: number
+  background: string
   stylePreset: StylePreset
   imageCount: number
   qualityOverride: string
@@ -98,6 +107,7 @@ const emit = defineEmits<{
   'update:customH': [v: number]
   'update:outputFormat': [v: string]
   'update:outputCompression': [v: number]
+  'update:background': [v: string]
   'update:stylePreset': [v: StylePreset]
   'update:imageCount': [v: number]
   'update:qualityOverride': [v: string]
@@ -151,5 +161,13 @@ function onStyleChange(e: Event) {
   const label = (e.target as HTMLSelectElement).value
   const s = styles.find(s => s.label === label)
   if (s) emit('update:stylePreset', s)
+}
+
+function onBackgroundChange(e: Event) {
+  const val = (e.target as HTMLSelectElement).value
+  emit('update:background', val)
+  if (val === 'transparent' && props.outputFormat !== 'png') {
+    emit('update:outputFormat', 'png')
+  }
 }
 </script>

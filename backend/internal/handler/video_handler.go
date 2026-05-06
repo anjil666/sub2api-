@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -111,7 +112,7 @@ func (h *VideoHandler) Generate(c *gin.Context) {
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 && price > 0 {
 		go func() {
-			_, _ = h.usageService.Create(c.Request.Context(), service.CreateUsageLogRequest{
+			_, _ = h.usageService.Create(context.Background(), service.CreateUsageLogRequest{
 				UserID:         authSubject.UserID,
 				RequestID:      uuid.New().String(),
 				Model:          req.Model,
@@ -280,7 +281,7 @@ func (h *VideoHandler) GenerateFromImage(c *gin.Context) {
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 && price > 0 {
 		go func() {
-			_, _ = h.usageService.Create(c.Request.Context(), service.CreateUsageLogRequest{
+			_, _ = h.usageService.Create(context.Background(), service.CreateUsageLogRequest{
 				UserID:         authSubject.UserID,
 				RequestID:      uuid.New().String(),
 				Model:          "img2video",

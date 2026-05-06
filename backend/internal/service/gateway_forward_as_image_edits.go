@@ -245,7 +245,7 @@ func parseMultipartImageEdits(body []byte, contentType string) (prompt, size str
 		case "size":
 			data, _ := io.ReadAll(part)
 			size = strings.TrimSpace(string(data))
-		case "image":
+		case "image", "image[]":
 			data, _ := io.ReadAll(part)
 			if len(data) > 0 {
 				images = append(images, data)
