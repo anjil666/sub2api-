@@ -34,3 +34,10 @@ type TimeoutCounterCache interface {
 	// GetTimeoutCountTTL 获取计数器剩余过期时间
 	GetTimeoutCountTTL(ctx context.Context, accountID int64) (time.Duration, error)
 }
+
+// Auth401CounterCache 401 认证错误计数器缓存接口
+type Auth401CounterCache interface {
+	IncrementAuth401Count(ctx context.Context, accountID int64, windowMinutes int) (int64, error)
+	ResetAuth401Count(ctx context.Context, accountID int64) error
+	GetAuth401CountTTL(ctx context.Context, accountID int64) (time.Duration, error)
+}

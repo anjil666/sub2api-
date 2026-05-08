@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -23,6 +24,7 @@ type RateLimitService struct {
 	geminiQuotaService    *GeminiQuotaService
 	tempUnschedCache      TempUnschedCache
 	timeoutCounterCache   TimeoutCounterCache
+	auth401CounterCache   Auth401CounterCache
 	settingService        *SettingService
 	tokenCacheInvalidator TokenCacheInvalidator
 	usageCacheMu          sync.RWMutex
@@ -67,6 +69,11 @@ func NewRateLimitService(accountRepo AccountRepository, usageRepo UsageLogReposi
 // SetTimeoutCounterCache 设置超时计数器缓存（可选依赖）
 func (s *RateLimitService) SetTimeoutCounterCache(cache TimeoutCounterCache) {
 	s.timeoutCounterCache = cache
+}
+
+// SetAuth401CounterCache 设置 401 认证错误计数器缓存（可选依赖）
+func (s *RateLimitService) SetAuth401CounterCache(cache Auth401CounterCache) {
+	s.auth401CounterCache = cache
 }
 
 // SetSettingService 设置系统设置服务（可选依赖）
@@ -210,10 +217,25 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 			}
 			shouldDisable = true
 		} else {
-			// 非 OAuth / Antigravity OAuth：保持 SetError 行为
+			// 非 OAuth：使用计数器，连续 6 次 401 才标记 error，避免上游临时故障导致永久禁用
 			msg := "Authentication failed (401): invalid or expired credentials"
 			if upstreamMsg != "" {
 				msg = "Authentication failed (401): " + upstreamMsg
+			}
+			if s.auth401CounterCache != nil {
+				count, err := s.auth401CounterCache.IncrementAuth401Count(ctx, account.ID, 30)
+				if err != nil {
+					slog.Warn("auth401_counter_increment_failed", "account_id", account.ID, "error", err)
+				}
+				if count < 6 {
+					cooldownMinutes := 5
+					until := time.Now().Add(time.Duration(cooldownMinutes) * time.Minute)
+					_ = s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, fmt.Sprintf("%s (attempt %d/6)", msg, count))
+					slog.Info("auth401_temp_cooldown", "account_id", account.ID, "count", count, "until", until)
+					shouldDisable = true
+					break
+				}
+				slog.Warn("auth401_threshold_reached", "account_id", account.ID, "count", count)
 			}
 			s.handleAuthError(ctx, account, msg)
 			shouldDisable = true
@@ -226,10 +248,24 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 			shouldDisable = true
 			break
 		}
-		// 支付要求：余额不足或计费问题，停止调度
+		// 支付要求：余额不足或计费问题，使用计数器阈值
 		msg := "Payment required (402): insufficient balance or billing issue"
 		if upstreamMsg != "" {
 			msg = "Payment required (402): " + upstreamMsg
+		}
+		if s.auth401CounterCache != nil {
+			count, err := s.auth401CounterCache.IncrementAuth401Count(ctx, account.ID, 30)
+			if err != nil {
+				slog.Warn("auth_error_counter_increment_failed", "account_id", account.ID, "status", 402, "error", err)
+			}
+			if count < 6 {
+				until := time.Now().Add(5 * time.Minute)
+				_ = s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, fmt.Sprintf("%s (attempt %d/6)", msg, count))
+				slog.Info("auth_error_temp_cooldown", "account_id", account.ID, "status", 402, "count", count)
+				shouldDisable = true
+				break
+			}
+			slog.Warn("auth_error_threshold_reached", "account_id", account.ID, "status", 402, "count", count)
 		}
 		s.handleAuthError(ctx, account, msg)
 		shouldDisable = true
@@ -657,10 +693,23 @@ func (s *RateLimitService) handle403(ctx context.Context, account *Account, upst
 	if account.Platform == PlatformAntigravity {
 		return s.handleAntigravity403(ctx, account, upstreamMsg, responseBody)
 	}
-	// 非 Antigravity 平台：保持原有行为
+	// 非 Antigravity 平台：使用计数器阈值
 	msg := "Access forbidden (403): account may be suspended or lack permissions"
 	if upstreamMsg != "" {
 		msg = "Access forbidden (403): " + upstreamMsg
+	}
+	if s.auth401CounterCache != nil {
+		count, err := s.auth401CounterCache.IncrementAuth401Count(ctx, account.ID, 30)
+		if err != nil {
+			slog.Warn("auth_error_counter_increment_failed", "account_id", account.ID, "status", 403, "error", err)
+		}
+		if count < 6 {
+			until := time.Now().Add(5 * time.Minute)
+			_ = s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, fmt.Sprintf("%s (attempt %d/6)", msg, count))
+			slog.Info("auth_error_temp_cooldown", "account_id", account.ID, "status", 403, "count", count)
+			return true
+		}
+		slog.Warn("auth_error_threshold_reached", "account_id", account.ID, "status", 403, "count", count)
 	}
 	s.handleAuthError(ctx, account, msg)
 	return true
@@ -696,10 +745,23 @@ func (s *RateLimitService) handleAntigravity403(ctx context.Context, account *Ac
 		return true
 
 	default:
-		// 通用 403: 保持原有行为
+		// 通用 403: 使用计数器阈值，避免上游临时故障导致永久禁用
 		msg := "Access forbidden (403): account may be suspended or lack permissions"
 		if upstreamMsg != "" {
 			msg = "Access forbidden (403): " + upstreamMsg
+		}
+		if s.auth401CounterCache != nil {
+			count, err := s.auth401CounterCache.IncrementAuth401Count(ctx, account.ID, 30)
+			if err != nil {
+				slog.Warn("auth_error_counter_increment_failed", "account_id", account.ID, "status", 403, "error", err)
+			}
+			if count < 6 {
+				until := time.Now().Add(5 * time.Minute)
+				_ = s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, fmt.Sprintf("%s (attempt %d/6)", msg, count))
+				slog.Info("auth_error_temp_cooldown", "account_id", account.ID, "status", 403, "count", count)
+				return true
+			}
+			slog.Warn("auth_error_threshold_reached", "account_id", account.ID, "status", 403, "count", count)
 		}
 		s.handleAuthError(ctx, account, msg)
 		return true
