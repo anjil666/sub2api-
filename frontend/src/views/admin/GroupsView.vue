@@ -645,7 +645,7 @@
             <div>
               <label class="input-label">1K ($)</label>
               <input
-                v-model.number="createForm.image_price_1k"
+                v-model="createForm.image_price_1k"
                 type="number"
                 step="0.001"
                 class="input"
@@ -655,7 +655,7 @@
             <div>
               <label class="input-label">2K ($)</label>
               <input
-                v-model.number="createForm.image_price_2k"
+                v-model="createForm.image_price_2k"
                 type="number"
                 step="0.001"
                 class="input"
@@ -665,11 +665,11 @@
             <div>
               <label class="input-label">4K ($)</label>
               <input
-                v-model.number="createForm.image_price_4k"
+                v-model="createForm.image_price_4k"
                 type="number"
                 step="0.001"
                 class="input"
-                placeholder="0.268"
+                placeholder="留空使用默认"
               />
             </div>
           </div>
@@ -1799,7 +1799,7 @@
             <div>
               <label class="input-label">1K ($)</label>
               <input
-                v-model.number="editForm.image_price_1k"
+                v-model="editForm.image_price_1k"
                 type="number"
                 step="0.001"
                 class="input"
@@ -1809,7 +1809,7 @@
             <div>
               <label class="input-label">2K ($)</label>
               <input
-                v-model.number="editForm.image_price_2k"
+                v-model="editForm.image_price_2k"
                 type="number"
                 step="0.001"
                 class="input"
@@ -1819,7 +1819,7 @@
             <div>
               <label class="input-label">4K ($)</label>
               <input
-                v-model.number="editForm.image_price_4k"
+                v-model="editForm.image_price_4k"
                 type="number"
                 step="0.001"
                 class="input"
@@ -3572,15 +3572,19 @@ const handleCreateGroup = async () => {
             })
           : undefined,
     };
-    // v-model.number 清空输入框时产生 ""，转为 null 让后端设为无限制
-    const emptyToNull = (v: any) => (v === "" || (typeof v === "number" && isNaN(v)) ? null : v);
-    requestData.daily_limit_usd = emptyToNull(requestData.daily_limit_usd);
-    requestData.weekly_limit_usd = emptyToNull(requestData.weekly_limit_usd);
-    requestData.monthly_limit_usd = emptyToNull(requestData.monthly_limit_usd);
-    requestData.video_price = emptyToNull(requestData.video_price);
-    requestData.image_price_1k = emptyToNull(requestData.image_price_1k);
-    requestData.image_price_2k = emptyToNull(requestData.image_price_2k);
-    requestData.image_price_4k = emptyToNull(requestData.image_price_4k);
+    // 清空输入框时转为 null，有值时转为数字
+    const toNullableNumber = (v: any) => {
+      if (v === "" || v === null || v === undefined || (typeof v === "number" && isNaN(v))) return null;
+      const n = Number(v);
+      return isNaN(n) ? null : n;
+    };
+    requestData.daily_limit_usd = toNullableNumber(requestData.daily_limit_usd);
+    requestData.weekly_limit_usd = toNullableNumber(requestData.weekly_limit_usd);
+    requestData.monthly_limit_usd = toNullableNumber(requestData.monthly_limit_usd);
+    requestData.video_price = toNullableNumber(requestData.video_price);
+    requestData.image_price_1k = toNullableNumber(requestData.image_price_1k);
+    requestData.image_price_2k = toNullableNumber(requestData.image_price_2k);
+    requestData.image_price_4k = toNullableNumber(requestData.image_price_4k);
     await adminAPI.groups.create(requestData);
     appStore.showSuccess(t("admin.groups.groupCreated"));
     closeCreateModal();
@@ -3703,15 +3707,19 @@ const handleUpdateGroup = async () => {
             })
           : undefined,
     };
-    // v-model.number 清空输入框时产生 ""，转为 null 让后端设为无限制
-    const emptyToNull = (v: any) => (v === "" || (typeof v === "number" && isNaN(v)) ? null : v);
-    payload.daily_limit_usd = emptyToNull(payload.daily_limit_usd);
-    payload.weekly_limit_usd = emptyToNull(payload.weekly_limit_usd);
-    payload.monthly_limit_usd = emptyToNull(payload.monthly_limit_usd);
-    payload.video_price = emptyToNull(payload.video_price);
-    payload.image_price_1k = emptyToNull(payload.image_price_1k);
-    payload.image_price_2k = emptyToNull(payload.image_price_2k);
-    payload.image_price_4k = emptyToNull(payload.image_price_4k);
+    // 清空输入框时转为 null，有值时转为数字
+    const toNullableNumber = (v: any) => {
+      if (v === "" || v === null || v === undefined || (typeof v === "number" && isNaN(v))) return null;
+      const n = Number(v);
+      return isNaN(n) ? null : n;
+    };
+    payload.daily_limit_usd = toNullableNumber(payload.daily_limit_usd);
+    payload.weekly_limit_usd = toNullableNumber(payload.weekly_limit_usd);
+    payload.monthly_limit_usd = toNullableNumber(payload.monthly_limit_usd);
+    payload.video_price = toNullableNumber(payload.video_price);
+    payload.image_price_1k = toNullableNumber(payload.image_price_1k);
+    payload.image_price_2k = toNullableNumber(payload.image_price_2k);
+    payload.image_price_4k = toNullableNumber(payload.image_price_4k);
     await adminAPI.groups.update(editingGroup.value.id, payload);
     appStore.showSuccess(t("admin.groups.groupUpdated"));
     closeEditModal();
