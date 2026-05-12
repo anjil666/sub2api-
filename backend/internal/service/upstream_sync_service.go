@@ -493,8 +493,11 @@ func (s *UpstreamSyncService) syncSiteAPIKeyMode(ctx context.Context, site *Upst
 		return SyncResult{Error: err.Error()}
 	}
 
-	// 4. 更新 managed resource 的关联 ID 和模型数
-	_ = s.resourceRepo.UpdateManagedIDs(ctx, res.ID, &groupID, &accountID, &channelID)
+	// 4. 更新 managed resource 的关联 ID 和模型数（重试一次防止丢失关联）
+	if err := s.resourceRepo.UpdateManagedIDs(ctx, res.ID, &groupID, &accountID, &channelID); err != nil {
+		log.Printf("[UpstreamSync] Warning: UpdateManagedIDs failed (retry once): %v", err)
+		_ = s.resourceRepo.UpdateManagedIDs(ctx, res.ID, &groupID, &accountID, &channelID)
+	}
 	_ = s.resourceRepo.UpdateModelCount(ctx, res.ID, len(models))
 
 	return SyncResult{
@@ -634,8 +637,11 @@ func (s *UpstreamSyncService) syncSiteLoginMode(ctx context.Context, site *Upstr
 			continue
 		}
 
-		// 更新关联 ID 和模型数
-		_ = s.resourceRepo.UpdateManagedIDs(ctx, res.ID, &groupID, &accountID, &channelID)
+		// 更新关联 ID 和模型数（重试一次防止丢失关联导致重复创建）
+		if err := s.resourceRepo.UpdateManagedIDs(ctx, res.ID, &groupID, &accountID, &channelID); err != nil {
+			log.Printf("[UpstreamSync] Warning: UpdateManagedIDs failed (retry once): %v", err)
+			_ = s.resourceRepo.UpdateManagedIDs(ctx, res.ID, &groupID, &accountID, &channelID)
+		}
 		_ = s.resourceRepo.UpdateModelCount(ctx, res.ID, len(models))
 
 		totalModels += len(models)
@@ -1104,6 +1110,17 @@ func (s *UpstreamSyncService) ensureAccount(ctx context.Context, site *UpstreamS
 			return existingAccount.ID, nil
 		}
 		log.Printf("[UpstreamSync] Managed account %d not found, will recreate", *existing.ManagedAccountID)
+	}
+
+	// 二次去重：搜索已有账号，比对 API Key 防止重复创建
+	if apiKey != "" {
+		existingAccounts, _, _ := s.adminService.ListAccounts(ctx, 1, 200, "", "", "", "", 0, "", "", "")
+		for i := range existingAccounts {
+			if existingAccounts[i].GetCredential("api_key") == apiKey {
+				log.Printf("[UpstreamSync] Found existing account %d with same API key, reusing", existingAccounts[i].ID)
+				return existingAccounts[i].ID, nil
+			}
+		}
 	}
 
 	// 创建新账号
