@@ -334,6 +334,15 @@ func (s *GatewayService) forwardImageViaChatCompletions(
 	// Extract image from chat completions response and convert to image generations format
 	imageData := extractImageFromChatResponse(respBody)
 	if imageData == "" {
+		// Log full response for debugging (truncated)
+		respSnippet := string(respBody)
+		if len(respSnippet) > 1000 {
+			respSnippet = respSnippet[:1000]
+		}
+		logger.L().Error("image_via_chat: no image found in upstream response",
+			zap.String("response_snippet", respSnippet),
+			zap.String("model", originalModel),
+		)
 		// No image found — extract upstream text content for diagnostics
 		upstreamText := gjson.GetBytes(respBody, "choices.0.message.content").String()
 		if len(upstreamText) > 200 {
