@@ -10,6 +10,7 @@
               {{ cleanGroupName(g.group_name) }}
               <template v-if="g.billing_display"> · {{ g.billing_display }}</template>
               <template v-else-if="g.image_price_1k"> · ${{ g.image_price_1k }}/次</template>
+              <template v-else-if="g.rate_multiplier && g.rate_multiplier !== 1"> · {{ g.rate_multiplier }}x</template>
             </option>
           </select>
           <span v-if="!groupApiKey && selectedGroupId" class="text-xs text-amber-500">无可用密钥</span>
