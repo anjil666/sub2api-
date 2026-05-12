@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -235,6 +237,7 @@ func (s *GatewayService) forwardImageViaChatCompletions(
 	originalModel := gjson.GetBytes(body, "model").String()
 	prompt := gjson.GetBytes(body, "prompt").String()
 	size := gjson.GetBytes(body, "size").String()
+	quality := gjson.GetBytes(body, "quality").String()
 	imageCount := int(gjson.GetBytes(body, "n").Int())
 	if imageCount <= 0 {
 		imageCount = 1
@@ -248,9 +251,13 @@ func (s *GatewayService) forwardImageViaChatCompletions(
 		"messages": []map[string]any{
 			{"role": "user", "content": prompt},
 		},
+		"modalities": []string{"text", "image"},
 	}
 	if size != "" {
 		chatReq["size"] = size
+	}
+	if quality != "" {
+		chatReq["quality"] = quality
 	}
 
 	chatBody, err := json.Marshal(chatReq)
@@ -327,9 +334,17 @@ func (s *GatewayService) forwardImageViaChatCompletions(
 	// Extract image from chat completions response and convert to image generations format
 	imageData := extractImageFromChatResponse(respBody)
 	if imageData == "" {
-		// No image found, return raw response as error
-		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "No image in upstream response")
-		return nil, fmt.Errorf("no image in chat response")
+		// No image found — extract upstream text content for diagnostics
+		upstreamText := gjson.GetBytes(respBody, "choices.0.message.content").String()
+		if len(upstreamText) > 200 {
+			upstreamText = upstreamText[:200]
+		}
+		errMsg := "No image in upstream response"
+		if upstreamText != "" {
+			errMsg = fmt.Sprintf("No image in upstream response. Upstream replied: %s", upstreamText)
+		}
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", errMsg)
+		return nil, fmt.Errorf("no image in chat response, upstream text: %s", upstreamText)
 	}
 
 	// Build OpenAI image generations response format
@@ -442,4 +457,191 @@ func downloadImageAsBase64(url string) string {
 		return ""
 	}
 	return base64.StdEncoding.EncodeToString(data)
+}
+
+// forwardImageEditsViaChatCompletions converts a multipart /v1/images/edits request
+// into a chat completions request with image content blocks.
+func (s *GatewayService) forwardImageEditsViaChatCompletions(
+	ctx context.Context,
+	c *gin.Context,
+	account *Account,
+	body []byte,
+	contentType string,
+	model string,
+	startTime time.Time,
+) (*ForwardResult, error) {
+	prompt, size, quality, images, err := parseMultipartImageEditsWithQuality(body, contentType)
+	if err != nil {
+		writeGatewayCCError(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse multipart body")
+		return nil, fmt.Errorf("parse multipart for image_via_chat: %w", err)
+	}
+
+	mappedModel := account.GetMappedModel(model)
+
+	// Build content array: text prompt + image(s)
+	contentParts := []map[string]any{
+		{"type": "text", "text": prompt},
+	}
+	for _, img := range images {
+		ct := http.DetectContentType(img)
+		dataURL := "data:" + ct + ";base64," + base64.StdEncoding.EncodeToString(img)
+		contentParts = append(contentParts, map[string]any{
+			"type": "image_url",
+			"image_url": map[string]any{
+				"url": dataURL,
+			},
+		})
+	}
+
+	chatReq := map[string]any{
+		"model": mappedModel,
+		"messages": []map[string]any{
+			{"role": "user", "content": contentParts},
+		},
+		"modalities": []string{"text", "image"},
+	}
+	if size != "" {
+		chatReq["size"] = size
+	}
+	if quality != "" {
+		chatReq["quality"] = quality
+	}
+
+	chatBody, err := json.Marshal(chatReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal chat request: %w", err)
+	}
+
+	baseURL := strings.TrimRight(account.GetCredential("base_url"), "/")
+	validatedURL, err := s.validateUpstreamBaseURL(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid upstream base_url: %w", err)
+	}
+	targetURL := validatedURL + "/v1/chat/completions"
+
+	apiKey := account.GetCredential("api_key")
+	if apiKey == "" {
+		return nil, fmt.Errorf("api_key not found in credentials")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", targetURL, bytes.NewReader(chatBody))
+	if err != nil {
+		return nil, fmt.Errorf("build upstream request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	logger.L().Debug("gateway image_edits_via_chat: forwarding to upstream",
+		zap.Int64("account_id", account.ID),
+		zap.String("target_url", targetURL),
+		zap.String("model", model),
+		zap.Int("image_count", len(images)),
+	)
+
+	proxyURL := ""
+	if account.ProxyID != nil && account.Proxy != nil {
+		proxyURL = account.Proxy.URL()
+	}
+	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
+	if err != nil {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "Upstream request failed")
+		return nil, fmt.Errorf("upstream request failed: %s", sanitizeUpstreamErrorMessage(err.Error()))
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+		writeGatewayCCError(c, mapUpstreamStatusCode(resp.StatusCode), "server_error", extractUpstreamErrorMessage(respBody))
+		return nil, fmt.Errorf("upstream error: %d", resp.StatusCode)
+	}
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 50<<20))
+	if err != nil {
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "Failed to read upstream response")
+		return nil, fmt.Errorf("read upstream response: %w", err)
+	}
+
+	imageData := extractImageFromChatResponse(respBody)
+	if imageData == "" {
+		upstreamText := gjson.GetBytes(respBody, "choices.0.message.content").String()
+		if len(upstreamText) > 200 {
+			upstreamText = upstreamText[:200]
+		}
+		errMsg := "No image in upstream response"
+		if upstreamText != "" {
+			errMsg = fmt.Sprintf("No image in upstream response. Upstream replied: %s", upstreamText)
+		}
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", errMsg)
+		return nil, fmt.Errorf("no image in chat response, upstream text: %s", upstreamText)
+	}
+
+	imgResp := map[string]any{
+		"created": time.Now().Unix(),
+		"data": []map[string]any{
+			{"b64_json": imageData},
+		},
+	}
+	imgRespBody, _ := json.Marshal(imgResp)
+	c.Data(http.StatusOK, "application/json", imgRespBody)
+
+	imageSize := parseOpenAIImageSize(size)
+	upstreamModel := ""
+	if mappedModel != model {
+		upstreamModel = mappedModel
+	}
+	return &ForwardResult{
+		RequestID:     resp.Header.Get("x-request-id"),
+		Model:         model,
+		UpstreamModel: upstreamModel,
+		Stream:        false,
+		Duration:      time.Since(startTime),
+		ImageCount:    1,
+		ImageSize:     imageSize,
+	}, nil
+}
+
+// parseMultipartImageEditsWithQuality parses a multipart image edit request body,
+// extracting prompt, size, quality, and image files.
+func parseMultipartImageEditsWithQuality(body []byte, contentType string) (prompt, size, quality string, images [][]byte, err error) {
+	_, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return "", "", "", nil, fmt.Errorf("parse content-type: %w", err)
+	}
+	boundary := params["boundary"]
+	if boundary == "" {
+		return "", "", "", nil, fmt.Errorf("no boundary in content-type")
+	}
+
+	reader := multipart.NewReader(bytes.NewReader(body), boundary)
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", "", "", nil, fmt.Errorf("read part: %w", err)
+		}
+		name := part.FormName()
+		switch name {
+		case "prompt":
+			data, _ := io.ReadAll(part)
+			prompt = strings.TrimSpace(string(data))
+		case "size":
+			data, _ := io.ReadAll(part)
+			size = strings.TrimSpace(string(data))
+		case "quality":
+			data, _ := io.ReadAll(part)
+			quality = strings.TrimSpace(string(data))
+		case "image", "image[]":
+			data, _ := io.ReadAll(part)
+			if len(data) > 0 {
+				images = append(images, data)
+			}
+		}
+		_ = part.Close()
+	}
+	return prompt, size, quality, images, nil
 }

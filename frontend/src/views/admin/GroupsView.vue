@@ -648,9 +648,8 @@
                 v-model.number="createForm.image_price_1k"
                 type="number"
                 step="0.001"
-                min="0"
                 class="input"
-                placeholder="0.134"
+                placeholder="留空使用默认"
               />
             </div>
             <div>
@@ -659,9 +658,8 @@
                 v-model.number="createForm.image_price_2k"
                 type="number"
                 step="0.001"
-                min="0"
                 class="input"
-                placeholder="0.201"
+                placeholder="留空使用默认"
               />
             </div>
             <div>
@@ -670,7 +668,6 @@
                 v-model.number="createForm.image_price_4k"
                 type="number"
                 step="0.001"
-                min="0"
                 class="input"
                 placeholder="0.268"
               />
@@ -1805,9 +1802,8 @@
                 v-model.number="editForm.image_price_1k"
                 type="number"
                 step="0.001"
-                min="0"
                 class="input"
-                placeholder="0.134"
+                placeholder="留空使用默认"
               />
             </div>
             <div>
@@ -1816,9 +1812,8 @@
                 v-model.number="editForm.image_price_2k"
                 type="number"
                 step="0.001"
-                min="0"
                 class="input"
-                placeholder="0.201"
+                placeholder="留空使用默认"
               />
             </div>
             <div>
@@ -1827,9 +1822,8 @@
                 v-model.number="editForm.image_price_4k"
                 type="number"
                 step="0.001"
-                min="0"
                 class="input"
-                placeholder="0.268"
+                placeholder="留空使用默认"
               />
             </div>
           </div>
@@ -3584,6 +3578,9 @@ const handleCreateGroup = async () => {
     requestData.weekly_limit_usd = emptyToNull(requestData.weekly_limit_usd);
     requestData.monthly_limit_usd = emptyToNull(requestData.monthly_limit_usd);
     requestData.video_price = emptyToNull(requestData.video_price);
+    requestData.image_price_1k = emptyToNull(requestData.image_price_1k);
+    requestData.image_price_2k = emptyToNull(requestData.image_price_2k);
+    requestData.image_price_4k = emptyToNull(requestData.image_price_4k);
     await adminAPI.groups.create(requestData);
     appStore.showSuccess(t("admin.groups.groupCreated"));
     closeCreateModal();
@@ -3712,6 +3709,9 @@ const handleUpdateGroup = async () => {
     payload.weekly_limit_usd = emptyToNull(payload.weekly_limit_usd);
     payload.monthly_limit_usd = emptyToNull(payload.monthly_limit_usd);
     payload.video_price = emptyToNull(payload.video_price);
+    payload.image_price_1k = emptyToNull(payload.image_price_1k);
+    payload.image_price_2k = emptyToNull(payload.image_price_2k);
+    payload.image_price_4k = emptyToNull(payload.image_price_4k);
     await adminAPI.groups.update(editingGroup.value.id, payload);
     appStore.showSuccess(t("admin.groups.groupUpdated"));
     closeEditModal();

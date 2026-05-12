@@ -41,6 +41,11 @@ func (s *GatewayService) ForwardAsImageEdits(
 		return s.forwardImageEditsAsGrsaiDraw(ctx, c, account, body, contentType, model, startTime)
 	}
 
+	// image_via_chat 标记：通过 /v1/chat/completions 做图
+	if account.GetCredential("image_via_chat") == "true" {
+		return s.forwardImageEditsViaChatCompletions(ctx, c, account, body, contentType, model, startTime)
+	}
+
 	mappedModel := account.GetMappedModel(model)
 
 	baseURL := strings.TrimRight(account.GetCredential("base_url"), "/")
