@@ -180,11 +180,9 @@
           </template>
 
           <template #cell-rate_multiplier="{ value, row }">
-            <span v-if="row.billing_display" class="text-sm font-medium text-blue-600 dark:text-blue-400"
+            <span class="text-sm text-gray-700 dark:text-gray-300">{{ value }}x</span>
+            <span v-if="row.billing_display" class="ml-1 text-xs text-blue-500 dark:text-blue-400"
               >{{ row.billing_display }}</span
-            >
-            <span v-else class="text-sm text-gray-700 dark:text-gray-300"
-              >{{ value }}x</span
             >
           </template>
 
