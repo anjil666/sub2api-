@@ -167,6 +167,7 @@ export function useVideoGeneration() {
       formData.append('aspect_ratio', aspectRatio.value)
       const { data } = await apiClient.post('/video/img2video', formData, {
         timeout: 600000,
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
       const resp = data.data || data
       const task: VideoTask = {
