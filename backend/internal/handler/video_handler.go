@@ -100,7 +100,7 @@ func (h *VideoHandler) Generate(c *gin.Context) {
 		proxyReq.Header.Set("Authorization", "Bearer "+proxyToken)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: 300 * time.Second}
 	resp, err := client.Do(proxyReq)
 	if err != nil {
 		response.Error(c, http.StatusBadGateway, "proxy error: "+err.Error())
@@ -142,7 +142,7 @@ func (h *VideoHandler) GetStatus(c *gin.Context) {
 		proxyReq.Header.Set("Authorization", "Bearer "+proxyToken)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: 300 * time.Second}
 	resp, err := client.Do(proxyReq)
 	if err != nil {
 		response.Error(c, http.StatusBadGateway, "proxy error: "+err.Error())
@@ -211,7 +211,7 @@ func (h *VideoHandler) EnhancePrompt(c *gin.Context) {
 		proxyReq.Header.Set("Authorization", "Bearer "+proxyToken)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: 300 * time.Second}
 	resp, err := client.Do(proxyReq)
 	if err != nil {
 		response.Error(c, http.StatusBadGateway, "proxy error: "+err.Error())
@@ -269,7 +269,7 @@ func (h *VideoHandler) GenerateFromImage(c *gin.Context) {
 		proxyReq.Header.Set("Authorization", "Bearer "+proxyToken)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: 300 * time.Second}
 	resp, err := client.Do(proxyReq)
 	if err != nil {
 		response.Error(c, http.StatusBadGateway, "proxy error: "+err.Error())
