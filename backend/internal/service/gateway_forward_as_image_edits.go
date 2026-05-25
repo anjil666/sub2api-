@@ -294,6 +294,7 @@ func (s *GatewayService) forwardImageEditsAsJSON(
 	jsonReq := map[string]any{
 		"model":  mappedModel,
 		"prompt": prompt,
+		"async":  true,
 	}
 	if size != "" {
 		jsonReq["size"] = size
@@ -363,14 +364,29 @@ func (s *GatewayService) forwardImageEditsAsJSON(
 		return nil, fmt.Errorf("upstream error: %d %s", resp.StatusCode, upstreamMsg)
 	}
 
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 50<<20))
+	submitBody, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 	if err != nil {
-		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "Failed to read upstream response")
-		return nil, fmt.Errorf("read upstream response: %w", err)
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "Failed to read async submit response")
+		return nil, fmt.Errorf("read async submit response: %w", err)
 	}
 
-	respBody = convertImageURLsToBase64(respBody)
-	c.Data(resp.StatusCode, "application/json", respBody)
+	var asyncResp struct {
+		ID     string `json:"id"`
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(submitBody, &asyncResp); err != nil || asyncResp.ID == "" {
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "Invalid async response from upstream")
+		return nil, fmt.Errorf("parse async response: body=%s err=%v", string(submitBody), err)
+	}
+
+	resultBody, err := s.pollAsyncImageTask(ctx, validatedURL, apiKey, asyncResp.ID)
+	if err != nil {
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", err.Error())
+		return nil, fmt.Errorf("async poll failed: %w", err)
+	}
+
+	resultBody = convertImageURLsToBase64(resultBody)
+	c.Data(http.StatusOK, "application/json", resultBody)
 
 	imageSize := parseOpenAIImageSize(size)
 	upstreamModel := ""
@@ -386,4 +402,73 @@ func (s *GatewayService) forwardImageEditsAsJSON(
 		ImageCount:    1,
 		ImageSize:     imageSize,
 	}, nil
+}
+
+func (s *GatewayService) pollAsyncImageTask(ctx context.Context, baseURL, apiKey, taskID string) ([]byte, error) {
+	pollURL := strings.TrimRight(baseURL, "/") + "/v1/images/" + taskID
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for i := 0; i < 120; i++ {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("client disconnected while polling task %s", taskID)
+		case <-ticker.C:
+		}
+
+		req, err := http.NewRequestWithContext(ctx, "GET", pollURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("build poll request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			logger.L().Warn("poll async image task: request failed, retrying",
+				zap.String("task_id", taskID), zap.Error(err))
+			continue
+		}
+
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 50<<20))
+		_ = resp.Body.Close()
+
+		if resp.StatusCode >= 500 {
+			logger.L().Warn("poll async image task: server error, retrying",
+				zap.String("task_id", taskID), zap.Int("status", resp.StatusCode))
+			continue
+		}
+		if resp.StatusCode >= 400 {
+			return nil, fmt.Errorf("poll task %s returned %d: %s", taskID, resp.StatusCode, string(body))
+		}
+
+		var status struct {
+			Status string `json:"status"`
+			Error  struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(body, &status); err != nil {
+			return nil, fmt.Errorf("parse poll response: %w", err)
+		}
+
+		switch status.Status {
+		case "completed":
+			logger.L().Info("poll async image task: completed",
+				zap.String("task_id", taskID), zap.Int("attempt", i+1))
+			return body, nil
+		case "failed":
+			msg := status.Error.Message
+			if msg == "" {
+				msg = "task failed without error message"
+			}
+			return nil, fmt.Errorf("async task %s failed: %s", taskID, msg)
+		default:
+			logger.L().Debug("poll async image task: still pending",
+				zap.String("task_id", taskID), zap.String("status", status.Status), zap.Int("attempt", i+1))
+		}
+	}
+
+	return nil, fmt.Errorf("async task %s timed out after 10 minutes", taskID)
 }
