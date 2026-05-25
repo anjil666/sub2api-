@@ -184,7 +184,7 @@ func convertImageURLsToBase64(respBody []byte) []byte {
 	if !ok {
 		return respBody
 	}
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: 180 * time.Second}
 	for _, item := range dataSlice {
 		m, ok := item.(map[string]any)
 		if !ok {
@@ -447,7 +447,7 @@ func extractBase64FromDataURL(s string) string {
 }
 
 func downloadImageAsBase64(url string) string {
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: 180 * time.Second}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return ""

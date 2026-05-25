@@ -8690,8 +8690,14 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 
 	if groupID != nil {
 		accounts, err = s.accountRepo.ListSchedulableByGroupID(ctx, *groupID)
+		if err != nil || len(accounts) == 0 {
+			accounts, err = s.accountRepo.ListByGroup(ctx, *groupID)
+		}
 	} else {
 		accounts, err = s.accountRepo.ListSchedulable(ctx)
+		if err != nil || len(accounts) == 0 {
+			accounts, err = s.accountRepo.ListActive(ctx)
+		}
 	}
 
 	if err != nil || len(accounts) == 0 {
