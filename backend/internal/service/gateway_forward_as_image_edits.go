@@ -46,6 +46,11 @@ func (s *GatewayService) ForwardAsImageEdits(
 		return s.forwardImageEditsViaChatCompletions(ctx, c, account, body, contentType, model, startTime)
 	}
 
+	// edits_as_json: 上游的 /v1/images/edits 接口只接受 JSON（非 multipart）
+	if account.GetCredential("edits_as_json") == "true" {
+		return s.forwardImageEditsAsJSON(ctx, c, account, body, contentType, model, startTime)
+	}
+
 	mappedModel := account.GetMappedModel(model)
 
 	baseURL := strings.TrimRight(account.GetCredential("base_url"), "/")
@@ -267,4 +272,118 @@ func credentialKeys(creds map[string]any) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+func (s *GatewayService) forwardImageEditsAsJSON(
+	ctx context.Context,
+	c *gin.Context,
+	account *Account,
+	body []byte,
+	contentType string,
+	model string,
+	startTime time.Time,
+) (*ForwardResult, error) {
+	prompt, size, images, err := parseMultipartImageEdits(body, contentType)
+	if err != nil {
+		writeGatewayCCError(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse multipart body")
+		return nil, fmt.Errorf("parse multipart for edits_as_json: %w", err)
+	}
+
+	mappedModel := account.GetMappedModel(model)
+
+	jsonReq := map[string]any{
+		"model":  mappedModel,
+		"prompt": prompt,
+	}
+	if size != "" {
+		jsonReq["size"] = size
+	}
+	if len(images) > 0 {
+		ct := http.DetectContentType(images[0])
+		jsonReq["image"] = "data:" + ct + ";base64," + base64.StdEncoding.EncodeToString(images[0])
+	}
+
+	jsonBody, err := json.Marshal(jsonReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal json edits request: %w", err)
+	}
+
+	baseURL := strings.TrimRight(account.GetCredential("base_url"), "/")
+	validatedURL, err := s.validateUpstreamBaseURL(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid upstream base_url: %w", err)
+	}
+	targetURL := validatedURL + "/v1/images/edits"
+
+	apiKey := account.GetCredential("api_key")
+	if apiKey == "" {
+		return nil, fmt.Errorf("api_key not found in credentials")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", targetURL, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("build upstream request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	proxyURL := ""
+	if account.ProxyID != nil && account.Proxy != nil {
+		proxyURL = account.Proxy.URL()
+	}
+	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
+	if err != nil {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "Upstream request failed")
+		return nil, fmt.Errorf("upstream request failed: %s", sanitizeUpstreamErrorMessage(err.Error()))
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+		upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
+		upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
+		if s.shouldFailoverUpstreamError(resp.StatusCode) {
+			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+				Platform:           account.Platform,
+				AccountID:          account.ID,
+				AccountName:        account.Name,
+				UpstreamStatusCode: resp.StatusCode,
+				Kind:               "failover",
+				Message:            upstreamMsg,
+			})
+			if s.rateLimitService != nil {
+				s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
+			}
+			return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode, ResponseBody: respBody}
+		}
+		writeGatewayCCError(c, mapUpstreamStatusCode(resp.StatusCode), "server_error", upstreamMsg)
+		return nil, fmt.Errorf("upstream error: %d %s", resp.StatusCode, upstreamMsg)
+	}
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 50<<20))
+	if err != nil {
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", "Failed to read upstream response")
+		return nil, fmt.Errorf("read upstream response: %w", err)
+	}
+
+	respBody = convertImageURLsToBase64(respBody)
+	c.Data(resp.StatusCode, "application/json", respBody)
+
+	imageSize := parseOpenAIImageSize(size)
+	upstreamModel := ""
+	if mappedModel != model {
+		upstreamModel = mappedModel
+	}
+	return &ForwardResult{
+		RequestID:     resp.Header.Get("x-request-id"),
+		Model:         model,
+		UpstreamModel: upstreamModel,
+		Stream:        false,
+		Duration:      time.Since(startTime),
+		ImageCount:    1,
+		ImageSize:     imageSize,
+	}, nil
 }
