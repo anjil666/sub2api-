@@ -385,6 +385,7 @@ func (s *GatewayService) forwardImageEditsAsJSON(
 		return nil, fmt.Errorf("async poll failed: %w", err)
 	}
 
+	resultBody = normalizeAsyncImageResponse(resultBody)
 	resultBody = convertImageURLsToBase64(resultBody)
 	c.Data(http.StatusOK, "application/json", resultBody)
 
@@ -471,4 +472,51 @@ func (s *GatewayService) pollAsyncImageTask(ctx context.Context, baseURL, apiKey
 	}
 
 	return nil, fmt.Errorf("async task %s timed out after 10 minutes", taskID)
+}
+
+// normalizeAsyncImageResponse converts non-standard upstream async responses
+// into standard OpenAI format. The upstream returns image URLs inside
+// detail.data[].download_url instead of the standard data[].url.
+func normalizeAsyncImageResponse(body []byte) []byte {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return body
+	}
+
+	if _, hasData := raw["data"]; hasData {
+		return body
+	}
+
+	var detail struct {
+		Data []struct {
+			DownloadURL string `json:"download_url"`
+			B64JSON     string `json:"b64_json"`
+			URL         string `json:"url"`
+		} `json:"data"`
+	}
+	if detailRaw, ok := raw["detail"]; ok {
+		if err := json.Unmarshal(detailRaw, &detail); err == nil && len(detail.Data) > 0 {
+			dataArr := make([]map[string]string, 0, len(detail.Data))
+			for _, item := range detail.Data {
+				entry := map[string]string{}
+				if item.B64JSON != "" {
+					entry["b64_json"] = item.B64JSON
+				} else if item.URL != "" {
+					entry["url"] = item.URL
+				} else if item.DownloadURL != "" {
+					entry["url"] = item.DownloadURL
+				}
+				if len(entry) > 0 {
+					dataArr = append(dataArr, entry)
+				}
+			}
+			if len(dataArr) > 0 {
+				result := map[string]any{"data": dataArr}
+				if out, err := json.Marshal(result); err == nil {
+					return out
+				}
+			}
+		}
+	}
+	return body
 }
