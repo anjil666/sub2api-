@@ -1560,36 +1560,36 @@ func groupModelsByPricing(modelNames []string, multiplier float64) []pricingGrou
 		}
 
 		key := priceKey{
-			input:         price.InputPerToken * multiplier,
-			output:        price.OutputPerToken * multiplier,
+			input:         price.InputPerToken,
+			output:        price.OutputPerToken,
 			hasInput:      true,
 			hasOutput:     true,
 			hasCacheWrite: price.CacheWritePerToken != nil,
 			hasCacheRead:  price.CacheReadPerToken != nil,
 		}
 		if price.CacheWritePerToken != nil {
-			key.cacheWrite = *price.CacheWritePerToken * multiplier
+			key.cacheWrite = *price.CacheWritePerToken
 		}
 		if price.CacheReadPerToken != nil {
-			key.cacheRead = *price.CacheReadPerToken * multiplier
+			key.cacheRead = *price.CacheReadPerToken
 		}
 
 		if pg, ok := groups[key]; ok {
 			pg.Models = append(pg.Models, name)
 		} else {
-			inputP := price.InputPerToken * multiplier
-			outputP := price.OutputPerToken * multiplier
+			inputP := price.InputPerToken
+			outputP := price.OutputPerToken
 			pg := &pricingGroup{
 				Models:      []string{name},
 				InputPrice:  &inputP,
 				OutputPrice: &outputP,
 			}
 			if price.CacheWritePerToken != nil {
-				v := *price.CacheWritePerToken * multiplier
+				v := *price.CacheWritePerToken
 				pg.CacheWritePrice = &v
 			}
 			if price.CacheReadPerToken != nil {
-				v := *price.CacheReadPerToken * multiplier
+				v := *price.CacheReadPerToken
 				pg.CacheReadPrice = &v
 			}
 			groups[key] = pg
